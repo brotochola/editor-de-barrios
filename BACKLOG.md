@@ -37,7 +37,7 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 - [ ] **Terrenos vacíos** — pendiente. En Carabobo y en Parque Chas, lotes del tamaño de una o dos casas sin casa: con
   basura y yuyos, o sólo basura.
 
-- [ ] **Autos y techos se pelean por el orden** — hecho, falta el commit. Un auto que pasaba detrás de una casa quedaba encima
+- [ ] **Autos y techos se pelean por el orden** — hecho (ef7f96d). Un auto que pasaba detrás de una casa quedaba encima
   del techo, y la medianera de la casa de al lado cruzaba techos: en f00925d los techos se ordenaban por su borde de atrás.
   Ahora un techo se ordena por el borde de adelante de su propia pieza (lo que se le superpone en pantalla está siempre más
   lejos que él); un piso al ras y una tira fina en alto (tapa de muro, alero), por su borde de atrás.
