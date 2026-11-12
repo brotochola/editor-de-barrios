@@ -11,8 +11,8 @@
 // Para cada rumbo en que se usa un diseño (una "variante"): qué se ve; para cada pieza su lugar, escala y skew (la cara
 // plana proyectada en la vista oblicua es un paralelogramo: escala + skewX + skewY la dibujan exacta), el tinte, hacia
 // dónde mira y la altura de su centro (con eso WeedJS la ilumina como una superficie: lighting.faces), el orden de pintor
-// dentro de la casa (innerZ) y la y de orden (en una pared, el punto del piso que tiene debajo; en lo demás, su borde de atrás sobre
-// el piso; subida lo justo para no quedar detrás de una pieza de la casa que tapa; las paredes van en columnas finas, ver PIE_MAX).
+// dentro de la casa (innerZ) y la y de orden (en una pared, el punto del piso que tiene debajo; en lo demás, su borde de adelante
+// sobre el piso; subida lo justo para no quedar detrás de una pieza de la casa que tapa; las caras van en columnas finas: PIE_MAX).
 const Caras = (() => {
   const { SF, K, SYN, CZ } = R3;
   const VIEW = R3.norm([-K, 1, -SYN / CZ]);
@@ -165,6 +165,19 @@ const Caras = (() => {
     // el ancho de columna (texeles a lo largo de la pared) para que el pie no cambie más de PIE_MAX px de pantalla dentro de una
     // pieza: TILE, o TILE/2, TILE/4… E: el borde horizontal de la pieza; n: sus texeles. Una textura se corta una sola vez (si no,
     // va repetida al atlas): con la columna más fina que pida cualquiera de las variantes que la usan (cortes, por su hash y eje)
+    // la y de orden buscada de una pieza (P: su centro; O, E1, E2: su paralelogramo, en m). Una pared: el punto del piso que tiene
+    // debajo (sus columnas son finas). Lo que está en alto y no es vertical (techos, tapas de muros): su borde de adelante sobre el
+    // piso, el de la pieza misma: lo que se superpone en pantalla con un pedazo de techo está siempre más lejos que ese pedazo, así
+    // que el techo tiene que ir después. Un piso al ras (patio, escalón): su borde de atrás, así lo que se para encima va después.
+    // Una tira en alto (tapa de muro, alero, contorno; de menos de 60 cm): también su borde de atrás, así nunca empuja hacia
+    // adelante a la pared que tiene abajo (lo que pase detrás puede quedar encima de una tira de pocos cm: casi no se ve).
+    // (Con el frente de la casa entera, un techo, un piso o una tapa de atrás hacía subir hasta el frente a las paredes que se pintan
+    // después, y la gente parada al costado de una pared quedaba detrás; con el borde de atrás de los techos, la medianera de la casa
+    // de al lado y los autos que pasaban detrás quedaban encima del techo)
+    function buscada(vertical, P, O, E1, E2, tira) {
+      if (vertical) return J([P[0], P[1], 0])[1];
+      const C = [[0, 0], [1, 0], [0, 1], [1, 1]].map(([i, j]) => add(O, add(sc3(E1, i), sc3(E2, j)))), y = C.map(c => J([c[0], c[1], 0])[1]);
+      return tira || Math.max(...C.map(c => c[2])) <= .3 ? Math.min(...y) : Math.max(...y); }
     const cortes = new Map();
     function columna(E, n) { const porTexel = Math.abs(J(E)[1]) / n; let c = TILE; while (c > 8 && c * porTexel > PIE_MAX) c = Math.ceil(c / 2); return c; }
     const BLANCO = { w: 8, h: 8, grid: [{ nombre: "_white", x0: 0, y0: 0, w: 8, h: 8 }] };
@@ -269,16 +282,20 @@ const Caras = (() => {
           continue; }
         const q = it.q, T = q.reg, A = J(q.E1), B = J(q.E2), a = [A[0] / T.w, A[1] / T.w], b = [B[0] / T.h, B[1] / T.h];
         const sx = a[0], sy = b[1], kx = b[0] / b[1], ky = a[1] / a[0];
-        // una pared lisa (la textura blanca teñida) va en columnas: una pieza sola se ordena por el pie de su centro, y en una pared
-        // que corre hacia el fondo el pie sube o baja decenas de px de punta a punta (la gente parada al pie, adelante, quedaba
-        // tapada). Cada columna, de lo que el pie cambia a lo sumo PIE_MAX px de pantalla, se ordena por el pie de la suya
-        if (it.pared && T === BLANCO) {
-          const hor1 = Math.abs(q.E1[2]) <= Math.abs(q.E2[2]), Eh = hor1 ? q.E1 : q.E2, n = Math.max(1, Math.ceil(Math.abs(J(Eh)[1]) / PIE_MAX - 1e-6));
+        // una cara lisa (la textura blanca teñida) va en columnas: una pieza sola se ordena por un solo pie, y en una pared que corre
+        // hacia el fondo (o en la tapa larga de un muro) el pie sube o baja decenas de px de punta a punta (la gente parada al pie,
+        // adelante, quedaba tapada). Se corta a lo largo del borde que más cambia el pie (en una pared, el horizontal), en columnas
+        // donde cambia a lo sumo PIE_MAX px de pantalla. Sólo las paredes que llegan al piso (donde se para la gente): lo demás va
+        // entero (cortado, las piezas se duplicaban; las tiras, ver buscada)
+        const vert = Math.abs(it.F.n[2]) < .1, tira = !vert && Math.min(len(q.E1), len(q.E2)) < .6;
+        if (T === BLANCO && it.pared) {
+          const piso = (E) => Math.abs(J([E[0], E[1], 0])[1]);
+          const hor1 = vert ? Math.abs(q.E1[2]) <= Math.abs(q.E2[2]) : piso(q.E1) >= piso(q.E2), Eh = hor1 ? q.E1 : q.E2, n = Math.max(1, Math.ceil(piso(Eh) / PIE_MAX - 1e-6));
           const e1 = hor1 ? sc3(q.E1, 1 / n) : q.E1, e2 = hor1 ? q.E2 : sc3(q.E2, 1 / n), A1 = J(e1), B1 = J(e2);
           for (let k = 0; k < n; k++) {
             const O = add(q.O, sc3(Eh, k / n)), P = add(O, add(sc3(e1, .5), sc3(e2, .5))), j0 = J(O);
-            // el pie de la columna: el punto del piso bajo su centro (la pared es vertical)
-            tiles.push({ rank: r, cuadro: "_white", p: J(P), sx: A1[0] / 8, sy: B1[1] / 8, kx: B1[0] / B1[1], ky: A1[1] / A1[0], tn: q.tinte, iz, objetivo: J([P[0], P[1], 0])[1], borde: !!q.borde, n: it.F.n, z: P[2], el: it.el,
+            // su y de orden: la de una pieza de dibujo (abajo)
+            tiles.push({ rank: r, cuadro: "_white", p: J(P), sx: A1[0] / 8, sy: B1[1] / 8, kx: B1[0] / B1[1], ky: A1[1] / A1[0], tn: q.tinte, iz, objetivo: buscada(vert, P, O, e1, e2, tira), borde: !!q.borde, n: it.F.n, z: P[2], el: it.el,
               uv: hor1 ? [k / n, 0, (k + 1) / n, 1] : [0, k / n, 1, (k + 1) / n], poli: [j0, [j0[0] + A1[0], j0[1] + A1[1]], [j0[0] + A1[0] + B1[0], j0[1] + A1[1] + B1[1]], [j0[0] + B1[0], j0[1] + B1[1]]] });
           }
           continue;
@@ -286,13 +303,7 @@ const Caras = (() => {
         for (const g of T.grid) {
           const cu = g.x0 + g.w / 2, cv = g.y0 + g.h / 2, P = add(q.O, add(sc3(q.E1, cu / T.w), sc3(q.E2, cv / T.h))), p = J(P);
           const q0 = add(q.O, add(sc3(q.E1, g.x0 / T.w), sc3(q.E2, g.y0 / T.h))), da = J(sc3(q.E1, g.w / T.w)), db = J(sc3(q.E2, g.h / T.h)), j0 = J(q0);
-          // la y de orden buscada: una pared, el punto del piso que tiene debajo (sus columnas son finas); lo que no es vertical (techos,
-          // tapas de muros, pisos), su borde de atrás sobre el piso: lo que va encima o adelante se pinta después y sube hasta ella (más
-          // abajo), así nunca empuja hacia adelante a lo que tiene al lado. (Con el frente de la casa, que era la de techos y pisos, o con
-          // su centro, una pieza de atrás o una tapa larga hacía subir a las paredes que se pintan después, y la gente parada al costado
-          // de una pared quedaba detrás)
-          const objetivo = Math.abs(it.F.n[2]) < .1 ? J([P[0], P[1], 0])[1] : Math.min(...[[0, 0], [1, 0], [0, 1], [1, 1]].map(([i, j]) => {
-            const C = add(q0, add(sc3(q.E1, i * g.w / T.w), sc3(q.E2, j * g.h / T.h))); return J([C[0], C[1], 0])[1]; }));
+          const objetivo = buscada(vert, P, q0, sc3(q.E1, g.w / T.w), sc3(q.E2, g.h / T.h), tira);
           tiles.push({ rank: r, cuadro: g.nombre, p, sx: g.nombre === "_white" ? A[0] / 8 : sx, sy: g.nombre === "_white" ? B[1] / 8 : sy, kx, ky, tn: q.tinte, iz, objetivo, borde: !!q.borde, n: it.F.n, z: P[2], el: it.el, g,
             poli: [j0, [j0[0] + da[0], j0[1] + da[1]], [j0[0] + da[0] + db[0], j0[1] + da[1] + db[1]], [j0[0] + db[0], j0[1] + db[1]]] });
         }
