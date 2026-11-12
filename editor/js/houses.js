@@ -119,12 +119,10 @@ const Houses = (() => {
   const acc = (sc, a) => { (sc.acc || (sc.acc = [])).push(a); };
   // un accesorio solo, en el origen, para dibujarlo como sprite (caras.js)
   function accesorio(a, phi) { const sc = new Scene(); sc.setXform(phi); const k = KIT; KIT = false;
-    try { if (a.tipo === "tanque") tank(sc, 0, 0, 0, a.seed, a.kind); else if (a.tipo === "aire") ac(sc, 0, 0, 0, a.seed, a.wall, a.back);
+    try { if (a.tipo === "tanque") tank(sc, 0, 0, 0, a.seed, a.kind, true); else if (a.tipo === "aire") ac(sc, 0, 0, 0, a.seed, a.wall, a.back);
       else if (a.tipo === "antena") antenna(sc, 0, 0, 0); else if (a.tipo === "maceta") plant(sc, 0, 0, 0, a.seed, a.big); } finally { KIT = k; }
     return sc; }
   function pintada(t, x0, x1, y, r) { return typeof Graffiti !== "undefined" ? Graffiti.pintar(t, x0, x1, y, r, CTX) : false; }
-  function railingTex(wm, hm, seed, c = [28, 28, 32], gap = 4) { const t = new Tex(wm, hm, seed, [0, 0, 0], 0);
-    t.rect(0, 0, t.w, 2, c); t.rect(0, t.h - 2, t.w, t.h, c); for (let x = 0; x < t.w; x += gap) t.rect(x, 0, x + 1, t.h, c); if (t.h > 14) t.rect(0, t.h >> 1, t.w, (t.h >> 1) + 1, c); return t; }
   function rejaTex(wm, hm, seed) { const t = new Tex(wm, hm, seed, [0, 0, 0], 0), c = [24, 24, 28];
     for (let x = 1; x < t.w; x += 4) t.rect(x, 0, x + 1, t.h, c); for (const y of [1, t.h >> 1, t.h - 2]) t.rect(0, y, t.w, y + 1, c); for (let x = 1; x < t.w; x += 4) { t.p(x - 1, 3, c); t.p(x + 1, 3, c); } return t; }
   // textura hecha de una pieza de Gemini (lo demás transparente), para usarla en una cara 3D (rejas, barandas de hierro)
@@ -136,7 +134,10 @@ const Houses = (() => {
   const solid = (wm, hm, c, seed, kind = "concrete") => { const t = new Tex(wm, hm, seed); if (kind === "concrete") t.concrete(c); else if (kind === "stucco") t.stucco(c); else t.rect(0, 0, t.w, t.h, c); return t; };
 
   // ---------- objetos
-  function tank(sc, x, y, z, seed, kind = "negro") {
+  // el tanque de agua: en una de cada seis casas, no en todas (todos iguales, repetidos, se notaban). Sale de la semilla, no del
+  // sorteo de la casa: lo demás no cambia (siempre: el sprite del accesorio, que caras.js dibuja una vez)
+  function tank(sc, x, y, z, seed, kind = "negro", siempre = false) {
+    if (!siempre && ((Math.imul(seed ^ 0x2c1b3c6d, 0x297a2d39) >>> 8) % 6) !== 0) return;
     if (KIT) return acc(sc, { tipo: "tanque", x, y, z, seed: 1, kind });
     const R = .55;
     if (kind === "negro") { const h = 1.15, t = new Tex(2 * R, h, seed);
@@ -163,13 +164,6 @@ const Houses = (() => {
     for (let i = 0; i < t.w * t.h * .8; i++) { const xx = r.int(0, t.w - 1), yy = r.int(0, t.h - 1); if (((xx / t.w - .5) ** 2) / .25 + ((yy / t.h - .65) ** 2) / .4 < 1) t.p(xx, yy, r.pick([[56, 120, 56], [84, 150, 66], [40, 96, 48], [110, 170, 80]])); }
     if (r() < .4) t.p(t.w >> 1, 2, [226, 60, 80]);
     sc.quad([x + .175 - w / 2, y + .15, z + .3 + h], [w, 0, 0], [0, 0, -h], t, { both: true });
-  }
-  function clothes(sc, x0, x1, y, z, seed) {
-    const r = rng(seed), t = new Tex(x1 - x0, .7, seed, [0, 0, 0], 0); t.rect(0, 0, t.w, 1, [226, 226, 226]);
-    let x = 2; while (x < t.w - 6) { const c = r.pick([[214, 56, 56], [56, 112, 210], [238, 238, 230], [238, 198, 60], [86, 166, 96], [196, 116, 196], [40, 40, 52], [240, 150, 60]]), w = r.int(4, 8), h = r.int(5, 11);
-      t.rect(x, 1, x + w, 1 + h, c); t.rect(x + w - 1, 1, x + w, 1 + h, mul(c, .7)); t.rect(x, 1, x + w, 2, mul(c, .8)); x += w + r.int(1, 3); }
-    sc.quad([x0, y, z], [x1 - x0, 0, 0], [0, 0, -.7], t, { both: true });
-    for (const xx of [x0, x1 - .05]) sc.box(xx, y, z < 3 ? 0 : z - 1.6, xx + .05, y + .05, z + .05, { front: [150, 150, 156], back: [150, 150, 156], left: [120, 120, 126], right: [120, 120, 126], cast: false });
   }
   function bush(sc, x0, x1, y, z, h, seed) {
     const r = rng(seed), t = new Tex(x1 - x0, h, seed, [0, 0, 0], 0), prof = R3.vnoise(t.w, 1, 4, r);
@@ -242,7 +236,8 @@ const Houses = (() => {
     if (finish === "hueco" || r() < .25) stx.hueco(); else if (r() < .5) { stx.stucco(mix(wall, [190, 186, 178], .6), wear * 1.3); stx.runoff(.8, 1.2); stx.peel(2); } else stx.brick();
     if (r() < .15 && finish !== "hueco") pintada(stx, 4, stx.w - 4, px(Htot - 2.6), r);
     { const rg = rng(spec.seed ^ 0x2f6b1d3), dg = R3.DECALS.fd_graffiti, dm = R3.DECALS.fd_mural;
-      if (dg && rg() < (spec.wealth < .45 ? .35 : .1)) { const w = px(Math.min(D - .4, rg.uniform(1.6, 2.6))), h = Math.round(w * dg.h / dg.w); stx.blit("fd_graffiti", px(rg.uniform(.1, Math.max(.2, D - 2.8))), stx.h - h - px(rg.uniform(.3, .8)), w, h); }
+      // el grafiti de Gemini (siempre el mismo dibujo) ya no va: los grafitis van casa por casa (paredes.js). Los sorteos quedan, así el mural no cambia
+      if (dg && rg() < (spec.wealth < .45 ? .35 : .1)) { rg.uniform(1.6, 2.6); rg.uniform(.1, Math.max(.2, D - 2.8)); rg.uniform(.3, .8); }
       else if (dm && Htot > 5 && rg() < .12) { const w = px(Math.min(D - .3, rg.uniform(3, 5))), h = Math.min(px(Htot - 1), Math.round(w * dm.h / dm.w)); stx.blit("fd_mural", px(.15), stx.h - h - px(.5), w, h); }
       // casas de dos pisos o más: a veces un mural de los grandes en la medianera (sorteo aparte)
       else { const rm = rng(spec.seed ^ 0x3c6ef372), MUR = ["fd_mural_filete", "fd_mural_geometrico", "fd_mural_lago", "fd_mural_rio", "fd_mural_tango", "fd_mural_yaguarete"];
@@ -256,7 +251,7 @@ const Houses = (() => {
         for (const xc of cols) { const cc = new Tex(.3, Htot, spec.seed + xc); cc.concrete([172, 170, 164]); for (let y = 0; y < t.h; y++) for (let x = 0; x < cc.w && xc + x < t.w; x++) { const i = (y * t.w + xc + x) * 4, j = (y * cc.w + x) * 4; for (let k = 0; k < 3; k++) t.d[i + k] = cc.d[j + k]; } }
         for (let s = 0; s < storeys; s++) { const zz = GF + s * UF; t.rect(0, zt(zz), t.w, zt(zz) + px(.28), [170, 168, 162]); t.shade(0, zt(zz) + px(.28), t.w, zt(zz) + px(.28) + 1, .7); } }
     }
-    let shop = null, coShop = false; const wins = [], balconies = [];
+    let shop = null, coShop = false; const wins = [];
     // ---- frente, planta baja
     if (kind === "negocio" || kind === "negocio_casa") {
       // un comercio con nombre de un barrio real (spec.ct: Pizzería Keops, Café Chas): su cartel, del color de su rubro
@@ -304,11 +299,9 @@ const Houses = (() => {
       const zb = GF + (k - 1) * UF;
       if (kind === "villa") { for (let xm = .4; xm < W - 1.2; xm += 2.4) windowDecal(ft, X(xm), zt(zb + 2.2), X(1), px(.95), r.pick(["reja", "cerrado", "persiana"]), wall); continue; }
       if (kind === "obra") { for (let xm = .6; xm < W - 1.3; xm += 2.4) ft.rect(X(xm), zt(zb + 2.1), X(xm + 1.2), zt(zb + .9), [24, 20, 20]); continue; }
-      const n = Math.max(1, Math.floor(W / 2.8)), bal = r() < .6;
+      const n = Math.max(1, Math.floor(W / 2.8)); r();   // (este sorteo era el del balcón: las casas no tienen balcones)
       for (let i = 0; i < n; i++) { const cx = W * (i + .5) / n;
-        if (bal) windowDecal(ft, X(cx - .5), zt(zb + 2.35), X(1), px(2.1), r.pick(["persiana", "none"]), wall);
-        else { windowDecal(ft, X(cx - .62), zt(zb + 2.2), X(1.25), px(1.15), r.pick(["persiana", "cerrado", "none"]), wall); wins.push([cx - .62, zb + 1.05, 1.25, 1.15, false, "x"]); } }
-      if (bal) balconies.push(zb);
+        windowDecal(ft, X(cx - .62), zt(zb + 2.2), X(1.25), px(1.15), r.pick(["persiana", "cerrado", "none"]), wall); wins.push([cx - .62, zb + 1.05, 1.25, 1.15, false, "x"]); }
       if (finish !== "hueco") { ft.rect(0, zt(zb) - 2, ft.w, zt(zb) + 1, add(wall, 18)); ft.rect(0, zt(zb) + 1, ft.w, zt(zb) + 2, mul(wall, .7)); }
     }
     // ---- contrafrente (pared del fondo)
@@ -393,16 +386,6 @@ const Houses = (() => {
         for (const sx of [xm - ww / 2 - .05, xm + ww + .05]) { const t = new Tex(ww / 2, hh, spec.seed + 31, pc); for (let yy = 1; yy < t.h; yy += 2) t.shade(0, yy, t.w, yy + 1, .72); t.shade(0, 0, 1, t.h, .6);
           sc.box(sx, y0 - .06, zm, sx + ww / 2, y0, zm + hh, { front: t, right: mul(pc, .7), left: mul(pc, .8) }); } }
     }
-    for (const zb of spec.ct ? [] : balconies) {   // (el comercio con nombre, sin balcón: si no, tapa el cartel desde arriba)
-      ft.shade(0, px(Htot - zb), ft.w, px(Htot - zb + .5), .8);   // la sombra de la losa en la pared: que se lea que sale
-      sc.box(0, y0 - .85, zb - .02, W, y0, zb + .14, { front: [222, 218, 208], top: [236, 232, 222], right: [190, 186, 178], left: [200, 196, 188] });
-      const orn = spec.wealth > .5 && r() < .6 ? decalTex("fd_balcon_hierro", W - .1, .96, Math.max(1, Math.round((W - .1) / 2))) : null;
-      const verde = R3.DECALS.fd_balcon_plantas && rng(spec.seed ^ (zb * 1000 | 0) ^ 0x6a09e667)() < .3 * PLWc() ? decalTex("fd_balcon_plantas", W - .1, .96, Math.max(1, Math.round((W - .1) / 3))) : null;
-      sc.box(.05, y0 - .85, zb + .14, W - .05, y0 - .83, zb + 1.1, { front: verde || orn || railingTex(W - .1, .96, spec.seed), back: orn || railingTex(W - .1, .96, spec.seed), cast: false });
-      for (const xx of [.05, W - .07]) sc.box(xx, y0 - .85, zb + .14, xx + .02, y0, zb + 1.1, { right: railingTex(.85, .96, spec.seed), left: railingTex(.85, .96, spec.seed), cast: false });
-      for (let i = r.int(0, 3); i > 0; i--) plant(sc, r.uniform(.2, W - .6), y0 - .7, zb + .14, r.int(0, 99999));
-      if (r() < .4) clothes(sc, .3, W - .3, y0 - .45, zb + 2.0, r.int(0, 99999));
-    }
     if (shop && !coShop) {   // el frente coreano ya trae su cartel
       const [name, scol] = shop, sw = W - .3, st = new Tex(sw, .62, spec.seed + 40); st.stucco(scol, .2);
       st.rect(0, 0, st.w, 1, add(scol, 40)); st.rect(0, st.h - 1, st.w, st.h, mul(scol, .6));
@@ -457,7 +440,7 @@ const Houses = (() => {
       sc.quad([xs, y0 - .88, .9], [dir * n * run, 0, GF], [0, 0, -.06], bt, { both: true }); }
     if (r() < .3 && kind !== "obra") ac(sc, r.uniform(.2, Math.max(.3, W - 1.1)), y0, shop ? 3.3 : 2.45, spec.seed + 80);
     if (r() < .35 && !shop && kind !== "chalet") plant(sc, r.uniform(.2, Math.max(.3, W - .6)), y0 - .45, 0, spec.seed + 81, true);
-    if (r() < .6) clothes(sc, .3, W - .3, y0 + D + 1.6, 1.85, spec.seed + 99);      // ropa en el patio de atrás
+    r();   // acá iba la ropa del patio de atrás (ya no hay): el sorteo queda
     if (r() < .3) ac(sc, r.uniform(.2, Math.max(.3, W - 1.1)), y0 + D, 2.3, spec.seed + 83, true, true);
     // ---- terraza: lavadero o cuartito en el fondo (muy de Buenos Aires), con su tanque arriba
     let lav = null;
@@ -483,19 +466,14 @@ const Houses = (() => {
     if (r() < .5 && roofKind !== "tejas") antenna(sc, r.uniform(.4, W - .4), y0 + D * .3, roofZ);
     if (r() < .5) { const cx = r.uniform(.3, W - .5); sc.box(cx, y0 + D * .75, roofZ, cx + .25, y0 + D * .75 + .25, roofZ + 1, { front: [160, 160, 164], back: [160, 160, 164], left: [124, 124, 128], right: [124, 124, 128], top: [120, 120, 124] }); }
     if (r() < .3 && flat) ac(sc, r.uniform(.3, Math.max(.4, W - 1.1)), y0 + D * .35, zr, spec.seed + 91, false);
-    if (flat && r() < .25 && storeys === 1) clothes(sc, .4, W - .4, y0 + D * .5, zr + 1.6, spec.seed + 92);
+    if (flat) r();   // acá iba la ropa de la terraza (ya no hay): el sorteo queda
     return { sc, storeys, depth: y0 + D, shop: shop && shop[0], height: zr, puertas: cierraPuertas(), frenteY: y0 };
   }
 
   // ---------- edificio de departamentos (zonas ricas y avenidas): planta baja con hall (y a veces local o cochera),
-  // pisos con balcones corridos o ventanas, medianeras lisas, terraza con sala de máquinas y tanques.
+  // pisos con ventanas, medianeras lisas, terraza con sala de máquinas y tanques.
   const CLAROS = [[236, 230, 216], [226, 220, 206], [214, 210, 202], [232, 222, 196], [206, 200, 190], [222, 214, 200], [196, 204, 210], [228, 212, 190]];
-  function slidingDecal(t, x, y, w, h, frame) {        // puerta-ventana corrediza de aluminio
-    t.rect(x - 1, y - 1, x + w + 1, y + h + 1, mul(frame, .55)); t.rect(x, y, x + w, y + h, frame);
-    const n = w > px(2.2) ? 3 : 2, pw = (w - 2) / n;
-    for (let i = 0; i < n; i++) { const a = x + 1 + Math.round(i * pw), b = x + 1 + Math.round((i + 1) * pw) - 1; glass(t, a + 1, y + 2, b - 1, y + h - 2, t.r() < .5); }
-    t.shade(x, y, x + w, y + 2, .7);
-  }
+
   function edificio(spec, phi) {
     const r = rng(spec.seed), W = spec.W, D = spec.D, n = Math.min(PISOS(), spec.p || 6), GF2 = 3.4, UF2 = 2.8;
     const sc = new Scene(); sc.setXform(phi);
@@ -527,13 +505,10 @@ const Houses = (() => {
         if (!ft.blit(lc, X(lado[0]), zt(2.55), X(Math.min(lw, 4.2)), zt(0) - zt(2.55))) goodsDecal(ft, X(lado[0]), zt(2.5), X(lado[1]), zt(.4), shop[0]); }
       else for (let xm = lado[0] + .3; xm + 1.3 < lado[1]; xm += 1.9) windowDecal(ft, X(xm), zt(2.3), X(1.3), px(1.3), "persiana", pb); }
     // pisos
-    const bal = estilo !== "moderno" && estilo !== "ladrillo" ? true : estilo === "ladrillo" ? r() < .5 : false;
+    if (estilo === "ladrillo") r();   // (este sorteo era el de los balcones: los edificios no tienen)
     for (let k = 1; k < n; k++) { const zb = GF2 + (k - 1) * UF2;
       if (estilo === "moderno") { ft.rect(0, zt(zb + UF2 - .25), ft.w, zt(zb + .1), [52, 66, 80]); glass(ft, 2, zt(zb + UF2 - .3), ft.w - 2, zt(zb + .15), r() < .3);
         for (let xx = X(.05); xx < ft.w; xx += X(1.35)) ft.rect(xx, zt(zb + UF2 - .25), xx + 2, zt(zb + .1), frame); }
-      else if (bal) { if (R3.DECALS.fd_ed_balcon_puerta) { const m = Math.max(1, Math.floor((W - .6) / 2.8)), ww = (W - .6) / m;
-          for (let i = 0; i < m; i++) ft.blit("fd_ed_balcon_puerta", X(.3 + i * ww + .1), zt(zb + 2.35), X(ww - .2), px(2.25)); }
-        else slidingDecal(ft, X(.5), zt(zb + 2.3), X(W - 1.4), px(2.2), frame); }
       else { const m = Math.max(1, Math.floor(W / 2.4));
         for (let i = 0; i < m; i++) { const vx = W * (i + .5) / m - .75, g = r.pick(["fd_ed_ventana_persiana", "fd_ed_ventana_persiana", "fd_ed_ventana_cortina", "fd_ed_ventana_aire"]);
           if (!R3.DECALS[g]) windowDecal(ft, X(vx + .1), zt(zb + 2.1), X(1.3), px(1.3), r.pick(["persiana", "none", "persiana"]), wall);
@@ -562,21 +537,8 @@ const Houses = (() => {
     sc.box(-.08, -.16, zr + PH - .06, W + .08, .2, zr + PH + .1, { front: [238, 234, 224], top: [246, 242, 234], left: [204, 200, 192], right: [184, 180, 172] });
     // marquesina del hall
     sc.box(hx - .3, -1.1, 2.75, hx + hall + .3, 0, 2.95, { front: [58, 58, 62], top: [80, 80, 86], right: [44, 44, 48], left: [50, 50, 54] });
-    // balcones: losa saliente + baranda (metal o vidrio) + macetas, aires y ropa
-    if (bal) for (let k = 1; k < n; k++) { const zb = GF2 + (k - 1) * UF2, vidrio = estilo === "balcones" && r() < .5;
-      sc.box(0, -1.2, zb - .05, W, 0, zb + .15, { front: add(wall, 10), top: [214, 210, 202], right: mul(wall, .8), left: mul(wall, .86) });
-      const rt = vidrio ? (() => { const t = new Tex(W, 1, spec.seed + k, [0, 0, 0], 0); t.rect(0, 0, t.w, 2, frame); for (let xx = 0; xx < t.w; xx += px(1.4)) t.rect(xx, 0, xx + 1, t.h, frame); for (let xx = 3; xx < t.w; xx += 11) for (let j = 0; j < 4; j++) t.p(xx + j, 4 + j, [220, 236, 246]); return t; })() : railingTex(W, 1, spec.seed + k, frame.map(v => v * .4));
-      const cerr = R3.DECALS.fd_ed_balcon_cerrado && r() < .18, para = !vidrio && R3.DECALS.fd_ed_parapeto && r() < .35;
-      if (cerr) { const ct = decalTex("fd_ed_balcon_cerrado", W, 2.2, Math.max(1, Math.round(W / 3))); sc.box(0, -1.2, zb + .15, W, -1.18, zb + 2.35, { front: ct, back: ct, cast: false });
-        sc.box(0, -1.2, zb + 2.35, W, 0, zb + 2.5, { front: add(wall, 10), top: [214, 210, 202], right: mul(wall, .8), left: mul(wall, .86) }); continue; }
-      const gv = vidrio && R3.DECALS.fd_ed_baranda_vidrio ? decalTex("fd_ed_baranda_vidrio", W, 1, Math.max(1, Math.round(W / 3))) : para ? decalTex("fd_ed_parapeto", W, 1.2, Math.max(1, Math.round(W / 3))) : null;
-      const verde = !para && R3.DECALS.fd_balcon_plantas && rng(spec.seed ^ (k * 7919) ^ 0x6a09e667)() < .22 * PLWc() ? decalTex("fd_balcon_plantas", W, 1, Math.max(1, Math.round(W / 3))) : null;
-      sc.box(0, -1.2, zb + .15, W, -1.18, zb + (para ? 1.35 : 1.15), { front: verde || gv || rt, back: gv || rt, cast: !!para });
-      for (const xx of [0, W - .03]) sc.box(xx, -1.2, zb + .15, xx + .03, 0, zb + 1.15, { right: railingTex(1.2, 1, spec.seed), left: railingTex(1.2, 1, spec.seed), cast: false });
-      for (let i = r.int(0, 3); i > 0; i--) plant(sc, r.uniform(.2, W - .6), -1, zb + .15, r.int(0, 99999), r() < .4);
-      if (r() < .35) ac(sc, r.uniform(.3, W - 1.1), -.35, zb + .15, r.int(0, 9999), false);
-      if (r() < .06) { const c0 = r.uniform(.4, W * .5); clothes(sc, c0, c0 + Math.min(2.2, W * .4), -.7, zb + 1.9, r.int(0, 99999)); } }
-    else for (let k = 1; k < n; k++) if (r() < .4) ac(sc, r.uniform(.3, W - 1.1), 0, GF2 + (k - 1) * UF2 + .3, r.int(0, 9999));
+    // aires en la fachada
+    for (let k = 1; k < n; k++) if (r() < .4) ac(sc, r.uniform(.3, W - 1.1), 0, GF2 + (k - 1) * UF2 + .3, r.int(0, 9999));
     // terraza: sala de máquinas con tanques, antenas, aire
     const mw = Math.min(3, W * .4), mx = r.uniform(.4, W - mw - .4), my = D * r.uniform(.35, .55), mt = new Tex(mw, 2.4, spec.seed + 60); mt.stucco(mix(wall, [210, 206, 198], .5), 1.2); mt.runoff(.8, 1.4);
     doorDecal(mt, px(.3), px(.4), px(.8), px(1.9), "chapa", wall);
@@ -590,7 +552,7 @@ const Houses = (() => {
   }
 
   // ---------- petit hotel / casa de estilo (zonas ricas): fachada clásica con pilastras, buñado en planta baja,
-  // ventanas altas con balconcitos, cornisa con dentículos y puerta de madera de dos hojas.
+  // ventanas altas, cornisa con dentículos y puerta de madera de dos hojas.
   function petit(spec, phi) {
     const r = rng(spec.seed), W = spec.W, D = spec.D, n = Math.min(PISOS(), spec.p || 2), GF2 = 3.8, UF2 = 3.4;
     const sc = new Scene(); sc.setXform(phi);
@@ -620,15 +582,11 @@ const Houses = (() => {
     sc.box(-.18, -.42, zr, W + .18, .1, zr + .18, { front: add(wall, 22), top: add(wall, 30), right: dk, left: dk });
     const par = new Tex(W, 1, spec.seed + 11, lt); for (let xx = px(.2); xx < par.w - px(.2); xx += px(.32)) par.rect(xx, px(.25), xx + px(.12), par.h - 2, mul(wall, .55));
     sc.box(0, -.05, zr + .18, W, .15, zr + 1.2, { front: par, back: par, top: lt, left: dk, right: dk });
-    // ventanas: dintel con clave y balconcito en los pisos altos
+    // ventanas: dintel con clave y alféizar
     for (const [xm, zw, ww, hh, k] of wins) {
       sc.box(xm - .12, -.08, zw + hh, xm + ww + .12, 0, zw + hh + .22, { front: add(wall, 20), top: add(wall, 30), right: dk, left: dk });
       sc.box(xm + ww / 2 - .1, -.11, zw + hh - .05, xm + ww / 2 + .1, 0, zw + hh + .28, { front: add(wall, 28), right: dk, left: dk });
-      if (k > 0) { sc.box(xm - .2, -.55, zw - .1, xm + ww + .2, 0, zw + .02, { front: lt, top: add(wall, 24), right: dk, left: dk });
-        const orn = decalTex("fd_balcon_hierro", ww + .36, .93);
-        sc.box(xm - .18, -.55, zw + .02, xm + ww + .18, -.53, zw + .95, { front: orn || railingTex(ww + .36, .93, spec.seed + k, [30, 30, 34], 3), back: orn || railingTex(ww + .36, .93, spec.seed, [30, 30, 34], 3), cast: false });
-        if (r() < .5) plant(sc, xm + r.uniform(0, ww - .35), -.45, zw + .02, r.int(0, 9999)); }
-      else sc.box(xm - .1, -.1, zw - .08, xm + ww + .1, 0, zw, { front: [232, 228, 218], top: [244, 240, 232], right: [196, 192, 184], left: [206, 202, 194] }); }
+      sc.box(xm - .1, -.1, zw - .08, xm + ww + .1, 0, zw, { front: [232, 228, 218], top: [244, 240, 232], right: [196, 192, 184], left: [206, 202, 194] }); }
     tank(sc, r.uniform(1, W - 1), D * .6, zr, spec.seed + 90, "gris");
     if (r() < .6) { const cx = r.uniform(.5, W - .8); sc.box(cx, D * .8, zr, cx + .45, D * .8 + .45, zr + 1.4, { front: [172, 96, 70], back: [172, 96, 70], right: [140, 76, 56], left: [150, 80, 60], top: [80, 70, 64] }); }
     return { sc, storeys: n, depth: D, shop: null, height: zr, puertas: cierraPuertas(), frenteY: 0 };
@@ -842,7 +800,7 @@ const Houses = (() => {
       const ux = dx / L, uy = dy / L; sc.casters.push({ c: sc.P([(a[0] + b[0]) / 2 - uy * .15, (a[1] + b[1]) / 2 + ux * .15, Htot / 2]), ax: [sc.V([ux, uy, 0]), sc.V([-uy, ux, 0]), [0, 0, 1]], h: [L / 2, .15, Htot / 2], fid: sc.nid() }); }
     // (sin contorno: si no, se ven las líneas del abanico cruzando la terraza)
     for (let i = 1; i + 1 < N; i++) { const a = P[0], b = P[i], c = P[i + 1]; sc.quad([a[0], a[1], zr], [c[0] - a[0], c[1] - a[1], 0], [b[0] - a[0], b[1] - a[1], 0], techo, { tri: true }); sc.faces[sc.faces.length - 1].sinContorno = true; }
-    tank(sc, cx, cy, zr, seed);   // el tanque de agua, como en todas las terrazas
+    tank(sc, cx, cy, zr, seed);   // el tanque de agua (en una de cada seis)
     if (spec.tipo !== "moderno") ac(sc, cx + 1.5, cy - .8, zr, seed + 3, false);
     return { sc, storeys: n, depth: 10, shop: spec.tipo === "keops" ? "PIZZERIA" : null, height: zr };
   }

@@ -39,6 +39,7 @@ const CFG = (() => {
     ["Casas", "pb", "Altura planta baja", 2.6, 4.5, .1, 3.2, "m", "bake", ""],
     ["Casas", "piso", "Altura pisos altos", 2.5, 4, .1, 2.9, "m", "bake", ""],
     ["Casas", "desgaste", "Desgaste y suciedad", 0, 3, .1, 1, "×", "bake", ""],
+    ["Casas", "grafitis", "Grafitis", 0, 3, .1, 1, "×", "live", "Grafitis, firmas y carteles de arte/objetos en las paredes, casa por casa, sin repetir el mismo dibujo cerca (al exportar: el visor no los muestra). 1× = en la mayoría de las paredes de lo pobre y de los tapiales y paredones, en menos de lo rico."],
     ["Población", "conGente", "Gente", 0, 1, 1, 1, "", "world", "Si se apaga, el barrio no trae gente (ni en el editor ni al exportar)."],
     ["Población", "conAutos", "Autos", 0, 1, 1, 1, "", "world", "Si se apaga, el barrio no trae autos estacionados ni circulando."],
     ["Población", "faroles", "Faroles", .3, 3, .1, 1, "×", "world", "Densidad de faroles en las veredas (1× = uno cada 16 a 22 m, alternando vereda)."],

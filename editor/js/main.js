@@ -5,7 +5,7 @@
   const MOBILE = matchMedia("(pointer: coarse)").matches || innerWidth < 760;
   const loadImg = (src) => new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => fail(new Error("no cargó una imagen")); i.src = src; });
   // atlas v4 + los árboles procedurales (a la escala del barrio) en la franja libre de abajo
-  const atlasImg = await (async () => { const im = await loadImg(ASSETS_PNG), cv = document.createElement("canvas"); cv.width = 2048; cv.height = 2560;
+  const atlasImg = await (async () => { const im = await loadImg(ASSETS_PNG), cv = document.createElement("canvas"); cv.width = 2048; cv.height = 3072;
     const g = cv.getContext("2d"); g.drawImage(im, 0, 0); let x = 0, y = im.height + 2, rowH = 0;
     for (const t of Arboles.TIPOS) { const v = Arboles.render(t).vista; if (x + v.w > 2048) { x = 0; y += rowH + 2; rowH = 0; }
       g.drawImage(v.canvas, x, y); ASSETS.frames["arbol_" + t] = { x, y, w: v.w, h: v.h, ox: Math.round(v.ox), oy: Math.round(v.oy) }; x += v.w + 2; rowH = Math.max(rowH, v.h); }
@@ -15,6 +15,18 @@
       for (const [n, h] of Object.entries(HD_ASSETS.frames)) { const e = h.e || HD_ASSETS.escala, w = Math.ceil(h.w * e), hh = Math.ceil(h.h * e); if (x + w > 2048) { x = 0; y += rowH + 2; rowH = 0; }
         g.drawImage(hi, h.x, h.y, h.w, h.h, x, y, h.w * e, h.h * e);
         ASSETS.frames[n] = { x, y, w, h: hh, ox: Math.round(h.ox * e), oy: Math.round(h.oy * e), hd: { img: hi, ...h, e } }; x += w + 2; rowH = Math.max(rowH, hh); } }
+    // objetos de arte/objetos (recursos/objetos.js: plantas, macetas, basura, sillas, faroles…, a la escala de los personajes LPC): cada uno
+    // en su png; el visor los usa a la escala del barrio (sin suavizar: son pixel art) y el exportador copia el original (f.hd, con f.hd.zip).
+    // Los grafitis no van al visor: el exportador los pone en las paredes, casa por casa
+    if (typeof OBJETOS !== "undefined") { const e = OBJETOS.escala; x = 0; y += rowH + 2; rowH = 0; g.imageSmoothingEnabled = false;
+      const imgs = await Promise.all(Object.entries(OBJETOS.frames).map(async ([n, o]) => [n, o, await loadImg(OBJETOS.base + o.src)]));
+      for (const [n, o, img] of imgs) { const hd = { img, x: 0, y: 0, w: o.w, h: o.h, ox: o.ox, oy: o.oy, e, zip: true, tierra: o.tierra, luz: o.luz, on: o.on, grafiti: o.grafiti };
+        if (o.grafiti) { ASSETS.frames[n] = { x: 0, y: 0, w: 0, h: 0, ox: 0, oy: 0, hd }; continue; }
+        const w = Math.ceil(o.w * e), hh = Math.ceil(o.h * e); if (x + w > 2048) { x = 0; y += rowH + 2; rowH = 0; }
+        g.drawImage(img, 0, 0, o.w, o.h, x, y, o.w * e, o.h * e);
+        ASSETS.frames[n] = { x, y, w, h: hh, ox: Math.round(o.ox * e), oy: Math.round(o.oy * e), hd }; x += w + 2; rowH = Math.max(rowH, hh); }
+      g.imageSmoothingEnabled = true;
+      if (y + rowH > cv.height) console.warn("el atlas del visor no alcanza:", y + rowH, ">", cv.height); }
     // piezas de fachada (Gemini): R3 las pega en las paredes al hornear las casas
     if (typeof FACHADA !== "undefined") { const fi = await loadImg(FACHADA_PNG), c2 = document.createElement("canvas"); c2.width = fi.width; c2.height = fi.height;
       const g2 = c2.getContext("2d", { willReadFrequently: true }); g2.drawImage(fi, 0, 0);
@@ -97,7 +109,7 @@
     const sh = opt.shadow ?? SH(name); if (sh && F[sh]) { s.sh = DC.add(sh, x, y, opt.ang || 0, cat); s.shName = sh; }
     sprites.push(s);
     if (!opt.noCollide && phys) {
-      const cr = lookup(COLR, name, 0); if (cr) addStaticCircle(x, y, cr, name);
+      const cr = lookup(COLR, opt.rol || name, 0); if (cr) addStaticCircle(x, y, cr, name);
     }
     return s;
   }
@@ -155,7 +167,9 @@
     // los que miran a algún lado: el cuadro (frente o atrás) y el espejo dependen del giro de la cámara
     for (const e of B.props) { let name = e.f, flip = e.flip;
       if (e.face) [name, flip] = Barrio.vista(F, e.f, Cam.C.ax * e.face[0] + Cam.C.ay * e.face[1], Cam.C.bx * e.face[0] + Cam.C.by * e.face[1]);
-      const sp = put(name, e.x, e.y, { noClaim: true, flip, shadow: e.sh }); if (sp && e.face) yawDeps.push({ s: sp, f: e.f, dx: e.face[0], dy: e.face[1] }); }
+      // la planta de una maceta (e.o: texeles del dibujo sobre el pie de la maceta) va subida, sobre la tierra
+      const oy = e.o ? F[name].oy + e.o * F[name].hd.e : undefined;
+      const sp = put(name, e.x, e.y, { noClaim: true, flip, shadow: e.sh, rol: e.rol, oy }); if (sp && e.face) yawDeps.push({ s: sp, f: e.f, dx: e.face[0], dy: e.face[1] }); }
     for (const a of B.arboles) put("arbol_" + a.t.replace(/_c$/, ""), a.x, a.y, { noClaim: true, flip: a.flip, shadow: "sh_tree", cat: "trees" });
     // ---- cables (tramos 3D)
     const cables = []; for (const c of B.cables) cables.push(c[0], c[1], c[2], c[3], c[4], c[5]); Gfx.setCables(cables);

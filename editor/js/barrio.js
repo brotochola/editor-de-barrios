@@ -45,23 +45,40 @@ const Barrio = (() => {
     // ---- registros
     const props = [], arboles = [], people = [], cables = [], cars = [], postes = [], pits = [], lineas = [];
     const VAR = {}; for (const n of Object.keys(F)) { const m = /^(.+)_([b-z])$/.exec(n); if (m && F[m[1]]) (VAR[m[1]] ||= [m[1]]).push(n); }
+    // Los objetos de arte/objetos (recursos/objetos.js): el nombre que se pide es un rol (u_farola, pl_malvon, yy_avena…) y el cuadro
+    // sale de sus listas, por el lugar (no del sorteo, así el resto del barrio no cambia). Una maceta armada son dos props: el
+    // recipiente y la planta, subida hasta la tierra (o: texeles del dibujo sobre el pie del recipiente), que se mece. Lo de Gemini
+    // que no tiene reemplazo (OBJETOS.quitar) no se pone más. Las medidas (ocupación, choque, sombra) siguen siendo las del rol
+    const OBJ = typeof OBJETOS !== "undefined" ? OBJETOS : null, QUITAR = new Set(OBJ ? OBJ.quitar : []);
+    const mezcla = (h, k) => { h = Math.imul(h ^ (h >>> 15) ^ Math.imul(k, 0x9e3779b1), 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); return (h ^ (h >>> 16)) >>> 0; };
+    function elegir(rol, h) {
+      const ps = OBJ.roles[rol]; let tot = 0; for (const [, w] of ps) tot += w;
+      let q = mezcla(h, 1) / 4294967296 * tot, p = ps[0][0]; for (const [pp, w] of ps) { q -= w; if (q <= 0) { p = pp; break; } }
+      if (typeof p === "string") { const L = OBJ.pools[p]; return { f: L[mezcla(h, 2) % L.length] }; }
+      const m = p.m[mezcla(h, 3) % p.m.length], tl = OBJ.pools[p.p[mezcla(h, 4) % p.p.length]];
+      return { f: m, top: tl[mezcla(h, 5) % tl.length], tierra: OBJ.frames[m].tierra };
+    }
     function put(name, x, y, opt = {}) {
       const h = Math.abs(Math.imul(Math.round(x * 10), 73856093) ^ Math.imul(Math.round(y * 10), 19349663));
-      if (VAR[name]) name = VAR[name][h % VAR[name].length];
-      if (!F[name] || ANIMAL.test(name)) return null;
-      if (CAJA.test(name)) { const l = W.lotAt(x, y), c = l ? null : W.classify(x, y);
+      if (QUITAR.has(name)) return null;
+      const rol = name, ob = OBJ && OBJ.roles[name] ? elegir(name, h) : null;
+      if (ob) name = ob.f; else if (VAR[name]) name = VAR[name][h % VAR[name].length];
+      if (!F[name] || ANIMAL.test(rol)) return null;
+      if (!ob && CAJA.test(name)) { const l = W.lotAt(x, y), c = l ? null : W.classify(x, y);
         const phi = l ? (l.plaza ? Math.atan2(l.plaza.u[1], l.plaza.u[0]) : l.phi) : c ? Math.atan2(c.s.dir[1], c.s.dir[0]) : opt.face ? Math.atan2(opt.face[1], opt.face[0]) : null;
         if (phi == null || !diagonalOk(phi)) return null; }
-      if (name.startsWith("yy_") && !W.dentro(x, y)) return null;   // afuera del paredón, sin yuyos (son la mayoría de los props)
+      if (rol.startsWith("yy_") && !W.dentro(x, y)) return null;   // afuera del paredón, sin yuyos (son la mayoría de los props)
       // en la calzada sólo lo que va en la calle (vallas, conos, volquetes, contenedores); lo demás que caiga ahí (una maceta de un
       // lote de esquina, un hidrante corrido) no se pone
-      if (!EN_CALLE.test(name)) { const ck = W.classify(x, y); if (ck && ck.k === "road") return null; }
-      if (!opt.noClaim && !claim(x, y, opt.rad ?? lookup(RAD, name, .3))) return null;
+      if (!EN_CALLE.test(rol)) { const ck = W.classify(x, y); if (ck && ck.k === "road") return null; }
+      if (!opt.noClaim && !claim(x, y, opt.rad ?? lookup(RAD, rol, .3))) return null;
       // face: hacia dónde mira (m del mundo). Lo que tiene vista de atrás y no mira a nada en especial mira a una diagonal
       // sacada del lugar (no del sorteo, así el resto del barrio no cambia)
       const face = opt.face || (F[name + "_atras"] ? DIAG[(h >>> 7) & 3] : null);
-      const e = { f: name, x, y, flip: !!opt.flip, cr: opt.noCollide ? 0 : lookup(COLR, name, 0), sh: opt.shadow ?? SH(name), face };
-      props.push(e); return e;
+      const e = { f: name, x, y, flip: !!opt.flip, cr: opt.noCollide ? 0 : lookup(COLR, rol, 0), sh: opt.shadow ?? SH(rol), face, ...(ob ? { rol } : {}) };
+      props.push(e);
+      if (ob && ob.top) props.push({ f: ob.top, x, y, flip: !!(mezcla(h, 6) & 1), cr: 0, sh: null, face: null, o: ob.tierra - 2, rol });
+      return e;
     }
     // árbol: un tipo procedural según la riqueza del lugar (lleva el mismo sorteo que antes, así el resto no cambia)
     // tronco pintado a la cal (blanco hasta 1,2 m): en buena parte de los árboles de vereda, más en los barrios. Sale de la
