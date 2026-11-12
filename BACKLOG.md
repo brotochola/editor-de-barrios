@@ -8,15 +8,15 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 
 ## Objetos y casas
 
-- [ ] **Ropa colgada de las paredes** — hecho, falta el commit. Sale la soga con ropa que las casas traían pintada en las
+- [ ] **Ropa colgada de las paredes** — hecho (f00925d). Sale la soga con ropa que las casas traían pintada en las
   paredes; los tendederos sueltos de `arte/objetos` quedan.
-- [ ] **Plantas con tutor (enredaderas en espaldera)** — hecho, falta el commit. Van pegadas a las paredes, como los
+- [ ] **Plantas con tutor (enredaderas en espaldera)** — hecho (f00925d). Van pegadas a las paredes, como los
   grafitis (casa por casa, con el skew y la luz de la pared), paradas en el piso y quietas; más en las casas de más plata
   (knob «plantas»). Ya no salen sueltas en la vereda.
-- [ ] **Sin balcones** — hecho, falta el commit. Los balcones que salen de la pared (casas, edificios, balconcitos de las
+- [ ] **Sin balcones** — hecho (f00925d). Los balcones que salen de la pared (casas, edificios, balconcitos de las
   casas antiguas) dejaban pedazos de pared en medio de la vereda o de la calle; las ventanas que daban a ellos son
   ventanas comunes. Los que están pintados en la fachada de algunas esquinas son dibujo plano y quedan.
-- [ ] **Gente tapada por las paredes** — hecho, falta el commit. Dos causas:
+- [ ] **Gente tapada por las paredes** — hecho (f00925d). Dos causas:
   - La principal: la y de orden de cada pieza se «sube» para no quedar detrás de una pieza de la misma casa que se pinta
     antes y la toca. Techos, pisos, tapas de muros y accesorios se ordenaban por el frente de la casa (o por su centro):
     uno de atrás empujaba a las paredes que se pintan después hasta el frente, y la gente parada al costado quedaba
@@ -25,7 +25,7 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
     Ahora van en columnas donde cambia 8 px como mucho; cada textura se corta una sola vez.
   - En Parque Chas, las piezas bajas de pared ordenadas más de 8 px por delante de su pie bajaron del 23 % al 2,4 %.
     Las piezas de casas pasaron de 223 089 a 276 605 (+24 %), y el atlas de 33,0 a 34,9 MB (7068 × 4094).
-- [ ] **Tanques de agua** — hecho, falta el commit. Estaban en todas las casas, todos iguales: ahora en una de cada seis.
+- [ ] **Tanques de agua** — hecho (f00925d). Estaban en todas las casas, todos iguales: ahora en una de cada seis.
 - [ ] **Fondos de las manzanas** — pendiente. Las casas dan a la calle, pero sus fondos (lo de adentro de la manzana)
   tienen que ser patios, jardines o la continuación de la casa, separados entre sí por medianeras y rejas (las paredes y
   rejas que el mapa ya genera). Cada fondo, lindo o abandonado:
@@ -36,15 +36,15 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 
 ## Piso
 
-- [ ] **Veredas parejas** — hecho, falta el commit. Cada lado de cada cuadra lleva un solo tipo de vereda (el que más
+- [ ] **Veredas parejas** — hecho (f00925d). Cada lado de cada cuadra lleva un solo tipo de vereda (el que más
   frente ocupaba entre sus lotes), también donde no hay lote.
-- [ ] **Calles parejas** — hecho, falta el commit. Un solo material por calle (asfalto, asfalto roto, adoquín, tierra), el
+- [ ] **Calles parejas** — hecho (f00925d). Un solo material por calle (asfalto, asfalto roto, adoquín, tierra), el
   que más largo tenía entre sus cuadras. Una calle son las cuadras del mismo nombre; sin nombre, las que siguen derecho en
   la esquina.
 
 ## Luces
 
-- [ ] **Faros de los autos** — hecho, falta el commit. La luz sale del frente del auto, no 18 px más adelante (la sombra de
+- [ ] **Faros de los autos** — hecho (f00925d). La luz sale del frente del auto, no 18 px más adelante (la sombra de
   un árbol al costado caía hacia atrás), y el auto ya no lleva destellos.
 - [ ] **Brillos ordenados por Y** — motor. Los brillos tienen que ordenarse por Y con lo demás. El brillo propio de cada
   luz (`hasGlowSprite`, con `lightGlow: 'sprite'`) ya va con las entidades, pero la luz de la noche lo multiplica y casi no
@@ -54,9 +54,14 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   brillos con prueba de profundidad contra las entidades, o un búfer emisivo que se suma después de la luz).
 - [ ] **Resolución de la luz para pixel art** — charlar. ¿Tiene sentido `lighting.resolution: .5` en un juego pixel art?
 
+## Cables
+
+- [ ] **Cables que salen del aire** — en curso. Los cables tienen que salir de algo (un poste, una casa) y llegar a algo,
+  y verse más reales y más lindos (con su comba, de a varios, del color del cable).
+
 ## Movimiento
 
-- [ ] **Menos vaivén** — hecho, falta el commit. Árboles y plantas se mecen la mitad (o menos) que antes, y un poco más
+- [ ] **Menos vaivén** — hecho (f00925d). Árboles y plantas se mecen la mitad (o menos) que antes, y un poco más
   lento.
 
 ## Sombras
@@ -69,4 +74,4 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 ## Barrios y rama
 
 - [ ] **Reexportar el barrio inventado y Carabobo** — pendiente. Todavía tienen los objetos de Gemini y nada de lo de arriba.
-- [ ] **Rama `objetos-zip`** — pendiente: mergear a main y subir cuando el dueño diga.
+- [x] **Rama `objetos-zip`** — mergeada a main el 12/11 (sin subir a GitHub).
