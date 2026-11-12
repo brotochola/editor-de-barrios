@@ -51,7 +51,7 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 - [ ] **Casas de la rotonda: huecos y paredes «de papel»** — hecho (2bfae69). Entre el techo y la pared quedaba una rayita (el triángulo
   compartido de los techos, ahora más fino y pasado de la diagonal) y las paredes no tenían espesor (ahora llevan tapa arriba y el
   parapeto corrido hacia adentro).
-- [ ] **La fuente tira agua** — hecho (HASH_FUENTE). Un chorro de gotas que sube de 0,8 a 1,15 m sobre el pico y cae en la taza de
+- [ ] **La fuente tira agua** — hecho (cc6f691). Un chorro de gotas que sube de 0,8 a 1,15 m sobre el pico y cae en la taza de
   arriba, con gravedad de verdad (45 gotas por segundo, sin importar los fps). Partículas de GPU (`ParticleEmitter.emitGpu`, capa
   `agua`) que tira una entidad `Chorro` por fuente. El editor dice de dónde sale y adónde cae (`chorro` en `objetos.js`,
   `META.fuentes`), así sirve para cualquier dibujo de fuente. Las de las plazas también tiran.
