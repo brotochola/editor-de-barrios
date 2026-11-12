@@ -131,7 +131,7 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 - [ ] **Plazas sin juegos ni bancos de Gemini** — pendiente. Con los objetos de Gemini se fueron los juegos (hamacas, tobogán,
   subibaja, calesita), el monumento, la glorieta, el bebedero, el ping-pong, el ajedrez y las manchas del piso; los packs de
   `arte/objetos` no traen nada de eso. Se podrían armar en 3D en el editor, como los postes (`Houses.poste`), u otro pack.
-- [ ] **Atlas de las caras con mucho repetido** — hecho (HASH_CARAS). Las paredes de material (revoque, ladrillo, ladrillo hueco,
+- [ ] **Atlas de las caras con mucho repetido** — hecho (c1d764e). Las paredes de material (revoque, ladrillo, ladrillo hueco,
   salpicré, hormigón, piedra) salen de una baldosa compartida que se repite; el revoque, gris, teñido del color de cada pared. Al
   hornear: el fondo en recortes de la baldosa (con las manchas horneadas), y lo dibujado encima (ventanas, puertas, carteles,
   zócalos) en recuadros con sólo eso, compartidos; una pieza igual a otra va una sola vez.
