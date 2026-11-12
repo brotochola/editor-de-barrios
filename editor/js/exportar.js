@@ -129,6 +129,8 @@ const Exportar = (() => {
     const DET = opts.detalle || 5 / 3, TDp = SF * DET; R3.setDetalle(DET);
     const entries = [...B.cat.values()], SKEW = C.skew !== 0;
     let PIES = null;   // de caras.js: pie, sombra y puertas de cada clave del catálogo
+    // grafitis, firmas y carteles de arte/objetos en las paredes, casa por casa (paredes.js, con las ranuras de caras.js)
+    const PAR = SKEW && typeof Paredes !== "undefined" && typeof OBJETOS !== "undefined" ? Paredes.nuevo(F, C, Caras.L) : null;
     let hojas = [], franjas = {}, casas = [], hojasCaras = 0, variantes = null, nTiles = 0;
     if (!SKEW) {
       const rendered = [], TOL = Math.round(8 * DET), PIEZA = Math.round(64 * DET), ANCHO = Math.round(64 * DET);
@@ -238,8 +240,10 @@ const Exportar = (() => {
         else rec.r = r1(.15 * 13.5);
         if (o.e.spec.t === "poste" && o.e.spec.l) rec.l = 1;
         if (cts.length) { rec.sp = sombraCasa(cts, o, fx, fy); nSombraPts += rec.sp.length / 3; }
+        if (PAR) { const g = PAR.poner(H.ranuras[o.e.id], o.x0, o.y0, o.e.spec.t, W.wealthAt(o.x0, o.y0)); if (g) rec.g = g; }
         casas.push(rec);
       }
+      if (PAR) console.log("grafitis:", PAR.n, "piezas en las paredes");
     }
     // ---------- 3. árboles: piezas (tronco + ramas) en una hoja, a la resolución de dibujo (el juego las muestra al 0,6)
     progreso("árboles", .62); await espera();
@@ -311,11 +315,15 @@ const Exportar = (() => {
     if (puertas.length) console.log("puertas:", puertas.length, "props sacados de delante:", B.props.length - propsB.length);
     const props = propsB.map(e => { const [x, y] = PW(e.x, e.y); let fl = e.flip, f = e.f;
       if (e.face) { const s0 = PW(e.x, e.y), s1 = PW(e.x + e.face[0], e.y + e.face[1]); [f, fl] = Barrio.vista(F, e.f, s1[0] - s0[0], s1[1] - s0[1]); }
-      return { f, x: r1(x), y: r1(y), fl: fl ? 1 : 0, r: r1(e.cr * 13.5), sh: e.sh && F[e.sh] ? e.sh : null, ...(e.cruce && e.cruce._cid >= 0 ? { cr: e.cruce._cid, ej: e.eje } : {}) }; });
-    const anclas = {}, escalas = {}; let semAlto = 0;
+      // la planta de una maceta armada va subida sobre la tierra: o, en px de mundo (e.o viene en texeles del dibujo)
+      return { f, x: r1(x), y: r1(y), fl: fl ? 1 : 0, r: r1(e.cr * 13.5), sh: e.sh && F[e.sh] ? e.sh : null, ...(e.cruce && e.cruce._cid >= 0 ? { cr: e.cruce._cid, ej: e.eje } : {}),
+        ...(e.o ? { o: r1(e.o * ((F[e.f].hd && F[e.f].hd.e) || 1)) } : {}) }; });
+    const anclas = {}, escalas = {}, lamparas = {}; let semAlto = 0;
     { const usados = new Set(); for (const p of props) { usados.add(p.f); if (p.sh) usados.add(p.sh); } ["sh_person", "sh_car_h", "sh_tree"].forEach(n => F[n] && usados.add(n));
       // los props HD (f.hd) salen de su hoja, no del atlas del editor, y el juego los dibuja a f.hd.e (escalas)
       const S = (n) => F[n].hd || F[n];
+      // los faroles de arte/objetos tienen otro cuadro para cuando están prendidos (f.on): va también
+      for (const n of [...usados]) { const f = S(n); if (f.on && F[f.on]) usados.add(f.on); }
       // los de Gemini (f.e) ya vienen con su contorno dibujado: no se les agrega otro, sólo se achican hasta E_HD y llevan un margen
       // transparente (el borde suave del dibujo no se corta contra el del cuadro). Los demás llevan el contorno de las casas y los árboles
       // (no el de los personajes y los autos, que es más grueso y oscuro): por fuera, de ~0,6 px de mundo, del color del relleno llevado a su
@@ -323,11 +331,13 @@ const Exportar = (() => {
       const SIN_CONTORNO = /^sh_/, cuadro = {}, SUAVE = Math.min(1, .7 * R3.LIGHT.outline), MARGEN = 2;
       for (const n of usados) { let f = S(n), c = document.createElement("canvas"), t; c.width = f.w; c.height = f.h;
         c.getContext("2d").drawImage(f.img || atlas, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
-        if (f.e) { t = MARGEN; if (/^(pl|plm|yy)_/.test(n)) sinCian(c);
+        if (f.e) { t = MARGEN; if (!f.zip && /^(pl|plm|yy)_/.test(n)) sinCian(c);   // los de arte/objetos no tienen fondo cian
           if (f.e < E_HD) { const r = f.e / E_HD; c = achicarLineal(c, r, t, R3.LIGHT.sat); f = { ...f, w: f.w * r, h: f.h * r, ox: f.ox * r, oy: f.oy * r, e: E_HD }; }
           else { const c2 = document.createElement("canvas"); c2.width = f.w + 2 * t; c2.height = f.h + 2 * t; c2.getContext("2d").drawImage(c, t, t); c = c2; } }
         else { t = SIN_CONTORNO.test(n) ? 0 : 1; if (t) c = Contorno.canvas(c, t, null, SUAVE); }
         cuadro[n] = { cv: c, t, f }; }
+      // los grafitis de las paredes (paredes.js): ya en su tono y saturados, sin margen
+      if (PAR) for (const [n, cv] of PAR.cuadros()) { cuadro[n] = { cv, t: 0, f: { w: cv.width, h: cv.height, ox: cv.width / 2, oy: cv.height / 2 } }; usados.add(n); }
       const ns = [...usados].sort((a, b) => cuadro[b].cv.height - cuadro[a].cv.height); let x = 0, y = 0, rowH = 0; const pos = {};
       for (const n of ns) { const c = cuadro[n].cv; if (x + c.width > 2048) { x = 0; y += rowH + 2; rowH = 0; } pos[n] = [x, y]; x += c.width + 2; rowH = Math.max(rowH, c.height); }
       const cv = document.createElement("canvas"); cv.width = 2048; cv.height = Math.max(4, y + rowH); const g = cv.getContext("2d"), frames = {};
@@ -340,6 +350,8 @@ const Exportar = (() => {
         const oy = crDe[n] ? Math.min(f.oy, f.h - 1 - crDe[n] * SYN * SF / (f.e || 1)) : f.oy;
         anclas[n] = [r2((f.ox + t) / c.width), r2((oy + t) / c.height)];
         if (f.e) escalas[n] = f.e;
+        // un farol de arte/objetos: dónde están sus lámparas (fracción del cuadro), a qué altura (m) y su cuadro prendido
+        if (f.luz) lamparas[n] = { l: f.luz.map(([lx, ly]) => [r2((lx + t) / c.width), r2((ly + t) / c.height)]), z: r2((oy - f.luz[0][1]) * f.e / (CZ * SF)), ...(f.on ? { on: f.on } : {}) };
         if (n === "u_semaforo") semAlto = r1(c.height * anclas[n][1] * (f.e || 1)); }
       archivos.push(["img/props.png", await png(cv)], ["img/props.json", json(hoja(frames, "props.png", cv))]); }
     // ---------- 5. autos y cables
@@ -450,7 +462,7 @@ const Exportar = (() => {
     const meta = { formato: 1, escalaCasas: Math.round(1 / DET * 1e5) / 1e5, editor: "editor de barrios · Conurbano", fecha: new Date().toISOString(), seed: B.SEED, knobs: { ...C },
       MW, MH, MG: W.MG || 0, WW, WH, SF, K, SYN, CZ, GC, CW, CH: CHh, WG: WGc, HG: HGc, PW: PWc, PH: PHc, NS, CELL, PXM: 13.5, pisoPartes: offs,
       hojasCasas: hojas.length, peatones: targets.length, ...(C.ffBinario ? { ffExt: FF_EXT } : {}), nCasas: casas.length, nSombraPts, nFranjas, nPiezas, skew: SKEW ? 1 : 0, hojasCaras, nTiles, nArboles: arboles.length,
-      nPiezasArboles: arboles.reduce((a, t) => a + arbolTipos[t.t].piezas.length, 0), nProps: props.length, nAutos: autos.length, nCables: cables.length, nLineas: lineas.length, anclas, escalas,
+      nPiezasArboles: arboles.reduce((a, t) => a + arbolTipos[t.t].piezas.length, 0), nProps: props.length, nAutos: autos.length, nCables: cables.length, nLineas: lineas.length, anclas, escalas, lamparas, nGrafitis: PAR ? PAR.n : 0,
       ...(W.inicio ? { inicio: PW(W.inicio[0], W.inicio[1]).map(v => Math.round(v)), lugar: W.real } : {}),
       // rotondas: centro en px de pantalla (x, y) y en m (mx, my), radios de la isla y de la calzada (m) y las salidas: rumbo de cada
       // calle hacia afuera (m) y el corrimiento de su carril de salida (m, a la derecha)

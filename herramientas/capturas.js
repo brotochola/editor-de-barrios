@@ -11,14 +11,15 @@
 // la placa (el de la luna, por ejemplo, sólo se veía con GPU de verdad). Imprime la hora real, la intensidad del sol y los fps.
 // Sin placa, la captura llega atrasada: la cámara se pone una sola vez, antes de la espera de arranque, y antes de cada
 // captura se saca otra que se tira.
-const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+const { chromium } = require('./playwright.js').playwright();   // el de WeedJS si el juego no tiene uno a mano
+const fs = require('fs'), path = require('path');
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 && i + 1 < process.argv.length ? process.argv[i + 1] : d; };
 (async () => {
   const URL0 = arg('url', 'http://localhost:8000'), BARRIO = arg('barrio', ''), HORAS = arg('horas', '7,9,12,16,18.5,22').split(',').map(Number);
   const X = arg('x', null), Y = arg('y', null), Z = arg('zoom', null), SAL = arg('sal', 'capturas'), NOM = arg('nombre', 'cap');
   const ESPERA = +arg('espera', 6000), ARRANQUE = +arg('arranque', 15000), SEG = Math.max(1, +arg('seguidas', 1)), EXTRA = arg('extra', '');
   fs.mkdirSync(SAL, { recursive: true });
-  const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'] });
+  const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader', '--mute-audio'] });
   const p = await (await b.newContext({ viewport: { width: 1280, height: 760 } })).newPage();
   const errores = []; p.on('pageerror', e => errores.push(String(e))); p.on('console', m => { if (m.type() === 'error') errores.push(m.text()); });
   const q = [BARRIO && 'barrio=' + BARRIO, EXTRA].filter(Boolean).join('&');

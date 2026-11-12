@@ -242,7 +242,8 @@ const Houses = (() => {
     if (finish === "hueco" || r() < .25) stx.hueco(); else if (r() < .5) { stx.stucco(mix(wall, [190, 186, 178], .6), wear * 1.3); stx.runoff(.8, 1.2); stx.peel(2); } else stx.brick();
     if (r() < .15 && finish !== "hueco") pintada(stx, 4, stx.w - 4, px(Htot - 2.6), r);
     { const rg = rng(spec.seed ^ 0x2f6b1d3), dg = R3.DECALS.fd_graffiti, dm = R3.DECALS.fd_mural;
-      if (dg && rg() < (spec.wealth < .45 ? .35 : .1)) { const w = px(Math.min(D - .4, rg.uniform(1.6, 2.6))), h = Math.round(w * dg.h / dg.w); stx.blit("fd_graffiti", px(rg.uniform(.1, Math.max(.2, D - 2.8))), stx.h - h - px(rg.uniform(.3, .8)), w, h); }
+      // el grafiti de Gemini (siempre el mismo dibujo) ya no va: los grafitis van casa por casa (paredes.js). Los sorteos quedan, así el mural no cambia
+      if (dg && rg() < (spec.wealth < .45 ? .35 : .1)) { rg.uniform(1.6, 2.6); rg.uniform(.1, Math.max(.2, D - 2.8)); rg.uniform(.3, .8); }
       else if (dm && Htot > 5 && rg() < .12) { const w = px(Math.min(D - .3, rg.uniform(3, 5))), h = Math.min(px(Htot - 1), Math.round(w * dm.h / dm.w)); stx.blit("fd_mural", px(.15), stx.h - h - px(.5), w, h); }
       // casas de dos pisos o más: a veces un mural de los grandes en la medianera (sorteo aparte)
       else { const rm = rng(spec.seed ^ 0x3c6ef372), MUR = ["fd_mural_filete", "fd_mural_geometrico", "fd_mural_lago", "fd_mural_rio", "fd_mural_tango", "fd_mural_yaguarete"];

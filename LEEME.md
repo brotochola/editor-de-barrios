@@ -6,7 +6,7 @@ El mismo barrio de la versión Pixi/Three, armado como escena de WeedJS 0.13.0 m
 
 WeedJS usa `SharedArrayBuffer`, así que la página tiene que estar "aislada" (encabezados COOP/COEP).
 
-- **En tu compu:** `python3 servir.py` y abrí `http://localhost:8000/`.
+- **En tu compu:** `python3 servir.py` (o `node herramientas/servir.js`, si no hay Python) y abrí `http://localhost:8000/`.
 - **Publicado:** subí la carpeta entera a cualquier hosting estático con HTTPS (por ejemplo GitHub Pages). `weed-sw.js` pone los encabezados: la primera visita recarga una vez sola.
 - `?gente=N` fija la cantidad de gente (si no, se ajusta sola).
 - `?prueba=x,y;x,y,p;x,y,u_cono` pone faroles (o la prop que digas, o `p` = una persona quieta) en esas coordenadas de mundo, para revisar a mano el orden de dibujo.
@@ -147,7 +147,44 @@ nombres de ciudades europeas (Berlín, Ginebra, La Haya, Londres, Cádiz…), y 
 - **Autos estacionados:** por cada calle tienen que poder pasar dos autos (2,45 m cada uno); se estaciona sólo si entran tres (de un lado) o cuatro (de los dos). Y como manda el Código de Tránsito de CABA: no en las avenidas de doble mano (prohibido de 7 a 21), ni en la esquina (hasta 5 m después de la vereda de la otra calle), ni en la parada del colectivo, ni junto a un hidrante.
 - **Cazuelas** de tierra (con borde de ladrillo, de cemento o sin borde) alrededor de los árboles de vereda, a veces con plantas o yuyos.
 
-## Arte con Gemini (props, plantas, yuyos y piezas de fachada)
+## Objetos (`arte/objetos`): plantas, macetas, basura, sillas, obra, faroles y grafitis
+
+Los objetos sueltos del barrio salen de `arte/objetos/`: dibujos de varios packs (0-mem0ry, Cainos, GandalfHardcore, LPC Revised,
+karsiori), elegidos y unificados con los personajes LPC (misma escala, 31,25 px/m; misma saturación; el contorno con la regla de los
+personajes; sin sombras dibujadas). `arte/objetos/indice.csv` los lista y `CREDITOS_Y_LICENCIAS.txt` dice de quién es cada uno. De
+Gemini quedan la plaza, los semáforos, los locales coreanos, las manchas del piso, la rejilla, la tapa y las piezas de fachada y murales.
+
+1. `node herramientas/objetos.js` arma `editor/recursos/objetos.js`: los cuadros (nombre, archivo, tamaño) y qué objeto del juego hace
+   cada uno. El editor sigue pidiendo los objetos por su nombre de siempre (`u_farola`, `pl_malvon`, `yy_avena`…), que ahora es un
+   **rol**: cada rol sale de una o más listas con su peso, y el cuadro sale del lugar (no del sorteo), así el resto del barrio no
+   cambia. Las medidas (cuánto ocupa, si choca, su sombra) siguen siendo las del rol.
+   - **Macetas armadas:** un recipiente (balde, tambor, goma, inodoro) y una planta encima (flores, hojas, huerta, brotes), elegidos
+     cada uno por su lado: salen cientos de macetas distintas. La planta va subida hasta la tierra del recipiente (`tierra`, medida a ojo
+     en px del dibujo; en `mundo.json`, `o` en px de mundo) y se mece; el recipiente queda quieto. Las macetas de las casas de más plata
+     son las que ya traen su planta (y alguna armada); las de lo pobre, baldes, gomas y tambores.
+   - **Nombres:** `yy_z_*` yuyos y pasto, `plm_z_*` plantas en la tierra, `plm_t_*` plantas de maceta (las tres se mecen),
+     `u_farol_*` faroles, `z_*` lo demás (quieto).
+   - **Faroles:** el farol de hierro, apagado de día y con el vidrio prendido mientras su luz está prendida (el juego cambia el cuadro a la
+     hora de la luz). `META.lamparas` dice dónde está la lámpara, a qué altura (2,3 m) y cuál es el cuadro prendido.
+   - Lo de Gemini que no tiene reemplazo (contenedores, kioscos, paradas, motos, bicis, puestos, volquetes, mesas, parrillas, el
+     Gauchito, la Virgen…) no se pone más (`OBJETOS.quitar`).
+   - Son de frente, como la gente: van en cualquier lado (no sólo a 50° como las cajas isométricas de Gemini) y no tienen vista de
+     atrás. El exportador los copia tal cual (a la escala de la gente, 0,6; sin achicar, sin contorno agregado, sin sacarles el cian).
+2. **Grafitis en las paredes, casa por casa** (`editor/js/paredes.js`): las casas salen de un catálogo compartido, así que lo que se
+   pinta en el diseño se repite en cada casa igual. Los grafitis de `arte/objetos` (9 grandes, en 6 colores cada uno; letras sueltas
+   que se juntan en firmas teñidas; 6 carteles que se pegan de a varios) van aparte, como piezas de cada casa (`casas[].g` en
+   `mundo.json`), encima de su pared, con la misma escala, skew, luz y orden que ella.
+   - Dónde: `caras.js` marca en cada pared que llega al piso (lisa o con dibujo) las celdas de 4 texeles que son pared (del color de la
+     pared: sin aberturas, carteles, murales ni pintadas), entre 0,25 y 3,4 m, y sin nada de la casa adelante.
+   - Cuántos: más en lo pobre (3 de 4 paredes), en tapiales y paredones (y varios por paredón), menos en lo rico; knob `grafitis`.
+   - Sin que se note la repetición: el mismo dibujo no se repite a menos de 45 m, ni el mismo dibujo y color a menos de 160 m; entre los
+     que se pueden, el menos usado. Unos más gastados que otros. Las firmas y los grupos de carteles salen distintos cada vez.
+   - El visor del editor no los muestra: salen al exportar. Las pintadas con frases (`graffiti.js`) siguen como estaban.
+
+## Arte con Gemini (plaza, semáforos, locales coreanos, manchas del piso y piezas de fachada)
+
+Lo que queda de Gemini; los objetos sueltos ya salen de `arte/objetos` (arriba). El editor todavía carga los props HD de Gemini, pero los que tienen reemplazo no se ponen.
+
 
 Estilo: pixel art duro con contorno de color (el más oscuro de cada material, nunca negro), sombreado de 3 a 5 tonos que tira a violeta en la sombra y a amarillo en la luz, luz desde arriba a la izquierda.
 
@@ -172,12 +209,12 @@ Estilo: pixel art duro con contorno de color (el más oscuro de cada material, n
 
 ## Límites conocidos
 
-- Los props de Gemini que son cajas (parrillas, bancos, contenedores, juegos de plaza, motos) están dibujados en isométrica: sólo se
+- Los props de Gemini que son cajas (los juegos de plaza, los bancos de la plaza) están dibujados en isométrica: sólo se
   ponen donde la casa, la plaza o la calle está girada 50° ± 6° (módulo 90°), que es como se ve esa caja en la vista del juego. En
   los demás lugares no van. Nada se pone delante de una puerta o un portón (las puertas salen del dibujo de cada casa). No hay
   animales.
 - Contorno: las casas y los árboles llevan el mismo borde fino, del color de la cosa oscurecido (las caras lisas y los techos de
-  material, con una tira de 1 px); los props de Gemini, el que trae el dibujo; los personajes y los autos, el suyo, más marcado. Los
+  material, con una tira de 1 px); los props de Gemini y los de `arte/objetos`, el que trae el dibujo; los personajes y los autos, el suyo, más marcado. Los
   personajes LPC van un 6 % más angostos.
 
 - El catálogo de casas se reparte entre lotes para entrar en el atlas único de WeedJS. Por eso algunas casas son un poco más angostas que su lote y quedan pasillos laterales.
@@ -193,3 +230,7 @@ Estilo: pixel art duro con contorno de color (el más oscuro de cada material, n
   (https://data.buenosaires.gob.ar), licencia CC BY 2.5 AR.
 
 - Autos: «TopDown Vehicles» v1.17 de MinZiin (https://minzinn.itch.io/), licencia Creative Commons Atribución 4.0.
+- Objetos (plantas, macetas, basura, muebles, obra, faroles, grafitis y carteles): 0-mem0ry (https://0-mem0ry.itch.io/), Cainos
+  (https://cainos.itch.io/), GandalfHardcore, karsiori (https://karsiori.itch.io/) y LPC Revised (https://github.com/ElizaWy/LPC,
+  CC-BY 3.0 / OGA-BY 3.0; sus autores, en `arte/objetos/CREDITS_LPC_*.txt`). Usados con permiso de sus autores; de quién es cada
+  uno y qué deja hacer cada licencia, en `arte/objetos/CREDITOS_Y_LICENCIAS.txt`.

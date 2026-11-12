@@ -188,15 +188,18 @@ export class Prop extends GameObject {
     this.shadowCaster.heightMultiplier = .8;
     const L = this.lightEmitter, top = this.spriteRenderer.originalHeight * an[1] * e;
     const f = c.f.endsWith('_atras') ? c.f.slice(0, -6) : c.f;   // vista de atrás: el mismo objeto
+    // los faroles de arte/objetos traen sus lámparas en META.lamparas (y un cuadro prendido, que se pone a la hora de la luz)
+    const LM = META.lamparas && META.lamparas[c.f];
+    this._fOff = c.f; this._fOn = LM && LM.on ? LM.on : null; this._prendido = -1;
     if (f.startsWith('u_farol')) {            // farol: charco de luz en la vereda + brillo en la lámpara
-      L.lightColor = LUZ; L.height = 0; L.glowHeightOffset = top * (f === 'u_farola' ? .97 : .88);
+      L.lightColor = LUZ; L.height = 0; L.glowHeightOffset = LM ? top * (an[1] - LM.l[0][1]) / an[1] : top * (f === 'u_farola' ? .97 : .88);
       // la luz sale de la lámpara (sourceHeight, a media altura del poste: el charco queda más parejo) y por eso más fuerte
       L.sourceHeight = top * .5; L.lightIntensity = (f === 'u_farol_doble' ? 2600 : f === 'u_farola' ? 2200 : 1800) * FAROL_K; L.hasGlowSprite = .55; L.active = 1;
       this.collider.visualRange = alcanceLuz(L.lightIntensity) || 260;   // alcance para las sombras que proyecta su luz (y, con ?raycast=1, las casas que la tapan)
       // brillo en cada lámpara (se prende con la luz): un centro chico y un halo, en la capa 'noche' (aditiva, arriba de todo:
       // debajo de la luz, multiplicados por el charco, no se veían). Esa capa no se ordena con las casas: el farol que tiene su
       // lámpara detrás de una casa (c.tp, ConurbanoScene._lamparasTapadas, al cargar) va sin brillo
-      const ls = c.tp ? null : LAMPARAS[f] || null, sw = this.spriteRenderer.originalWidth * e, sh = this.spriteRenderer.originalHeight * e;
+      const ls = c.tp ? null : (LM ? LM.l : LAMPARAS[f]) || null, sw = this.spriteRenderer.originalWidth * e, sh = this.spriteRenderer.originalHeight * e;
       if (ls) for (const [fx, fy] of ls) { const dx = (fx - an[0]) * sw * (c.fl ? -1 : 1), dy = (fy - an[1]) * sh;
         this.addDecoration('_lightGradient', dx, dy, .26, .26, 1, { tint: 0xfff2d0, alpha: 1, anchorX: .5, anchorY: .5, layer: 'noche' });
         this.addDecoration('_lightGradient', dx, dy, .8, .8, 1, { tint: LUZ, alpha: .5, anchorX: .5, anchorY: .5, layer: 'noche' }); }
@@ -213,8 +216,13 @@ export class Prop extends GameObject {
           Semaforos.ids[c.sk * 4 + q] = d >= 0 ? d + 1 : 0; }); }
       else if (c.f === 'u_semaforo' && !TR.n) { const rojo = rng() < .5; this.addDecoration('_lightGradient', 0, -top * (rojo ? .87 : .7), .35, .35, 0, { tint: rojo ? 0xff3b30 : 0x36d96b, alpha: .85, anchorX: .5, anchorY: .5, layer: 'brillos' }); }
     }
+    this.tick();
   }
-  tick() { luzHora(this); }
+  tick() {
+    luzHora(this);
+    // el farol con cuadro prendido: el vidrio se ve encendido mientras su luz está prendida
+    if (this._fOn) { const on = LuzHora.on[this.index] === 1 ? 1 : 0; if (on !== this._prendido) { this._prendido = on; this.setSprite('props', on ? this._fOn : this._fOff, 0); } }
+  }
 }
 
 // árbol del editor: el tronco es el sprite; cada rama (con sus hojas) es una decoración colgada, anclada en su base, que se mece.
@@ -658,7 +666,8 @@ export class ConurbanoScene extends Scene {
       const c = { pie, sil: envolvente(P), x0, x1 };
       for (let g = Math.floor(x0 / G); g <= Math.floor(x1 / G); g++) { let l = grilla.get(g); if (!l) grilla.set(g, l = []); l.push(c); } }
     for (const p of w.props || []) { if (!(p.r > 0) || !p.f || !p.f.startsWith('u_farol')) continue;
-      const hz = p.f.startsWith('u_farola_orn') ? 4 : p.f.startsWith('u_farola') ? 6.5 : 5.5, hy = p.y - hz * KZ, l = grilla.get(Math.floor(p.x / G));
+      const lm = META.lamparas && META.lamparas[p.f];   // los de arte/objetos dicen a qué altura está su lámpara
+      const hz = lm ? lm.z : p.f.startsWith('u_farola_orn') ? 4 : p.f.startsWith('u_farola') ? 6.5 : 5.5, hy = p.y - hz * KZ, l = grilla.get(Math.floor(p.x / G));
       if (l) for (const c of l) if (p.x >= c.x0 && p.x <= c.x1 && dentroConvexo(c.sil, p.x, hy) && p.y < frenteEn(c.pie, p.x)) { out.add(p); break; } }
     return out;
   }
@@ -695,7 +704,20 @@ export class ConurbanoScene extends Scene {
           if (CARAS && t.length >= 14) { // la normal en el espacio del piso de WeedJS: x de pantalla, y hacia la cámara, z arriba
             cfg.faceNormalX = t[10]; cfg.faceNormalY = META.K * t[10] - t[11]; cfg.faceNormalZ = t[12]; cfg.faceHeight = t[13] * META.SF;
           } else cfg.faceNormalX = undefined;
-          Decoration.spawn(cfg); } }
+          Decoration.spawn(cfg); }
+        // grafitis, firmas y carteles de esta casa (no del diseño: así no se repiten en cada casa igual), encima de su pared,
+        // con la misma escala, skew, luz y orden que ella; t[14]: el alfa (más o menos gastados)
+        if (h.g) {
+          for (let i = 0; i < h.g.length; i++) {
+            const t = h.g[i];
+            cfg.x = h.ox + t[1]; cfg.y = h.oy + t[2]; cfg.texture = t[0]; cfg.scaleX = t[3]; cfg.scaleY = t[4]; cfg.skewX = t[5]; cfg.skewY = t[6];
+            cfg.tint = t[7]; cfg.sortOffsetY = t[8]; cfg.innerZ = t[9]; cfg.alpha = t[14];
+            if (CARAS) { cfg.faceNormalX = t[10]; cfg.faceNormalY = META.K * t[10] - t[11]; cfg.faceNormalZ = t[12]; cfg.faceHeight = t[13] * META.SF; } else cfg.faceNormalX = undefined;
+            Decoration.spawn(cfg);
+          }
+          cfg.alpha = 1;
+        }
+      }
     } else for (const h of w.casas) { Casa.spawn({ x: h.x, y: h.y, col: h.col, r: h.r, k: h.k, l: h.l, sp: h.sp, fr: w.franjas[h.a], t: 'casas' + h.o + '_' + h.a + '_', e: META.escalaCasas || 1 }); }
     const tapadas = this._lamparasTapadas(w); this.lamparasTapadas = tapadas.size;
     for (const p of w.props) {
@@ -703,7 +725,9 @@ export class ConurbanoScene extends Scene {
       if (p.r > 0) { let sk = -1; if (p.f === 'u_semaforo' && p.cr >= 0 && this._sem.length < (TR.nSem || 0)) { sk = this._sem.length; this._sem.push({ cid: p.cr, eje: p.ej, sk, f: -1 }); }
         Prop.spawn({ x: p.x, y: p.y, f: p.f, r: p.r, fl: p.fl, sk, tp: tapadas.has(p) ? 1 : 0 }); }
       else { const a = META.anclas[p.f], e = (META.escalas && META.escalas[p.f]) || 1, mece = p.f.startsWith('plm_') || p.f.startsWith('yy_');   // plantas que se mecen (skew: la base queda fija)
-        Decoration.spawn({ x: p.x, y: p.y, texture: 'props_' + p.f, anchorX: a[0], anchorY: a[1], scaleX: p.fl ? -e : e, scaleY: e,
+        // la planta de una maceta (p.o: px sobre el pie de la maceta) se dibuja subida, sobre la tierra, y se ordena justo delante de la maceta
+        const o = p.o || 0;
+        Decoration.spawn({ x: p.x, y: p.y - o, texture: 'props_' + p.f, anchorX: a[0], anchorY: a[1], scaleX: p.fl ? -e : e, scaleY: e, sortOffsetY: o ? o + .05 : 0,
           ...(mece ? { swaySkew: 1, swayAmplitude: .05 + rng() * .05, swayFrequency: .5 + rng() * .6 } : {}),
           ...(p.f.startsWith('gd_') ? { layer: 'manchas' } : {}) }); }   // manchas y roturas: pegadas al piso, debajo de todo
     }
