@@ -25,7 +25,7 @@ const { Scene, GameObject, Component, SharedResource, RigidBody, Collider, Colli
 const LUZ = 0xffdcaa;
 // la luz de la noche (lighting.sun.night): una luna azulada que WeedJS suma a la luz de la escena cuando el sol baja de 0,4
 // (completa en 0,1), sin tocar Sun.intensity: las sombras del sol se apagan solas y las de los faroles no se debilitan
-const LUNA = 0x5473f2, LUNA_I = .3;
+const LUNA = 0x5473f2, LUNA_I = 0;
 // los faroles alumbran desde arriba (LightEmitter.sourceHeight): con la misma intensidad el pie quedaría oscuro
 const FAROL_K = 2.2;
 const { ShapeType } = enums;
@@ -70,19 +70,20 @@ const LPC_EXCLUDE = ['spellcast', 'thrust', 'slash', 'shoot', 'jump', 'sit', 'em
   .flatMap(a => ['up', 'left', 'down', 'right'].map(d => `${a}_${d}`)).concat(['hurt', 'climb']);
 
 // ---------- datos compartidos: piso (para el shader) y estado del juego
-export class PisoData extends SharedResource {}
+export class PisoData extends SharedResource { }
 // tránsito (transito.bin y los cruces de mundo.json): velocidad máxima, zonas antes de cada esquina y semáforos
-export class Transito extends SharedResource {}
+export class Transito extends SharedResource { }
 // las luces de cada semáforo: índices de sus decoraciones (+1; 0 = todavía no), las pone el semáforo y las prende la escena
-export class Semaforos extends SharedResource {}
-export class Estado extends SharedResource {}
+export class Semaforos extends SharedResource { }
+export class Estado extends SharedResource { }
 
 // ---------- componentes
 export class PersonaComp extends Component {
   static ARRAY_SCHEMA = { campo: Uint8Array, quieta: Uint8Array, estado: Uint8Array, timer: Float32Array, vel: Float32Array, cara: Uint8Array };
 }
 export class AutoComp extends Component {
-  static ARRAY_SCHEMA = { active: Uint8Array, driveForce: Float32Array, lateralFriction: Float32Array, turnTorque: Float32Array, minSteerSpeed: Float32Array,
+  static ARRAY_SCHEMA = {
+    active: Uint8Array, driveForce: Float32Array, lateralFriction: Float32Array, turnTorque: Float32Array, minSteerSpeed: Float32Array,
     minSteerFactor: Float32Array, maxSteerSpeed: Float32Array, lastKey: Int16Array,
     hl: Float32Array, hw: Float32Array,   // medio largo y medio ancho del colisionador (px): la IA y la gente miran el tamaño de cada vehículo
     ha: Float32Array, hb: Float32Array,   // medio largo y medio ancho de la huella en el piso, en px del dibujo (18 px/m, piso aplastado a AUTO_S)
@@ -107,8 +108,10 @@ export class LuzHora extends Component {
 const LUZ_TICK = 30;   // cada cuántos cuadros mira la hora cada luz (con el día de 8 minutos, 1 cuadro son 0,3 minutos de juego)
 // las horas de una luz fija salen de su posición (el mismo sorteo en cualquier hilo); las de los autos, al azar
 const _hl = [0, 0];
-function horasLuz(x, y, out) { const a = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453, b = Math.sin(x * 39.346 + y * 11.135) * 24634.6345;
-  out[0] = 18 + (a - Math.floor(a)); out[1] = 6 + (b - Math.floor(b)); return out; }
+function horasLuz(x, y, out) {
+  const a = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453, b = Math.sin(x * 39.346 + y * 11.135) * 24634.6345;
+  out[0] = 18 + (a - Math.floor(a)); out[1] = 6 + (b - Math.floor(b)); return out;
+}
 function luzNace(go, ag, a0, a1, c) {
   const i = go.index, L = LuzHora; if (c) { horasLuz(c.x, c.y, _hl); L.prende[i] = _hl[0]; L.apaga[i] = _hl[1]; } else { L.prende[i] = 18 + rng(); L.apaga[i] = 6 + rng(); }
   L.base[i] = LightEmitter.lightIntensity[i];
@@ -146,9 +149,13 @@ export class Casa extends GameObject {
     this.collider.visualRange = 260;
     // las piezas del dibujo cuelgan de la casa (WeedJS ≥ ff32c939): cada franja vertical del sprite se ordena en la base de su
     // pared (sortOffsetY = base de la franja − y de la casa) y cada pieza se recorta por su propio centro
-    if (c.fr) { const e = c.e || 1;
-      for (let k = 0; k < c.fr.length; k++) { const [fx, fy, p] = c.fr[k];
-        for (let j = 0; j < p.length; j++) this.addDecoration(c.t + k + '_' + j, fx + p[j][0], fy + p[j][1], e, e, j, { anchorX: .5, anchorY: .5, sortOffsetY: fy }); } }
+    if (c.fr) {
+      const e = c.e || 1;
+      for (let k = 0; k < c.fr.length; k++) {
+        const [fx, fy, p] = c.fr[k];
+        for (let j = 0; j < p.length; j++) this.addDecoration(c.t + k + '_' + j, fx + p[j][0], fy + p[j][1], e, e, j, { anchorX: .5, anchorY: .5, sortOffsetY: fy });
+      }
+    }
     // las casas no alumbran; los postes de madera con lámpara (calles de tierra y villas) sí
     const L = this.lightEmitter, on = c.k === 'poste' && !!c.l;
     L.lightColor = LUZ; L.height = 0; L.glowHeightOffset = 7 * META.CZ * META.SF; L.hasGlowSprite = on ? .5 : 0;
@@ -162,15 +169,25 @@ export class Casa extends GameObject {
 // dónde están las lámparas de cada farol, como fracción del cuadro exportado (medidas a ojo; de atrás quedan en el mismo lugar)
 // geometría plana para _lamparasTapadas: envolvente convexa, punto dentro de un polígono convexo y la y más baja en pantalla
 // (la más adelante) de un polígono en una x
-function envolvente(P) { const p = P.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]), cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+function envolvente(P) {
+  const p = P.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]), cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
   const lo = [], up = []; for (const q of p) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
   for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
-  up.pop(); lo.pop(); return lo.concat(up); }
-function dentroConvexo(H, x, y) { let sg = 0; for (let i = 0; i < H.length; i++) { const a = H[i], b = H[(i + 1) % H.length], c = (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]);
-  if (c !== 0) { if (sg === 0) sg = c > 0 ? 1 : -1; else if ((c > 0 ? 1 : -1) !== sg) return false; } } return H.length >= 3; }
-function frenteEn(H, x) { let m = -Infinity; for (let i = 0; i < H.length; i++) { const a = H[i], b = H[(i + 1) % H.length];
-  if ((a[0] - x) * (b[0] - x) > 0 || a[0] === b[0]) { if (a[0] === x) m = Math.max(m, a[1]); continue; }
-  m = Math.max(m, a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0])); } return m; }
+  up.pop(); lo.pop(); return lo.concat(up);
+}
+function dentroConvexo(H, x, y) {
+  let sg = 0; for (let i = 0; i < H.length; i++) {
+    const a = H[i], b = H[(i + 1) % H.length], c = (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]);
+    if (c !== 0) { if (sg === 0) sg = c > 0 ? 1 : -1; else if ((c > 0 ? 1 : -1) !== sg) return false; }
+  } return H.length >= 3;
+}
+function frenteEn(H, x) {
+  let m = -Infinity; for (let i = 0; i < H.length; i++) {
+    const a = H[i], b = H[(i + 1) % H.length];
+    if ((a[0] - x) * (b[0] - x) > 0 || a[0] === b[0]) { if (a[0] === x) m = Math.max(m, a[1]); continue; }
+    m = Math.max(m, a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]));
+  } return m;
+}
 const LAMPARAS = { u_farola: [[.65, .09]], u_farola_orn: [[.5, .2]], u_farol_doble: [[.17, .27], [.77, .18]] };
 // árboles, faroles, semáforos, contenedores… (lo que frena un auto); lo demás va como Decoration
 export class Prop extends GameObject {
@@ -200,9 +217,11 @@ export class Prop extends GameObject {
       // debajo de la luz, multiplicados por el charco, no se veían). Esa capa no se ordena con las casas: el farol que tiene su
       // lámpara detrás de una casa (c.tp, ConurbanoScene._lamparasTapadas, al cargar) va sin brillo
       const ls = c.tp ? null : (LM ? LM.l : LAMPARAS[f]) || null, sw = this.spriteRenderer.originalWidth * e, sh = this.spriteRenderer.originalHeight * e;
-      if (ls) for (const [fx, fy] of ls) { const dx = (fx - an[0]) * sw * (c.fl ? -1 : 1), dy = (fy - an[1]) * sh;
+      if (ls) for (const [fx, fy] of ls) {
+        const dx = (fx - an[0]) * sw * (c.fl ? -1 : 1), dy = (fy - an[1]) * sh;
         this.addDecoration('_lightGradient', dx, dy, .26, .26, 1, { tint: 0xfff2d0, alpha: 1, anchorX: .5, anchorY: .5, layer: 'noche' });
-        this.addDecoration('_lightGradient', dx, dy, .8, .8, 1, { tint: LUZ, alpha: .5, anchorX: .5, anchorY: .5, layer: 'noche' }); }
+        this.addDecoration('_lightGradient', dx, dy, .8, .8, 1, { tint: LUZ, alpha: .5, anchorX: .5, anchorY: .5, layer: 'noche' });
+      }
       luzNace(this, ls ? ls.length * 2 : 0, 1, .5, c);   // se prende a su hora, con sus brillos (centro y halo de cada lámpara)
     } else {
       L.lightIntensity = 0; L.active = 0; this.luzHora.base = 0;
@@ -210,10 +229,13 @@ export class Prop extends GameObject {
       // de atrás (u_semaforo_atras) no se ven las luces
       // con datos de tránsito: rojo, amarillo y verde (y una tapa para la roja, que en el dibujo está prendida), pegados al semáforo
       // y apagados; la escena los prende según el ciclo de su cruce. Si no, una luz fija
-      if (c.f === 'u_semaforo' && c.sk >= 0 && TR.n) { const dx = (c.fl ? -1 : 1) * .9;
+      if (c.f === 'u_semaforo' && c.sk >= 0 && TR.n) {
+        const dx = (c.fl ? -1 : 1) * .9;
         [[.862, 0xff3b30], [.773, 0xffb020], [.684, 0x36d96b], [.862, 0x241e1e]].forEach(([k, tint], q) => {
           const d = this.addDecoration('_whiteCircle', dx, -top * k, q === 3 ? .56 : .42, q === 3 ? .56 : .42, q === 3 ? 2 : 3, { tint, alpha: 0, anchorX: .5, anchorY: .5 });
-          Semaforos.ids[c.sk * 4 + q] = d >= 0 ? d + 1 : 0; }); }
+          Semaforos.ids[c.sk * 4 + q] = d >= 0 ? d + 1 : 0;
+        });
+      }
       else if (c.f === 'u_semaforo' && !TR.n) { const rojo = rng() < .5; this.addDecoration('_lightGradient', 0, -top * (rojo ? .87 : .7), .35, .35, 0, { tint: rojo ? 0xff3b30 : 0x36d96b, alpha: .85, anchorX: .5, anchorY: .5, layer: 'brillos' }); }
     }
     this.tick();
@@ -286,26 +308,32 @@ export class Persona extends GameObject {
           // ¿lo que tengo adelante es calle? Entonces mirar si vienen autos: si viene uno, esperar en el cordón
           let espera = false;
           NavGrid.requestVectorFromStaticFlowfield('calles', this.x + _v.x * 22, this.y + _v.y * 14, _w);
-          if (_w.x !== 0 || _w.y !== 0) for (let n = 0; n < this.neighborCount; n++) { const j = this.getNeighbor(n); if (!AutoComp.active[j] || !Transform.active[j]) continue;
+          if (_w.x !== 0 || _w.y !== 0) for (let n = 0; n < this.neighborCount; n++) {
+            const j = this.getNeighbor(n); if (!AutoComp.active[j] || !Transform.active[j]) continue;
             const cvx = RigidBody.vx[j], cvy = RigidBody.vy[j], cs2 = cvx * cvx + cvy * cvy; if (cs2 < 400) continue;
             const dx = this.x - Transform.x[j], dy = this.y - Transform.y[j], d2 = dx * dx + dy * dy; if (d2 > 26000) continue;
-            const encima = AutoComp.hl[j] + 2; if (dx * cvx + dy * cvy > 0 || d2 < encima * encima) { espera = true; break; } }     // se acerca, o está encima
+            const encima = AutoComp.hl[j] + 2; if (dx * cvx + dy * cvy > 0 || d2 < encima * encima) { espera = true; break; }
+          }     // se acerca, o está encima
           const sp = espera ? 0 : P.vel[i];
           this.addAcceleration((_v.x * sp - vx) * 6, (_v.y * sp - vy) * 6);
         }
       }
       // separación y esquivar autos (vecinos de la grilla espacial)
       let sx = 0, sy = 0; const mx = this.x, my = this.y;
-      for (let n = 0; n < this.neighborCount; n++) { const j = this.getNeighbor(n); if (!Transform.active[j]) continue;
+      for (let n = 0; n < this.neighborCount; n++) {
+        const j = this.getNeighbor(n); if (!Transform.active[j]) continue;
         const dx = mx - Transform.x[j], dy = my - Transform.y[j], d2 = dx * dx + dy * dy;
         if (AutoComp.active[j]) { const ra = AutoComp.hl[j] + 22, r2 = ra * ra; if (d2 < r2 && d2 > 1) { const f = (r2 - d2) / r2; sx += dx / Math.sqrt(d2) * f * 3; sy += dy / Math.sqrt(d2) * f * 3; } continue; }
-        if (d2 < 100 && d2 > .01) { const f = (100 - d2) / 100; sx += dx / Math.sqrt(d2) * f; sy += dy / Math.sqrt(d2) * f; } }
+        if (d2 < 100 && d2 > .01) { const f = (100 - d2) / 100; sx += dx / Math.sqrt(d2) * f; sy += dy / Math.sqrt(d2) * f; }
+      }
       if (sx || sy) this.addAcceleration(sx * 120, sy * 120);
     }
     // animación: caminar u ocioso, dirección según la velocidad en pantalla
     const s2 = vx * vx + vy * vy;
-    if (s2 > 16) { const ax = Math.abs(vx), ay = Math.abs(vy) * 2; P.cara[i] = ax > ay ? (vx > 0 ? 3 : 1) : (vy > 0 ? 2 : 0);
-      const want = P.cara[i]; if (this._anim !== want) { this._anim = want; this.setAnimation(WALK[want]); } this.setAnimationSpeed(Math.sqrt(s2) * .0045); }
+    if (s2 > 16) {
+      const ax = Math.abs(vx), ay = Math.abs(vy) * 2; P.cara[i] = ax > ay ? (vx > 0 ? 3 : 1) : (vy > 0 ? 2 : 0);
+      const want = P.cara[i]; if (this._anim !== want) { this._anim = want; this.setAnimation(WALK[want]); } this.setAnimationSpeed(Math.sqrt(s2) * .0045);
+    }
     else if (this._anim !== 10 + P.cara[i]) { this._anim = 10 + P.cara[i]; this.setAnimation(IDLE[P.cara[i]]); this.setAnimationSpeed(.03); }
   }
 }
@@ -318,10 +346,14 @@ const _h = { frontX: 0, frontY: 0, rightX: 0, rightY: 0 }, _h2 = { frontX: 0, fr
 // Date.now(), igual en todos los hilos, así las luces que se ven y los autos que frenan van juntos
 const TR = META.transito || { W: 0, H: 0, n: 0, semAlto: 0 }, LIM = [40, 20, 30, 40, 60], CICLO = 40;
 const ROT0 = (META.rotondas || [])[0] || null, TAU = Math.PI * 2;   // la rotonda del barrio (Parque Chas), si tiene
-function faseSemaforo(cid, eje) { const t = ((Date.now() / 1000 + Transito.cruces[cid * 6 + 5]) % CICLO + CICLO) % CICLO;
-  return eje === 0 ? (t < 17 ? 0 : t < 20 ? 1 : 2) : (t < 20 ? 2 : t < 37 ? 0 : 1); }   // 0 verde, 1 amarillo, 2 rojo
-function celdaTransito(sx, sy) { if (!TR.W) return 0; const ym = META.MH - sy / (META.SYN * META.SF), xm = sx / META.SF - META.K * ym;
-  if (xm < 0 || ym < 0 || xm >= TR.W || ym >= TR.H) return 0; return Transito.grid[(ym | 0) * TR.W + (xm | 0)]; }
+function faseSemaforo(cid, eje) {
+  const t = ((Date.now() / 1000 + Transito.cruces[cid * 6 + 5]) % CICLO + CICLO) % CICLO;
+  return eje === 0 ? (t < 17 ? 0 : t < 20 ? 1 : 2) : (t < 20 ? 2 : t < 37 ? 0 : 1);
+}   // 0 verde, 1 amarillo, 2 rojo
+function celdaTransito(sx, sy) {
+  if (!TR.W) return 0; const ym = META.MH - sy / (META.SYN * META.SF), xm = sx / META.SF - META.K * ym;
+  if (xm < 0 || ym < 0 || xm >= TR.W || ym >= TR.H) return 0; return Transito.grid[(ym | 0) * TR.W + (xm | 0)];
+}
 // metros por px de pantalla en el rumbo (fx, fy): la proyección no es igual en x que en y
 function metrosPorPx(fx, fy) { const dx = fx / META.SF + META.K * fy / (META.SYN * META.SF), dy = -fy / (META.SYN * META.SF); return Math.sqrt(dx * dx + dy * dy); }
 const _vista = { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
@@ -391,16 +423,22 @@ export class Auto extends GameObject {
   }
   onDespawned() { this.autoComp.active = 0; }
   // agarre lateral (las ruedas no patinan de costado)
-  _friction() { const i = this.index; GameObject.getHeadingAxes(i, _h);
+  _friction() {
+    const i = this.index; GameObject.getHeadingAxes(i, _h);
     const lat = dot2(RigidBody.vx[i], RigidBody.vy[i], _h.rightX, _h.rightY), k = AutoComp.lateralFriction[i];
-    RigidBody.ax[i] -= _h.rightX * lat * k; RigidBody.ay[i] -= _h.rightY * lat * k; }
+    RigidBody.ax[i] -= _h.rightX * lat * k; RigidBody.ay[i] -= _h.rightY * lat * k;
+  }
   applyForces(fwd = 0, turn = 0) {
     const i = this.index; if (!Transform.active[i]) return;
     GameObject.getHeadingAxes(i, _h);
     const sp = dot2(RigidBody.vx[i], RigidBody.vy[i], _h.frontX, _h.frontY);
     if (fwd) { const f = AutoComp.driveForce[i] * fwd; RigidBody.ax[i] += _h.frontX * f; RigidBody.ay[i] += _h.frontY * f; }
-    if (turn) { const a = Math.abs(sp); if (a >= AutoComp.minSteerSpeed[i]) { const mf = AutoComp.minSteerFactor[i], f = mf + (1 - mf) * Math.min(a / AutoComp.maxSteerSpeed[i], 1);
-      RigidBody.angularAccel[i] += turn * AutoComp.turnTorque[i] * f * (sp >= 0 ? 1 : -1); } }
+    if (turn) {
+      const a = Math.abs(sp); if (a >= AutoComp.minSteerSpeed[i]) {
+        const mf = AutoComp.minSteerFactor[i], f = mf + (1 - mf) * Math.min(a / AutoComp.maxSteerSpeed[i], 1);
+        RigidBody.angularAccel[i] += turn * AutoComp.turnTorque[i] * f * (sp >= 0 ? 1 : -1);
+      }
+    }
     if (fwd || turn) RigidBody.sleeping[i] = 0;
   }
   // los 48 rumbos están dibujados en ángulos de pantalla (como en carScene): el rumbo de pantalla va directo,
@@ -410,7 +448,8 @@ export class Auto extends GameObject {
     const sid = SpriteRenderer.spritesheetId[i], ks = sid ? angleKeys(SpriteSheetRegistry.getSpritesheetName(sid)) : _keys0; if (!ks.length) return;
     const last = AutoComp.lastKey[i]; if (last >= 0 && c * ks[last].c + s * ks[last].s >= Math.cos(Math.PI / ks.length)) return;
     let best = 0, bd = -2; for (let k = 0; k < ks.length; k++) { const d = c * ks[k].c + s * ks[k].s; if (d > bd) { bd = d; best = k; } }
-    if (last !== best) { AutoComp.lastKey[i] = best; const k = ks[best]; this.setAnimation(k.n); this.flipX = k.f === 1;
+    if (last !== best) {
+      AutoComp.lastKey[i] = best; const k = ks[best]; this.setAnimation(k.n); this.flipX = k.f === 1;
       const ap = apoyoDe(SpriteSheetRegistry.getSpritesheetName(sid) || ''); this.spriteRenderer.anchorY = (ap && ap[k.n]) || .5;
       // el colisionador, a la medida de la huella con este rumbo; la luz de los faros, en el frente de la huella
       const [L, W] = huellaAuto(AutoComp, i, k.c, k.s, _huella);
@@ -418,20 +457,28 @@ export class Auto extends GameObject {
       if (AutoComp.faros[i]) LightEmitter.offsetX[i] = L * .5;   // la luz, en el frente de la huella
     }
   }
-  tick() { const i = this.index; if (!Transform.active[i]) return; this._friction(); this._frame(); luzHora(this); }
+  tick() {
+    const i = this.index; if (!Transform.active[i]) return; this._friction(); this._frame(); luzHora(this);
+  }
 }
-export class AutoEstacionado extends Auto {}
-export class Chatarra extends Auto {}
+export class AutoEstacionado extends Auto { }
+export class Chatarra extends Auto { }
 
 // IA: sigue el flowfield de carriles (mano derecha), frena por gente y autos adelante (patrón de littleCity)
 const _probe = [[0, 0], [0, 8], [0, -8], [16, 0], [-16, 0], [0, 16], [0, -16], [24, 0], [-24, 0], [24, 12], [24, -12], [-24, 12], [-24, -12], [0, 24], [0, -24], [48, 0], [-48, 0], [36, 24], [-36, 24], [36, -24], [-36, -24]];
 export class AutoIA extends Auto {
-  onSpawned(c = {}) { super.onSpawned(c); const A = this.autoComp, rot = c.rot || 0;
-    A.lx = Math.cos(rot); A.ly = Math.sin(rot); A.stuck = 0; A.libre = 0; A.parado = 0; A.sx = c.x; A.sy = c.y; A.sr = rot; A.pf = .8 + rng() * .17; A.espera = 0; A.rs = -1; }
+  onSpawned(c = {}) {
+    super.onSpawned(c); const A = this.autoComp, rot = c.rot || 0;
+    A.lx = Math.cos(rot); A.ly = Math.sin(rot); A.stuck = 0; A.libre = 0; A.parado = 0; A.sx = c.x; A.sy = c.y; A.sr = rot; A.pf = .8 + rng() * .17; A.espera = 0; A.rs = -1;
+  }
   // el carril bajo el auto; si el auto se salió (cortó una esquina, se subió a la vereda), el carril más cercano de alrededor
   // y un empujón hacia él, así vuelve a la calle en vez de seguir paralelo por la vereda
-  _sample(x, y) { for (let k = 0; k < _probe.length; k++) { NavGrid.requestVectorFromStaticFlowfield('calles', x + _probe[k][0], y + _probe[k][1], _v);
-      if (_v.x * _v.x + _v.y * _v.y >= .01) { if (k) { const ox = _probe[k][0], oy = _probe[k][1], l = Math.hypot(ox, oy), m = Math.hypot(_v.x, _v.y); _v.x = _v.x / m + ox / l * 1.3; _v.y = _v.y / m + oy / l * 1.3; } return true; } } return false; }
+  _sample(x, y) {
+    for (let k = 0; k < _probe.length; k++) {
+      NavGrid.requestVectorFromStaticFlowfield('calles', x + _probe[k][0], y + _probe[k][1], _v);
+      if (_v.x * _v.x + _v.y * _v.y >= .01) { if (k) { const ox = _probe[k][0], oy = _probe[k][1], l = Math.hypot(ox, oy), m = Math.hypot(_v.x, _v.y); _v.x = _v.x / m + ox / l * 1.3; _v.y = _v.y / m + oy / l * 1.3; } return true; }
+    } return false;
+  }
   tick(dtRatio, dt) {
     super.tick();
     const i = this.index;
@@ -440,15 +487,23 @@ export class AutoIA extends Auto {
     else if (this._sample(this.x, this.y)) { AutoComp.lx[i] = _v.x; AutoComp.ly[i] = _v.y; } else { _v.x = AutoComp.lx[i]; _v.y = AutoComp.ly[i]; }
     // rotonda (Parque Chas): el flowfield da la vuelta en sentido antihorario; al entrar cada auto elige por cuál calle sale (no por
     // la que entró) y, llegando a ella, va a su carril de salida
-    if (ROT0) { const ym = META.MH - this.y / (META.SYN * META.SF), xm = this.x / META.SF - META.K * ym, dx = xm - ROT0.mx, dy = ym - ROT0.my, d = Math.sqrt(dx * dx + dy * dy);
-      if (d < ROT0.re + 1) { const S = ROT0.sal, th = Math.atan2(dy, dx);
-        if (AutoComp.rs[i] < 0) { let ent = 0, be = 9;
+    if (ROT0) {
+      const ym = META.MH - this.y / (META.SYN * META.SF), xm = this.x / META.SF - META.K * ym, dx = xm - ROT0.mx, dy = ym - ROT0.my, d = Math.sqrt(dx * dx + dy * dy);
+      if (d < ROT0.re + 1) {
+        const S = ROT0.sal, th = Math.atan2(dy, dx);
+        if (AutoComp.rs[i] < 0) {
+          let ent = 0, be = 9;
           for (let k = 0; k < S.length; k++) { const a = Math.abs(((Math.atan2(S[k][1], S[k][0]) - th) % TAU + TAU + Math.PI) % TAU - Math.PI); if (a < be) { be = a; ent = k; } }
-          AutoComp.rs[i] = (ent + 1 + ((rng() * (S.length - 1)) | 0)) % S.length; }
+          AutoComp.rs[i] = (ent + 1 + ((rng() * (S.length - 1)) | 0)) % S.length;
+        }
         const q = S[AutoComp.rs[i]], ccw = ((Math.atan2(q[1], q[0]) - th) % TAU + TAU) % TAU;
-        if (ccw < .7 || ccw > TAU - .25) { const ex = ROT0.mx + q[0] * (ROT0.re + 8) + q[1] * q[2] - xm, ey = ROT0.my + q[1] * (ROT0.re + 8) - q[0] * q[2] - ym;
-          _v.x = ex + META.K * ey; _v.y = -META.SYN * ey; } }
-      else if (d > ROT0.re + 8) AutoComp.rs[i] = -1; }
+        if (ccw < .7 || ccw > TAU - .25) {
+          const ex = ROT0.mx + q[0] * (ROT0.re + 8) + q[1] * q[2] - xm, ey = ROT0.my + q[1] * (ROT0.re + 8) - q[0] * q[2] - ym;
+          _v.x = ex + META.K * ey; _v.y = -META.SYN * ey;
+        }
+      }
+      else if (d > ROT0.re + 8) AutoComp.rs[i] = -1;
+    }
     const l2 = _v.x * _v.x + _v.y * _v.y; if (l2 < .01) return;
     const inv = 1 / Math.sqrt(l2), nx = _v.x * inv, ny = _v.y * inv, fx = this.forwardX, fy = this.forwardY;
     const cross = fx * ny - fy * nx, align = fx * nx + fy * ny;
@@ -456,11 +511,15 @@ export class AutoIA extends Auto {
     // ¿alguien adelante en el carril?
     // trabado más de 5 s (dos autos que se frenan mutuamente en un cruce): 3 s sin mirar a los demás
     const A = AutoComp;
-    if (RigidBody.speed[i] < 10) { A.stuck[i] += dts; A.parado[i] += dts;
-      if (A.stuck[i] > 5) { A.stuck[i] = 0; A.libre[i] = 3; } } else { A.stuck[i] = 0; A.parado[i] = 0; }
+    if (RigidBody.speed[i] < 10) {
+      A.stuck[i] += dts; A.parado[i] += dts;
+      if (A.stuck[i] > 5) { A.stuck[i] = 0; A.libre[i] = 3; }
+    } else { A.stuck[i] = 0; A.parado[i] = 0; }
     // parado más de 12 s (se metió en un lote, quedó contra un poste): fuera de cámara, vuelve a su carril de salida
-    if (A.parado[i] > 12 && !this.isOnScreen) { A.parado[i] = 0; this.x = A.sx[i]; this.y = A.sy[i]; this.rotation = A.sr[i];
-      RigidBody.vx[i] = 0; RigidBody.vy[i] = 0; A.lx[i] = Math.cos(A.sr[i]); A.ly[i] = Math.sin(A.sr[i]); return; }
+    if (A.parado[i] > 12 && !this.isOnScreen) {
+      A.parado[i] = 0; this.x = A.sx[i]; this.y = A.sy[i]; this.rotation = A.sr[i];
+      RigidBody.vx[i] = 0; RigidBody.vy[i] = 0; A.lx[i] = Math.cos(A.sr[i]); A.ly[i] = Math.sin(A.sr[i]); return;
+    }
     if (A.libre[i] > 0) A.libre[i] -= dts;
     // ---- la ley: lo que dice la grilla de tránsito un poco adelante del auto
     const ade = A.hl[i] + 10, cod = celdaTransito(this.x + fx * ade, this.y + fy * ade), zona = (cod >> 4) & 3, cid = (cod >> 6) - 1;
@@ -473,31 +532,41 @@ export class AutoIA extends Auto {
         // esquina sin semáforo: cede el paso al que cruza desde su derecha (art. 41). Si espera más de 4 s, sigue (si todos esperan
         // al de la derecha, nadie pasa nunca)
         const rx = -fy, ry = fx;
-        for (let n = 0; n < this.neighborCount && !alto; n++) { const j = this.getNeighbor(n); if (j === i || !Transform.active[j] || AutoComp.active[j] !== 1) continue;
+        for (let n = 0; n < this.neighborCount && !alto; n++) {
+          const j = this.getNeighbor(n); if (j === i || !Transform.active[j] || AutoComp.active[j] !== 1) continue;
           GameObject.getHeadingAxes(j, _h2); if (Math.abs(fx * _h2.frontX + fy * _h2.frontY) > .5) continue;            // no viene cruzado
           const dx = Transform.x[j] - this.x, dy = Transform.y[j] - this.y; if (dx * rx + dy * ry <= 0) continue;           // no viene de la derecha
           const dj = AutoComp.hl[j] + 10, cj = celdaTransito(Transform.x[j] + _h2.frontX * dj, Transform.y[j] + _h2.frontY * dj);
           if (((cj >> 6) - 1) !== cid || !((cj >> 4) & 3)) continue;                                                      // no está en esta esquina
           if ((C[o] - Transform.x[j]) * _h2.frontX + (C[o + 1] - Transform.y[j]) * _h2.frontY < 0) continue;               // ya pasó
-          alto = true; }
+          alto = true;
+        }
         if (alto) { A.espera[i] += dts; if (A.espera[i] > 4) alto = false; }
       }
       // no quedarse en el medio del cruce: si el de adelante está parado del otro lado, espera antes de la senda
-      if (!alto) { const reach = 22 / metrosPorPx(fx, fy);
-        for (let n = 0; n < this.neighborCount; n++) { const j = this.getNeighbor(n); if (j === i || !Transform.active[j] || AutoComp.active[j] !== 1 || RigidBody.speed[j] > 12) continue;
+      if (!alto) {
+        const reach = 22 / metrosPorPx(fx, fy);
+        for (let n = 0; n < this.neighborCount; n++) {
+          const j = this.getNeighbor(n); if (j === i || !Transform.active[j] || AutoComp.active[j] !== 1 || RigidBody.speed[j] > 12) continue;
           const dx = Transform.x[j] - this.x, dy = Transform.y[j] - this.y, ah = dx * fx + dy * fy; if (ah < A.hl[i] + 30 || ah > reach) continue;
-          if (Math.abs(fx * dy - fy * dx) < A.hw[i] + AutoComp.hw[j]) { alto = true; break; } } }
+          if (Math.abs(fx * dy - fy * dx) < A.hw[i] + AutoComp.hw[j]) { alto = true; break; }
+        }
+      }
     } else A.espera[i] = 0;
     let brake = 0, steer = 0;
-    if (A.libre[i] <= 0) for (let n = 0; n < this.neighborCount; n++) { const j = this.getNeighbor(n); if (!Transform.active[j] || j === i) continue;
+    if (A.libre[i] <= 0) for (let n = 0; n < this.neighborCount; n++) {
+      const j = this.getNeighbor(n); if (!Transform.active[j] || j === i) continue;
       const isCar = AutoComp.active[j] === 1, isPerson = !isCar && PersonaComp.vel[j] > 0; if (!isCar && !isPerson) continue;
       // alcance y ancho del carril según el tamaño de los dos (con dos autos chicos, ~95 y ~22 px)
       // en la esquina, al peatón que cruza por la senda se lo ve antes y más de costado (art. 41: el peatón tiene prioridad)
       const dx = Transform.x[j] + RigidBody.vx[j] * .2 - this.x, dy = Transform.y[j] + RigidBody.vy[j] * .2 - this.y, ahead = dx * fx + dy * fy, reach = isCar ? A.hl[i] + A.hl[j] + 35 : A.hl[i] + (zona ? 70 : 40);
       if (ahead <= 8 || ahead > reach) continue; const side = fx * dy - fy * dx, as = Math.abs(side), corr = isCar ? A.hw[i] + A.hw[j] - 2 : A.hw[i] + (zona ? 16 : 4); if (as > corr) continue;
-      const u = (1 - ahead / reach) * (.4 + .6 * (1 - as / corr)); if (u > brake) brake = u; if (isCar) steer += (side >= 0 ? -1 : 1) * u; }   // a la gente se la espera, no se la esquiva (si no, el auto se sube a la vereda)
-    if (brake > 0) { turn = Math.max(-1, Math.min(1, turn * (1 - brake * .6) + Math.max(-1, Math.min(1, steer)) * .8)); fwd *= 1 - brake;
-      if (brake > .6) { const k = 1 - (brake - .6) * .25; RigidBody.vx[i] *= k; RigidBody.vy[i] *= k; } }   // frena, no da marcha atrás
+      const u = (1 - ahead / reach) * (.4 + .6 * (1 - as / corr)); if (u > brake) brake = u; if (isCar) steer += (side >= 0 ? -1 : 1) * u;
+    }   // a la gente se la espera, no se la esquiva (si no, el auto se sube a la vereda)
+    if (brake > 0) {
+      turn = Math.max(-1, Math.min(1, turn * (1 - brake * .6) + Math.max(-1, Math.min(1, steer)) * .8)); fwd *= 1 - brake;
+      if (brake > .6) { const k = 1 - (brake - .6) * .25; RigidBody.vx[i] *= k; RigidBody.vy[i] *= k; }
+    }   // frena, no da marcha atrás
     // velocidad máxima (art. 51): acelera de menos cerca del límite y frena si se pasó; en rojo o cediendo el paso, se para
     // (los frenos van con dtRatio: frenan lo mismo por segundo a 60 o a 20 cuadros por segundo)
     if (alto) { fwd = 0; const k = Math.pow(.86, dtRatio || 1); RigidBody.vx[i] *= k; RigidBody.vy[i] *= k; }
@@ -610,22 +679,29 @@ export class ConurbanoScene extends Scene {
       // heightScaleY: lo que sube en pantalla un px de altura; sunDirect .5: las caras a la sombra quedan a la mitad, como en la luz de R3
       faces: { enabled: CARAS, heightScaleY: META.CZ, wrap: .15, gain: 1.3, sunDirect: .5 },
       shadowsEnabled: true, maxShadowCastingLights: 16, maxShadowsPerLight: 64, maxShadowsPerEntity: 2, shadowTextures: SOMBRA_TEX,
-      resolution: .25, shadowResolution: .25,
+      resolution: .5, shadowResolution: .5,
       // sol del lado de la cámara (shadowAngleOffset 0: las sombras caen hacia el fondo), si no las caras que se ven estarían siempre a
       // contraluz, y no sube más de 60° (maxElevation), si no al mediodía no le da a ninguna pared; arranca al atardecer para ver las luces enseguida
-      sun: { enabled: true, angle: 135, elevation: 40, intensity: 1, color: 0xfff4e0, shadowAlpha: .5, startHour: 17.5, shadowAngleOffset: 0, maxElevation: 60,
+      sun: {
+        enabled: true, angle: 135, elevation: 40, intensity: 1, color: 0xfff4e0, shadowAlpha: .5, startHour: 17.5, shadowAngleOffset: 0, maxElevation: 60,
         dayCycle: { enabled: true, speed: 1, dayDurationMinutes: 8 },
-        night: { intensity: LUNA_I, color: LUNA, from: .4, to: .1 } },
+        // night: { intensity: LUNA_I, color: LUNA, from: .4, to: .1 }
+      },
     },
     navigation: { enabled: true, cellSize: 64 },
     layers: {
-      piso: { zIndex: .5, shader: {
-        fragment: { webgl: 'shaders/piso.frag' }, worldRect: { width: META.WW, height: META.WH },
-        textures: [{ name: 'cellA', format: 'rgba8unorm', size: { width: META.CW, height: META.CH } }, { name: 'cellB', format: 'rgba8unorm', size: { width: META.CW, height: META.CH } },
+      piso: {
+        zIndex: .5, shader: {
+          fragment: { webgl: 'shaders/piso.frag' }, worldRect: { width: META.WW, height: META.WH },
+          textures: [{ name: 'cellA', format: 'rgba8unorm', size: { width: META.CW, height: META.CH } }, { name: 'cellB', format: 'rgba8unorm', size: { width: META.CW, height: META.CH } },
           { name: 'wealth', format: 'r8unorm', size: { width: META.WG, height: META.HG } }, { name: 'noiseT', format: 'rgba8unorm', size: { width: 256, height: 256 } },
           { name: 'segs', format: 'rgba8unorm', size: { width: 12, height: META.NS } }, { name: 'pits', format: 'rgba8unorm', size: { width: META.PW || 1, height: META.PH || 1 } }],
-        uniforms: { uMW: f32(META.MW), uMH: f32(META.MH), uK: f32(META.K), uSF: f32(META.SF), uSYN: f32(META.SYN), uGC: f32(META.GC), uCW: f32(META.CW), uCH: f32(META.CH), uWG: f32(META.WG), uHG: f32(META.HG), uPW: f32(META.PW || 1), uPH: f32(META.PH || 1),
-          uRX: f32(ROT0 ? ROT0.mx : 0), uRY: f32(ROT0 ? ROT0.my : 0), uRI: f32(ROT0 ? ROT0.ri : 0), uRE: f32(ROT0 ? ROT0.re : 0) } } },
+          uniforms: {
+            uMW: f32(META.MW), uMH: f32(META.MH), uK: f32(META.K), uSF: f32(META.SF), uSYN: f32(META.SYN), uGC: f32(META.GC), uCW: f32(META.CW), uCH: f32(META.CH), uWG: f32(META.WG), uHG: f32(META.HG), uPW: f32(META.PW || 1), uPH: f32(META.PH || 1),
+            uRX: f32(ROT0 ? ROT0.mx : 0), uRY: f32(ROT0 ? ROT0.my : 0), uRI: f32(ROT0 ? ROT0.ri : 0), uRE: f32(ROT0 ? ROT0.re : 0)
+          }
+        }
+      },
       // manchas, roturas y basura del piso (gd_*): arriba del piso, debajo de las sombras
       manchas: { zIndex: 1.4, ySorting: false, maxItems: Math.max(6000, META.nProps + (META.nLineas || 0)) },
       // las sombras de casas y autos son VolumeShadowCaster: WeedJS pone su capa (volumeShadows), en zIndex 1.5, y las compone una
@@ -644,8 +720,10 @@ export class ConurbanoScene extends Scene {
   // (con ?empaquetar en la URL se arma en el navegador, para volver a hornearlo después de cambiar los sprites)
   static assets = { ...(PACK || !META.atlas ? {} : { bigAtlas: { json: BARRIO + 'atlas/bigAtlas.json', png: BARRIO + 'atlas/bigAtlas.png' } }), spritesheets: SHEETS, flowfields: FLOW };
   static sharedResources = [
-    [PisoData, { cellA: { type: Uint8Array, length: META.CW * META.CH * 4 }, cellB: { type: Uint8Array, length: META.CW * META.CH * 4 },
-      wealth: { type: Uint8Array, length: META.WG * META.HG }, noise: { type: Uint8Array, length: 256 * 256 * 4 }, segs: { type: Uint8Array, length: META.NS * 48 }, pits: { type: Uint8Array, length: (META.PW || 1) * (META.PH || 1) * 4 } }],
+    [PisoData, {
+      cellA: { type: Uint8Array, length: META.CW * META.CH * 4 }, cellB: { type: Uint8Array, length: META.CW * META.CH * 4 },
+      wealth: { type: Uint8Array, length: META.WG * META.HG }, noise: { type: Uint8Array, length: 256 * 256 * 4 }, segs: { type: Uint8Array, length: META.NS * 48 }, pits: { type: Uint8Array, length: (META.PW || 1) * (META.PH || 1) * 4 }
+    }],
     [Estado, { manejando: { type: Int32Array, length: 1, mailbox: true } }],
     [Transito, { grid: { type: Uint16Array, length: Math.max(1, TR.W * TR.H) }, cruces: { type: Float32Array, length: Math.max(6, TR.n * 6) } }],
     [Semaforos, { ids: { type: Int32Array, length: Math.max(4, (TR.nSem || 0) * 4) } }],
@@ -657,16 +735,20 @@ export class ConurbanoScene extends Scene {
   // atrás que el frente de la casa en esa x. Los faroles no se mueven: se calcula una vez, al cargar
   _lamparasTapadas(w) {
     const KZ = META.CZ * META.SF, G = 256, grilla = new Map(), out = new Set();
-    for (const h of w.casas || []) { if (!h.col || !h.sp) continue;
+    for (const h of w.casas || []) {
+      if (!h.col || !h.sp) continue;
       const pie = h.col.map(([x, y]) => [h.x + x, h.y + y]), P = pie.slice();
       for (let i = 0; i < h.sp.length; i += 3) P.push([h.x + h.sp[i], h.y + h.sp[i + 1] - h.sp[i + 2] * KZ]);
       let x0 = Infinity, x1 = -Infinity; for (const q of pie) { if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0]; }
       const c = { pie, sil: envolvente(P), x0, x1 };
-      for (let g = Math.floor(x0 / G); g <= Math.floor(x1 / G); g++) { let l = grilla.get(g); if (!l) grilla.set(g, l = []); l.push(c); } }
-    for (const p of w.props || []) { if (!(p.r > 0) || !p.f || !p.f.startsWith('u_farol')) continue;
+      for (let g = Math.floor(x0 / G); g <= Math.floor(x1 / G); g++) { let l = grilla.get(g); if (!l) grilla.set(g, l = []); l.push(c); }
+    }
+    for (const p of w.props || []) {
+      if (!(p.r > 0) || !p.f || !p.f.startsWith('u_farol')) continue;
       const lm = META.lamparas && META.lamparas[p.f];   // los de arte/objetos dicen a qué altura está su lámpara
       const hz = lm ? lm.z : p.f.startsWith('u_farola_orn') ? 4 : p.f.startsWith('u_farola') ? 6.5 : 5.5, hy = p.y - hz * KZ, l = grilla.get(Math.floor(p.x / G));
-      if (l) for (const c of l) if (p.x >= c.x0 && p.x <= c.x1 && dentroConvexo(c.sil, p.x, hy) && p.y < frenteEn(c.pie, p.x)) { out.add(p); break; } }
+      if (l) for (const c of l) if (p.x >= c.x0 && p.x <= c.x1 && dentroConvexo(c.sil, p.x, hy) && p.y < frenteEn(c.pie, p.x)) { out.add(p); break; }
+    }
     return out;
   }
   async preload() {
@@ -685,8 +767,10 @@ export class ConurbanoScene extends Scene {
     const w = await (await fetch(BARRIO + 'mundo.json')).json();
     const { Decoration } = WEED;
     // ---- tránsito: la grilla (velocidades, esquinas) y los cruces (con o sin semáforo, rumbo de la primera calle, desfasaje)
-    if (TR.n) { const tb = await (await fetch(BARRIO + 'transito.bin')).arrayBuffer(); Transito.grid.set(new Uint16Array(tb));
-      (w.cruces || []).forEach((c, k) => { for (let q = 0; q < 6; q++) Transito.cruces[k * 6 + q] = c[q]; }); }
+    if (TR.n) {
+      const tb = await (await fetch(BARRIO + 'transito.bin')).arrayBuffer(); Transito.grid.set(new Uint16Array(tb));
+      (w.cruces || []).forEach((c, k) => { for (let q = 0; q < 6; q++) Transito.cruces[k * 6 + q] = c[q]; });
+    }
     this._sem = [];   // los semáforos: cruce, calle y número (sus luces, en Semaforos.ids)
     if (META.skew) {
       // casas por caras (WeedJS DX-DECOSKEW): la entidad lleva el colisionador; el dibujo son piezas de caras planas, decoraciones
@@ -694,15 +778,18 @@ export class ConurbanoScene extends Scene {
       // escala, skew, tinte de luz, y orden (sortOffsetY: la base de su columna; innerZ: el orden de pintor dentro de la casa).
       // Un solo objeto de configuración para todas: cargar no crea basura por pieza.
       const cfg = { x: 0, y: 0, texture: '', scaleX: 1, scaleY: 1, skewX: 0, skewY: 0, tint: 0xffffff, sortOffsetY: 0, innerZ: 0, anchorX: .5, anchorY: .5 };
-      for (const h of w.casas) { Casa.spawn({ x: h.x, y: h.y, col: h.col, r: h.r, k: h.k, l: h.l, sp: h.sp });
+      for (const h of w.casas) {
+        Casa.spawn({ x: h.x, y: h.y, col: h.col, r: h.r, k: h.k, l: h.l, sp: h.sp });
         const V = w.variantes[h.v];
-        for (let i = 0; i < V.length; i++) { const t = V[i];
+        for (let i = 0; i < V.length; i++) {
+          const t = V[i];
           cfg.x = h.ox + t[1]; cfg.y = h.oy + t[2]; cfg.texture = t[0]; cfg.scaleX = t[3]; cfg.scaleY = t[4]; cfg.skewX = t[5]; cfg.skewY = t[6];
           cfg.tint = t[7]; cfg.sortOffsetY = t[8]; cfg.innerZ = t[9];
           if (CARAS && t.length >= 14) { // la normal en el espacio del piso de WeedJS: x de pantalla, y hacia la cámara, z arriba
             cfg.faceNormalX = t[10]; cfg.faceNormalY = META.K * t[10] - t[11]; cfg.faceNormalZ = t[12]; cfg.faceHeight = t[13] * META.SF;
           } else cfg.faceNormalX = undefined;
-          Decoration.spawn(cfg); }
+          Decoration.spawn(cfg);
+        }
         // grafitis, firmas y carteles de esta casa (no del diseño: así no se repiten en cada casa igual), encima de su pared,
         // con la misma escala, skew, luz y orden que ella; t[14]: el alfa (más o menos gastados)
         if (h.g) {
@@ -716,33 +803,47 @@ export class ConurbanoScene extends Scene {
           cfg.alpha = 1;
         }
       }
-    } else for (const h of w.casas) { Casa.spawn({ x: h.x, y: h.y, col: h.col, r: h.r, k: h.k, l: h.l, sp: h.sp, fr: w.franjas[h.a], t: 'casas' + h.o + '_' + h.a + '_', e: META.escalaCasas || 1 }); }
+    } else for (const h of w.casas) {
+      Casa.spawn({ x: h.x, y: h.y, col: h.col, r: h.r, k: h.k, l: h.l, sp: h.sp, fr: w.franjas[h.a], t: 'casas' + h.o + '_' + h.a + '_', e: META.escalaCasas || 1 });
+    }
     const tapadas = this._lamparasTapadas(w); this.lamparasTapadas = tapadas.size;
     for (const p of w.props) {
       if (p.sh && !(p.r > 0)) { const a = META.anclas[p.sh]; Decoration.spawn({ x: p.x, y: p.y, texture: 'props_' + p.sh, anchorX: a[0], anchorY: a[1], alpha: .45, layer: 'sombras' }); }
-      if (p.r > 0) { let sk = -1; if (p.f === 'u_semaforo' && p.cr >= 0 && this._sem.length < (TR.nSem || 0)) { sk = this._sem.length; this._sem.push({ cid: p.cr, eje: p.ej, sk, f: -1 }); }
-        Prop.spawn({ x: p.x, y: p.y, f: p.f, r: p.r, fl: p.fl, sk, tp: tapadas.has(p) ? 1 : 0 }); }
-      else { const a = META.anclas[p.f], e = (META.escalas && META.escalas[p.f]) || 1, mece = p.f.startsWith('plm_') || p.f.startsWith('yy_');   // plantas que se mecen (skew: la base queda fija)
+      if (p.r > 0) {
+        let sk = -1; if (p.f === 'u_semaforo' && p.cr >= 0 && this._sem.length < (TR.nSem || 0)) { sk = this._sem.length; this._sem.push({ cid: p.cr, eje: p.ej, sk, f: -1 }); }
+        Prop.spawn({ x: p.x, y: p.y, f: p.f, r: p.r, fl: p.fl, sk, tp: tapadas.has(p) ? 1 : 0 });
+      }
+      else {
+        const a = META.anclas[p.f], e = (META.escalas && META.escalas[p.f]) || 1, mece = p.f.startsWith('plm_') || p.f.startsWith('yy_');   // plantas que se mecen (skew: la base queda fija)
         // la planta de una maceta (p.o: px sobre el pie de la maceta) se dibuja subida, sobre la tierra, y se ordena justo delante de la maceta
         const o = p.o || 0;
-        Decoration.spawn({ x: p.x, y: p.y - o, texture: 'props_' + p.f, anchorX: a[0], anchorY: a[1], scaleX: p.fl ? -e : e, scaleY: e, sortOffsetY: o ? o + .05 : 0,
+        Decoration.spawn({
+          x: p.x, y: p.y - o, texture: 'props_' + p.f, anchorX: a[0], anchorY: a[1], scaleX: p.fl ? -e : e, scaleY: e, sortOffsetY: o ? o + .05 : 0,
           ...(mece ? { swaySkew: 1, swayAmplitude: .02 + rng() * .02, swayFrequency: .45 + rng() * .4 } : {}),
-          ...(p.f.startsWith('gd_') ? { layer: 'manchas' } : {}) }); }   // manchas y roturas: pegadas al piso, debajo de todo
+          ...(p.f.startsWith('gd_') ? { layer: 'manchas' } : {})
+        });
+      }   // manchas y roturas: pegadas al piso, debajo de todo
     }
     const ash = META.anclas.sh_tree;
     // la mancha horneada (una elipse fija debajo del tronco) sólo para los árboles sin silueta: los que la tienen ya proyectan
     // su sombra de verdad con el sol (ShadowCaster), y al atardecer quedaba la elipse sola debajo de cada árbol
     for (const a of w.arboles) { const T = w.arbolTipos[a.t]; Arbol.spawn({ x: a.x, y: a.y, fl: a.fl, r: a.r, tipo: T }); if (ash && !T.sil) Decoration.spawn({ x: a.x, y: a.y, texture: 'props_sh_tree', anchorX: ash[0], anchorY: ash[1], alpha: .4, layer: 'sombras' }); }
-    for (const c of w.cables) { const dx = c[2] - c[0], dy = c[3] - c[1], L2 = Math.hypot(dx, dy);
+    for (const c of w.cables) {
+      const dx = c[2] - c[0], dy = c[3] - c[1], L2 = Math.hypot(dx, dy);
       const k = CABLE[c[4]];
-      Decoration.spawn({ x: c[0], y: c[1], texture: '_white', anchorX: 0, anchorY: .5, scaleX: L2 / 8, scaleY: k[0] / 8, rotation: Math.atan2(dy, dx), tint: k[1], alpha: k[2], layer: 'cables' }); }
+      Decoration.spawn({ x: c[0], y: c[1], texture: '_white', anchorX: 0, anchorY: .5, scaleX: L2 / 8, scaleY: k[0] / 8, rotation: Math.atan2(dy, dx), tint: k[1], alpha: k[2], layer: 'cables' });
+    }
     // líneas pintadas de las canchas: finas, pegadas al piso
-    for (const c of (w.lineas || [])) { const dx = c[2] - c[0], dy = c[3] - c[1], L2 = Math.sqrt(dx * dx + dy * dy);
-      Decoration.spawn({ x: c[0], y: c[1], texture: '_white', anchorX: 0, anchorY: .5, scaleX: (L2 + 1) / 8, scaleY: 1.5 / 8, rotation: Math.atan2(dy, dx), tint: 0xf2f2ea, alpha: .8, layer: 'manchas' }); }
+    for (const c of (w.lineas || [])) {
+      const dx = c[2] - c[0], dy = c[3] - c[1], L2 = Math.sqrt(dx * dx + dy * dy);
+      Decoration.spawn({ x: c[0], y: c[1], texture: '_white', anchorX: 0, anchorY: .5, scaleX: (L2 + 1) / 8, scaleY: 1.5 / 8, rotation: Math.atan2(dy, dx), tint: 0xf2f2ea, alpha: .8, layer: 'manchas' });
+    }
     // lugares para la gente: puntos al azar que caen en una vereda (el flowfield "veredas" tiene dirección ahí)
     const NG = 23000, gx = new Float32Array(NG), gy = new Float32Array(NG); let ng = 0;
-    for (let k = 0; k < NG * 40 && ng < NG; k++) { const x = rng() * META.WW, y = rng() * META.WH; NavGrid.requestVectorFromStaticFlowfield('veredas', x, y, _v);
-      if (_v.x !== 0 || _v.y !== 0) { gx[ng] = x; gy[ng] = y; ng++; } }
+    for (let k = 0; k < NG * 40 && ng < NG; k++) {
+      const x = rng() * META.WW, y = rng() * META.WH; NavGrid.requestVectorFromStaticFlowfield('veredas', x, y, _v);
+      if (_v.x !== 0 || _v.y !== 0) { gx[ng] = x; gy[ng] = y; ng++; }
+    }
     this._gx = gx.subarray(0, ng); this._gy = gy.subarray(0, ng); this._gq = new Uint8Array(ng);
     const NG_ = ng;
     this._gCur = 0; this.gente = 0; this.genteMax = Math.min(GENTE_MAX, NG_); this.genteFija = !!GENTE_FIJA;
@@ -788,10 +889,12 @@ export class ConurbanoScene extends Scene {
   // de 2 s (las lecturas sueltas saltan mucho). El hilo principal casi no trabaja, así que su fps no dice nada.
   medirFps() {
     const fr = this.views && this.views.frameRate; if (!fr) return;
-    if (!this._fIdx) { const S = this.config.spatial.numberOfSpatialWorkers, L = this.numberOfLogicWorkers, idx = [S];
+    if (!this._fIdx) {
+      const S = this.config.spatial.numberOfSpatialWorkers, L = this.numberOfLogicWorkers, idx = [S];
       if (!Q.has('ignorarRender')) idx.push(S + 1);
       for (let i = 0; i < S; i++) idx.push(i); for (let i = 0; i <= L; i++) idx.push(S + 3 + i);
-      this._fIdx = idx; this._fSum = new Float64Array(idx.length); this._fN = new Uint32Array(idx.length); }
+      this._fIdx = idx; this._fSum = new Float64Array(idx.length); this._fN = new Uint32Array(idx.length);
+    }
     for (let k = 0; k < this._fIdx.length; k++) { const f = fr[this._fIdx[k] * 16]; if (f > 1) { this._fSum[k] += Math.min(f, 70); this._fN[k]++; } }
   }
   cerrarVentana() {
@@ -806,13 +909,18 @@ export class ConurbanoScene extends Scene {
     this.fps = this.cerrarVentana();
     if (this.genteFija || this._quieto) return;
     // si sacar gente no mejoró nada, el cuello de botella es otro (la GPU con la luz, por ejemplo): devolverla y dejar de tocar
-    if (this._antes) { const a = this._antes; this._antes = null;
-      if (this.fps < a.fps + 3) { this.sumarGente(a.gente - this.gente); this._quieto = true; return; } }
+    if (this._antes) {
+      const a = this._antes; this._antes = null;
+      if (this.fps < a.fps + 3) { this.sumarGente(a.gente - this.gente); this._quieto = true; return; }
+    }
     const temprano = t - this._gT0 < 75000;
-    if (this.fps < (temprano ? 46 : 36) && this.gente > 600) { this._antes = { fps: this.fps, gente: this.gente };
-      this.quitarGente(Math.max(150, this.gente * .12 | 0)); this._techo = this.gente; this._gIgn = t + 1000; this._gT = t + 3000; }
+    if (this.fps < (temprano ? 46 : 36) && this.gente > 600) {
+      this._antes = { fps: this.fps, gente: this.gente };
+      this.quitarGente(Math.max(150, this.gente * .12 | 0)); this._techo = this.gente; this._gIgn = t + 1000; this._gT = t + 3000;
+    }
     else if (temprano && this.fps > 55 && this.gente < this.genteMax && !(this._techo && this.gente >= this._techo * .92)) {
-      this.sumarGente(Math.max(200, this.gente * .1 | 0)); this._gIgn = t + 1000; this._gT = t + 3000; }
+      this.sumarGente(Math.max(200, this.gente * .1 | 0)); this._gIgn = t + 1000; this._gT = t + 3000;
+    }
   }
 
   // salta a la próxima hora: mediodía, atardecer, noche, amanecer
@@ -841,19 +949,25 @@ export class ConurbanoScene extends Scene {
 
   // cámara libre en el hilo principal: arrastrar, pellizcar, rueda, WASD/flechas
   // semáforos: cada cuarto de segundo, la luz de la fase de su cruce (la misma cuenta que usan los autos)
-  luces() { const ahora = Date.now(); if (!this._sem || !this._sem.length || ahora - (this._lucesT || 0) < 250) return; this._lucesT = ahora;
+  luces() {
+    const ahora = Date.now(); if (!this._sem || !this._sem.length || ahora - (this._lucesT || 0) < 250) return; this._lucesT = ahora;
     const { Decoration } = WEED, al = (i, v) => { const d = i >= 0 ? Decoration.get(i) : null; if (d) d.alpha = v; };
-    for (const S of this._sem) { const f = faseSemaforo(S.cid, S.eje); if (f === S.f) continue; const o = S.sk * 4, ids = Semaforos.ids;
+    for (const S of this._sem) {
+      const f = faseSemaforo(S.cid, S.eje); if (f === S.f) continue; const o = S.sk * 4, ids = Semaforos.ids;
       if (!ids[o] || !ids[o + 3]) continue; S.f = f;   // el semáforo todavía no armó sus luces
-      al(ids[o] - 1, f === 2 ? .95 : 0); al(ids[o + 1] - 1, f === 1 ? .95 : 0); al(ids[o + 2] - 1, f === 0 ? .95 : 0); al(ids[o + 3] - 1, f === 2 ? 0 : .95); } }
+      al(ids[o] - 1, f === 2 ? .95 : 0); al(ids[o + 1] - 1, f === 1 ? .95 : 0); al(ids[o + 2] - 1, f === 0 ? .95 : 0); al(ids[o + 3] - 1, f === 2 ? 0 : .95);
+    }
+  }
   update(dtRatio = 1) {
     this.luces();
     this.afinarGente();
     if (Keyboard.isPressed && (Keyboard.isPressed('v'))) this.setDriving(!this.driving);
     if (this.driving) { if (Mouse.count >= 2) this.zoomBy(Mouse.pinchRatio()); if (Mouse.wheel) this.zoomBy(Math.exp(-Mouse.wheel * .0012)); Camera.targetZoom = this.zoomT; return; }
     const z = Camera.zoom || 1;
-    if (Mouse.count === 1) { const cx = Mouse.canvasXAt(0), cy = Mouse.canvasYAt(0);
-      if (this._drag) { this.focusX -= (cx - this._drag[0]) / z; this.focusY -= (cy - this._drag[1]) / z; } this._drag = [cx, cy]; }
+    if (Mouse.count === 1) {
+      const cx = Mouse.canvasXAt(0), cy = Mouse.canvasYAt(0);
+      if (this._drag) { this.focusX -= (cx - this._drag[0]) / z; this.focusY -= (cy - this._drag[1]) / z; } this._drag = [cx, cy];
+    }
     else this._drag = null;
     if (Mouse.count >= 2) this.zoomBy(Mouse.pinchRatio());
     if (Mouse.wheel) this.zoomBy(Math.exp(-Mouse.wheel * .0012));
