@@ -26,9 +26,12 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   - En Parque Chas, las piezas bajas de pared ordenadas más de 8 px por delante de su pie bajaron del 23 % al 2,4 %.
     Las piezas de casas pasaron de 223 089 a 276 605 (+24 %), y el atlas de 33,0 a 34,9 MB (7068 × 4094).
 - [ ] **Tanques de agua** — hecho (f00925d). Estaban en todas las casas, todos iguales: ahora en una de cada seis.
-- [ ] **Casas de esquina con la forma de la esquina** — pendiente. En una esquina que no es de 90°, la casa es una caja
-  rectangular y queda un triángulo de vereda vacío, rarísimo. Tiene que tomar la forma de la esquina, aunque sea
-  irregular, como las casas del centro de Parque Chas (las de la rotonda).
+- [ ] **Casas de esquina con la forma de la esquina** — hecho, falta el commit. En las esquinas que no son en escuadra (entre 25°
+  y 78°, o entre 102° y 155°) va una casa como las de la rotonda (`Houses.chas`): ochava de 2,8 m, frentes de 10 m y el fondo
+  donde se cruzan las medianeras. Frentes y ochava miden siempre lo mismo y las medianeras son lisas: todas las esquinas de un
+  estilo comparten sus texturas. Los techos en abanico usan un medio cuadrado blanco compartido (si no, cada triángulo iba al
+  atlas). En Parque Chas (antes de ensanchar las calles) salieron 88. Pendiente: muchas esquinas no entran (la vereda o el
+  lote de al lado no dejan); se podría probar con frentes más cortos.
 - [ ] **Fondos de las manzanas** — pendiente. Las casas dan a la calle, pero sus fondos (lo de adentro de la manzana)
   tienen que ser patios, jardines o la continuación de la casa, separados entre sí por medianeras y rejas (las paredes y
   rejas que el mapa ya genera). Cada fondo, lindo o abandonado:
@@ -42,10 +45,27 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   Ahora un techo se ordena por el borde de adelante de su propia pieza (lo que se le superpone en pantalla está siempre más
   lejos que él); un piso al ras y una tira fina en alto (tapa de muro, alero), por su borde de atrás.
 
+- [ ] **Caras lisas invisibles** — hecho, falta el commit. Las caras de un color (medianeras lisas, contornos) iban en `mundo.json` con
+  textura `null`, y WeedJS les da la textura 0, que es `_empty` (transparente): no se veían. El exportador ahora escribe
+  `_white`.
+- [ ] **Casas de la rotonda: huecos y paredes «de papel»** — hecho, falta el commit. Entre el techo y la pared quedaba una rayita (el triángulo
+  compartido de los techos, ahora más fino y pasado de la diagonal) y las paredes no tenían espesor (ahora llevan tapa arriba y el
+  parapeto corrido hacia adentro).
+- [ ] **La fuente tira agua** — pendiente. La fuente de la rotonda tira agua hacia arriba, un metro más o menos, con
+  `ParticleEmitter`.
+
 ## Piso
 
-- [ ] **Veredas parejas** — hecho (f00925d). Cada lado de cada cuadra lleva un solo tipo de vereda (el que más
-  frente ocupaba entre sus lotes), también donde no hay lote.
+- [ ] **Veredas parejas** — hecho, falta el commit: una por manzana. En f00925d era una por lado de cuadra, y en una misma manzana
+  se mezclaban. Ahora el editor arma las manzanas (lo que queda adentro de las calles, en una grilla de 1 m) y cada una lleva un solo
+  tipo de vereda (el que más frente ocupa entre sus lotes), en todas las veredas que la rodean.
+- [ ] **Veredas sin plantas en el medio** — hecho, falta el commit. Los yuyos «de las grietas» iban en cualquier punto del
+  ancho de la vereda: ahora junto al cordón o al pie de la pared.
+- [ ] **Veredas y calles más anchas** — hecho, falta el commit. Knob `ancho` (1,5): multiplica calzadas y veredas (también las
+  de un barrio real y la calzada de la rotonda). La franja de pasto junto al cordón mide un tercio de la vereda (entre 1 y
+  2,2 m; antes 1 m fijo). Parque Chas: 3379 casas (antes 4140; las manzanas quedaron más chicas).
+- [ ] **Gente caminando por la calzada de la rotonda** — pendiente, revisar. Con las calles más anchas, en la rotonda de Parque
+  Chas se ve mucha gente caminando por la calzada.
 - [ ] **Calles parejas** — hecho (f00925d). Un solo material por calle (asfalto, asfalto roto, adoquín, tierra), el
   que más largo tenía entre sus cuadras. Una calle son las cuadras del mismo nombre; sin nombre, las que siguen derecho en
   la esquina.
@@ -66,12 +86,16 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 
 ## Cables
 
-- [ ] **Cables que salen del aire** — en curso. Los cables tienen que salir de algo (un poste, una casa) y llegar a algo,
-  y verse más reales y más lindos (con su comba, de a varios, del color del cable).
+- [ ] **Cables que salen del aire** — hecho, falta el commit. Las bajadas terminaban en un punto al azar (en el aire): ahora van a
+  la fachada de una o dos casas del lado del poste. De poste a poste, los tres de luz y dos de teléfono y tele, más gruesos y
+  combados; la línea cruza la esquina si la calle sigue derecho, y si no, el último poste lleva su rienda al piso. Cada tramo
+  tiene su estilo (grosor y tono). Parque Chas: 34 065 tramos (antes 7028). Además el pool de decoraciones de la escena no
+  contaba los grafitis: las últimas decoraciones (cables, líneas) podían quedar sin lugar.
 
 ## Árboles
 
-- [ ] **Ramas más angostas y menos hojas** — pendiente. Que se vea más a través de los árboles.
+- [ ] **Ramas más angostas y menos hojas** — hecho, falta el commit. Ramas a 0,6 de su grosor (el tronco igual), la mitad de
+  los racimos pelados y al resto le queda un cuarto de sus hojas.
 
 ## Movimiento
 
@@ -85,6 +109,17 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   no el dibujo girado. Las sombras de los sprites las hace WeedJS (rota el dibujo); los objetos sueltos son decoraciones
   con una sombra horneada fija.
 
+## Imágenes y atlas
+
+- [ ] **Ordenar las imágenes; repo limpio** — en curso. Cada pack de `arte/objetos` (y lo de Gemini que sigue en uso) en un
+  spritesheet con su JSON; la escena carga esas hojas enteras y WeedJS arma el bigAtlas al cargar. El editor deja de hornear el
+  atlas y de armar la hoja de props: sólo genera lo suyo (caras de las casas, árboles, piso). El repo, sin cambios pendientes ni
+  archivos sueltos.
+- [ ] **Atlas de las caras con mucho repetido** — pendiente. Cada pared es una textura propia aunque sea casi la misma (ladrillo,
+  revoque, con su ruido, sus manchas y sus ventanas pintadas), y cada techo guarda su material en su propia medida. Reusar
+  pedazos: paredes con una baldosa de material compartida (como los techos) y ventanas, puertas y carteles como piezas aparte,
+  también compartidas; techos con una sola baldosa por material, repetida.
+
 ## Formato
 
 - [ ] **Un solo formato** — pendiente. El editor exporta y la escena lee un único formato, sin compatibilidad hacia atrás ni
@@ -92,7 +127,23 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   (knob `ffBinario`, `META.ffExt`), las lámparas de los faroles de Gemini (`LAMPARAS`) y el número de `formato`. Los
   tres barrios ya están en lo nuevo (caras con skew, `.bin`); el barrio inventado y Carabobo hay que reexportarlos igual.
 
+## Una sola escena: la del demo de WeedJS
+
+- [ ] **Este repo pasa a ser el editor de barrios** — pendiente (decidido el 12/11). El juego jugable es el demo de WeedJS
+  (`demos/buenosAiresScene`), como ahora; la escena de acá (`conurbanoScene.js`) se deja de mantener. Quizás este repo
+  cambie de nombre. Lo que el editor arma es dato, y la escena sólo lo lee con lectores genéricos. Hoy al demo le faltan
+  tres:
+  - las piezas propias de cada casa (`casas[].g`: grafitis, firmas, carteles, enredaderas), con el mismo formato que las
+    piezas de las caras;
+  - las lámparas de cada farol (`META.lamparas`: dónde está la lámpara, a qué altura, su cuadro prendido), en vez de una tabla
+    por nombre;
+  - la planta sobre su maceta (`props[].o`).
+  Y conviene que el formato diga las cosas en vez de que la escena las deduzca de los nombres (por ejemplo, un dato «se
+  mece» en vez de los prefijos `plm_`/`yy_`). Va junto con «Un solo formato». A resolver: el horneado del atlas (hoy lo hace
+  la página del juego de acá, con la gente y los autos) y cuánto pesan los barrios en el repo de WeedJS (Parque Chas son unos
+  80 MB por exportación).
+
 ## Barrios y rama
 
-- [ ] **Reexportar el barrio inventado y Carabobo** — pendiente. Todavía tienen los objetos de Gemini y nada de lo de arriba.
+- [ ] **Reexportar el barrio inventado y Carabobo** — en curso.
 - [x] **Rama `objetos-zip`** — mergeada a main el 12/11 (sin subir a GitHub).

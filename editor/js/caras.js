@@ -39,9 +39,7 @@ const Caras = (() => {
   // ---------- texturas planas (RGBA), multiplicadas por G
   // cara con textura propia: en su espacio (u a la derecha, v hacia abajo), con AO del piso, saturación y contorno
   function textura(f) {
-    // un triángulo de color liso: su color en una textura del tamaño de la cara
-    const t = f.tex || (() => { const w = Math.max(1, Math.round(len(f.E1) * R3.TD)), h = Math.max(1, Math.round(len(f.E2) * R3.TD)), d = new Float32Array(w * h * 4);
-      for (let i = 0; i < w * h; i++) { d[i * 4] = f.col[0]; d[i * 4 + 1] = f.col[1]; d[i * 4 + 2] = f.col[2]; d[i * 4 + 3] = 255; } return { w, h, d }; })();
+    const t = f.tex;   // (un triángulo de color liso no pasa por acá: va con TRI, la textura compartida)
     const w = t.w, h = t.h, d = new Uint8ClampedArray(w * h * 4), aoK = R3.LIGHT.ao;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const u = (x + .5) / w, v = (y + .5) / h; if (f.tri && u + v > 1) continue;
@@ -174,13 +172,19 @@ const Caras = (() => {
     // (Con el frente de la casa entera, un techo, un piso o una tapa de atrás hacía subir hasta el frente a las paredes que se pintan
     // después, y la gente parada al costado de una pared quedaba detrás; con el borde de atrás de los techos, la medianera de la casa
     // de al lado y los autos que pasaban detrás quedaban encima del techo)
-    function buscada(vertical, P, O, E1, E2, tira) {
+    function buscada(vertical, P, O, E1, E2, tira, tri) {
       if (vertical) return J([P[0], P[1], 0])[1];
-      const C = [[0, 0], [1, 0], [0, 1], [1, 1]].map(([i, j]) => add(O, add(sc3(E1, i), sc3(E2, j)))), y = C.map(c => J([c[0], c[1], 0])[1]);
+      const C = (tri ? [[0, 0], [1, 0], [0, 1]] : [[0, 0], [1, 0], [0, 1], [1, 1]]).map(([i, j]) => add(O, add(sc3(E1, i), sc3(E2, j)))), y = C.map(c => J([c[0], c[1], 0])[1]);
       return tira || Math.max(...C.map(c => c[2])) <= .3 ? Math.min(...y) : Math.max(...y); }
     const cortes = new Map();
     function columna(E, n) { const porTexel = Math.abs(J(E)[1]) / n; let c = TILE; while (c > 8 && c * porTexel > PIE_MAX) c = Math.ceil(c / 2); return c; }
     const BLANCO = { w: 8, h: 8, grid: [{ nombre: "_white", x0: 0, y0: 0, w: 8, h: 8 }] };
+    // medio cuadrado blanco (u + v ≤ 1): cualquier triángulo liso es su imagen con escala y skew, como una cara lisa lo es de _white.
+    // Todos lo comparten, teñido de su color (antes cada triángulo iba al atlas con su textura: los techos de las esquinas con forma)
+    // (128 texeles, y un texel y medio pasado de la diagonal: si no, entre el techo y la pared quedaba una rayita escalonada)
+    const TRI = (() => { const n = 128, d = new Uint8ClampedArray(n * n * 4);
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { if ((x + .5) / n + (y + .5) / n > 1 + 1.5 / n) continue; const o = (y * n + x) * 4; d[o] = d[o + 1] = d[o + 2] = d[o + 3] = 255; }
+      return registrar({ w: n, h: n, d }, "t"); })();
     // un accesorio: su sprite de R3 (iluminado, con contorno) por tipo y octavo de vuelta, y dónde cae su origen en él
     const sprites = new Map();
     function spriteAcc(a, oct) {
@@ -214,6 +218,10 @@ const Caras = (() => {
           // color liso: la textura blanca del motor, teñida con el color iluminado
           st.lisas++; const col = saturar(F0.col[0] * L[0], F0.col[1] * L[1], F0.col[2] * L[2]);
           sub.push({ reg: BLANCO, O: F.O, E1: F.E1, E2: F.E2, tinte: hexDe(col), girable: false, principal: true });
+        } else if (!F0.tex) {
+          // triángulo de color liso: el medio cuadrado compartido (TRI), teñido
+          st.lisas++; const col = saturar(F0.col[0] * L[0], F0.col[1] * L[1], F0.col[2] * L[2]);
+          sub.push({ reg: TRI, O: F.O, E1: F.E1, E2: F.E2, tinte: hexDe(col), girable: false, tri: true });
         } else if (F0.tex && F0.tex.mat && hashD(F0.tex.d) === F0.tex.limpia) {
           // material limpio (un techo): baldosas compartidas de hasta 6 m, cada una un recorte de medio metro en medio metro
           st.material++; const m = F0.tex.mat, Wm = len(F.E1), Hm = len(F.E2), nx = Math.max(1, Math.ceil(Wm / m.tw - .01)), ny = Math.max(1, Math.ceil(Hm / m.th - .01));
@@ -291,7 +299,9 @@ const Caras = (() => {
         if (T === BLANCO && it.pared) {
           const piso = (E) => Math.abs(J([E[0], E[1], 0])[1]);
           const hor1 = vert ? Math.abs(q.E1[2]) <= Math.abs(q.E2[2]) : piso(q.E1) >= piso(q.E2), Eh = hor1 ? q.E1 : q.E2, n = Math.max(1, Math.ceil(piso(Eh) / PIE_MAX - 1e-6));
-          const e1 = hor1 ? sc3(q.E1, 1 / n) : q.E1, e2 = hor1 ? q.E2 : sc3(q.E2, 1 / n), A1 = J(e1), B1 = J(e2);
+          // cada columna, 1 px de pantalla más ancha (como las piezas con textura): si no, entre una y otra quedaba una rayita
+          const pasa = n > 1 ? 1 + 1 / Math.max(1, Math.hypot(...J(sc3(Eh, 1 / n)))) : 1;
+          const e1 = hor1 ? sc3(q.E1, pasa / n) : q.E1, e2 = hor1 ? q.E2 : sc3(q.E2, pasa / n), A1 = J(e1), B1 = J(e2);
           for (let k = 0; k < n; k++) {
             const O = add(q.O, sc3(Eh, k / n)), P = add(O, add(sc3(e1, .5), sc3(e2, .5))), j0 = J(O);
             // su y de orden: la de una pieza de dibujo (abajo)
@@ -303,9 +313,9 @@ const Caras = (() => {
         for (const g of T.grid) {
           const cu = g.x0 + g.w / 2, cv = g.y0 + g.h / 2, P = add(q.O, add(sc3(q.E1, cu / T.w), sc3(q.E2, cv / T.h))), p = J(P);
           const q0 = add(q.O, add(sc3(q.E1, g.x0 / T.w), sc3(q.E2, g.y0 / T.h))), da = J(sc3(q.E1, g.w / T.w)), db = J(sc3(q.E2, g.h / T.h)), j0 = J(q0);
-          const objetivo = buscada(vert, P, q0, sc3(q.E1, g.w / T.w), sc3(q.E2, g.h / T.h), tira);
+          const objetivo = buscada(vert, P, q0, sc3(q.E1, g.w / T.w), sc3(q.E2, g.h / T.h), tira, q.tri);
           tiles.push({ rank: r, cuadro: g.nombre, p, sx: g.nombre === "_white" ? A[0] / 8 : sx, sy: g.nombre === "_white" ? B[1] / 8 : sy, kx, ky, tn: q.tinte, iz, objetivo, borde: !!q.borde, n: it.F.n, z: P[2], el: it.el, g,
-            poli: [j0, [j0[0] + da[0], j0[1] + da[1]], [j0[0] + da[0] + db[0], j0[1] + da[1] + db[1]], [j0[0] + db[0], j0[1] + db[1]]] });
+            poli: q.tri ? [j0, [j0[0] + da[0], j0[1] + da[1]], [j0[0] + db[0], j0[1] + db[1]]] : [j0, [j0[0] + da[0], j0[1] + da[1]], [j0[0] + da[0] + db[0], j0[1] + da[1] + db[1]], [j0[0] + db[0], j0[1] + db[1]]] });
         }
       }
       // la y de orden: la buscada, o la de una pieza de la casa que tapa y va antes en el orden de pintor, si es más baja

@@ -148,9 +148,10 @@ const World = (() => {
       if (type === "pasaje" && mat === "asf" && r() < .4) mat = w < .5 ? "tierra" : "roto";
       if (extra.tierra) mat = "tierra";
       else if (type === "calle" && mat !== "tierra" && w > .34 && r() < .38 * (C.adoquines ?? 1)) mat = "adoquin";      // calles de adoquines, como en Flores
-      const hw = extra.hwR ?? { ave: C.avenida / 2, calle: C.calle / 2 * (extra.ancha ? 1.25 : 1), pasaje: C.pasaje / 2, pasillo: C.pasillo / 2 }[type];
+      const AN = type === "pasillo" ? 1 : C.ancho;   // calles y veredas más anchas (knob «ancho»)
+      const hw = (extra.hwR ?? { ave: C.avenida / 2, calle: C.calle / 2 * (extra.ancha ? 1.25 : 1), pasaje: C.pasaje / 2, pasillo: C.pasillo / 2 }[type]) * AN;
       const VER = (RM && RM.estilo && RM.estilo.vereda) || C.vereda;   // el ancho de vereda del barrio real, si lo trae
-      let sw = { ave: VER * 1.45, calle: VER * (w < .3 ? .8 : 1), pasaje: VER * (w < .4 ? .45 : .56), pasillo: 0 }[type]; const sw0 = sw;
+      let sw = { ave: VER * 1.45, calle: VER * (w < .3 ? .8 : 1), pasaje: VER * (w < .4 ? .45 : .56), pasillo: 0 }[type] * AN; const sw0 = sw;
       if (mat === "tierra" && type !== "pasillo") sw = Math.max(sw, extra.tierra ? 1.6 : 2.6);
       const s = { id: segs.length, a, b, len, dir: [(b[0] - a[0]) / len, (b[1] - a[1]) / len], type, mat, hw, sw, sw0, w, cls: CLS[type],
         med: type === "ave" ? Math.max(0, Math.min(hw - 2.5, extra.medR ?? C.cantCentral / 2)) : 0, nombre: extra.nombre || "", cantero: type !== "pasillo" && mat !== "tierra" && sw >= 2.5 && r() < (w < .35 ? .45 : .85), cross: [], lots: { 1: [], "-1": [] }, district: d };
@@ -181,6 +182,8 @@ const World = (() => {
         s.mat = mat; s.sw = mat === "tierra" ? Math.max(s.sw0, 2.6) : s.sw0;
         s.cantero = mat !== "tierra" && s.sw >= 2.5 && (Math.imul(s.id + 1, 0x9e3779b1) >>> 0) / 4294967296 < (s.w < .35 ? .45 : .85); } }
 
+    // la franja de pasto junto al cordón (cantero), de un tercio de la vereda, entre 1 y 2,2 m (0: no tiene)
+    for (const s of segs) s.cantW = s.cantero ? Math.min(2.2, Math.max(1, .35 * s.sw)) : 0;
     // ---------- índice espacial de calles
     const B = 16, GW = Math.ceil(MW / B) + 2, GH = Math.ceil(MH / B) + 2, buckets = Array.from({ length: GW * GH }, () => []);
     for (const s of segs) { const rad = s.hw + s.sw + 1.5;
@@ -192,7 +195,7 @@ const World = (() => {
     // rotondas de un barrio real (Parque Chas: la fuente de la esquina de seis): [x, y, radio de la isla, radio de la calzada].
     // La isla no es calle ni vereda (ahí va la fuente); hasta el radio de la calzada todo es calle (se come las puntas de las
     // veredas y de los lotes de las esquinas), de la calle más cercana
-    const ROTONDAS = (RM && RM.rotondas) || [];
+    const ROTONDAS = ((RM && RM.rotondas) || []).map(q => [q[0], q[1], q[2], q[2] + (q[3] - q[2]) * C.ancho]);   // la calzada, con las calles más anchas
     function enRotonda(x, y) { for (let i = 0; i < ROTONDAS.length; i++) { const q = ROTONDAS[i], dx = x - q[0], dy = y - q[1], d2 = dx * dx + dy * dy;
         if (d2 < q[3] * q[3]) return d2 < q[2] * q[2] ? 2 : 1; } return 0; }
     // clasificación de un punto (sin lotes)
@@ -395,6 +398,49 @@ const World = (() => {
         lots.push(lot); stamp(q, id); seg.lots[side].push({ t0: Math.min(t0, t1), t1: Math.max(t0, t1), lot });
       }
     }
+    // ---------- esquinas que no son en escuadra (entre 25° y 78°, o entre 102° y 155°): una casa con la forma de la esquina, como las
+    // de la rotonda de Parque Chas (Houses.chas): la ochava de OCH m de ancho, un frente de FRENTE m sobre cada calle y el fondo
+    // donde se cruzan las medianeras (a lo sumo FONDO m). Frentes y ochava miden siempre lo mismo y las medianeras son lisas, así
+    // todas las esquinas de un estilo comparten sus texturas (el atlas no crece con cada esquina); lo que cambia con el ángulo son
+    // las medianeras. Sin sorteos: sale del lugar
+    if (C.ochavas !== 0) { const OCH = 2.8, FRENTE = 10, FONDO = 14;
+      const cruce = (P, d, Q, e) => { const den = d[0] * e[1] - d[1] * e[0]; if (Math.abs(den) < 1e-6) return null; const t = ((Q[0] - P[0]) * e[1] - (Q[1] - P[1]) * e[0]) / den; return [P[0] + d[0] * t, P[1] + d[1] * t]; };
+      const desde = (q, p) => Math.hypot(q.a[0] - p[0], q.a[1] - p[1]) < Math.hypot(q.b[0] - p[0], q.b[1] - p[1]) ? q.dir : [-q.dir[0], -q.dir[1]];   // de p hacia la calle
+      for (const it of inters) {
+        const { s, o, p } = it;
+        if ([s, o].some(q => q.type === "pasillo" || q.type === "pasaje" || q.mat === "tierra")) continue;
+        let A = { s, u: desde(s, p) }, Bq = { s: o, u: desde(o, p) };
+        const cs = A.u[0] * Bq.u[0] + A.u[1] * Bq.u[1]; if (Math.abs(cs) <= .2 || Math.abs(cs) > .9) continue;   // en escuadra (ya tiene la suya) o casi derecha
+        if (A.u[0] * Bq.u[1] - A.u[1] * Bq.u[0] < 0) [A, Bq] = [Bq, A];   // la primera calle es la que gira hacia la otra en sentido antihorario
+        const u1 = A.u, u2 = Bq.u, n1 = [-u1[1], u1[0]], n2 = [u2[1], -u2[0]], d1 = A.s.hw + A.s.sw + .05, d2 = Bq.s.hw + Bq.s.sw + .05;
+        const K = cruce([p[0] + n1[0] * d1, p[1] + n1[1] * d1], u1, [p[0] + n2[0] * d2, p[1] + n2[1] * d2], u2); if (!K) continue;
+        if (K[0] < 6 || K[1] < 6 || K[0] > MW - 6 || K[1] > MH - 6 || !dentro(K[0], K[1])) continue;
+        const wq = wealthAt(K[0], K[1]); if (wq < .2) continue;
+        const ang = Math.acos(Math.max(-1, Math.min(1, cs))), a = OCH / 2 / Math.sin(ang / 2);
+        const O1 = [K[0] + u1[0] * a, K[1] + u1[1] * a], O2 = [K[0] + u2[0] * a, K[1] + u2[1] * a];
+        const F1 = [O1[0] + u1[0] * FRENTE, O1[1] + u1[1] * FRENTE], F2 = [O2[0] + u2[0] * FRENTE, O2[1] + u2[1] * FRENTE];
+        if (villaAt(F1[0], F1[1]) || villaAt(F2[0], F2[1])) continue;
+        // el fondo: donde se cruzan las medianeras, o dos puntos a FONDO m de cada frente si se cruzan más lejos
+        const X = cruce(F1, n1, F2, n2), dX = X ? (X[0] - F1[0]) * n1[0] + (X[1] - F1[1]) * n1[1] : Infinity;
+        const B1 = dX > 1 && dX <= FONDO ? X : [F1[0] + n1[0] * FONDO, F1[1] + n1[1] * FONDO], B2 = dX > 1 && dX <= FONDO ? X : [F2[0] + n2[0] * FONDO, F2[1] + n2[1] * FONDO];
+        const poly = [O1, F1, B1, B2, F2, O2], rol = ["f1", "m", "m", "m", "f2", "o"];
+        // vereda delante de los dos frentes y de la ochava, y adentro de la manzana, libre (sin calles ni otros lotes)
+        const vereda = (P, n) => { const c = classify(P[0] - n[0] * .6, P[1] - n[1] * .6); return c && c.k === "walk"; };
+        if (!vereda(O1, n1) || !vereda(F1, n1) || !vereda(O2, n2) || !vereda(F2, n2)) continue;
+        const xs = poly.map(q => q[0]), ys = poly.map(q => q[1]); let libre = true;
+        for (let y = Math.min(...ys); y <= Math.max(...ys) && libre; y += .6) for (let x = Math.min(...xs); x <= Math.max(...xs); x += .6)
+          if (inside(poly, [x, y]) > .3 && !free(x, y)) { libre = false; break; }
+        if (!libre) continue;
+        const id = lots.length, h = Math.abs(Math.imul(Math.round(K[0] * 10), 73856093) ^ Math.imul(Math.round(K[1] * 10), 19349663));
+        const tipos = wq > .6 ? ["balaustres", "moderno", "ladrillo"] : wq > .35 ? ["gris", "ladrillo", "balaustres"] : ["gris", "ladrillo"];
+        const lot = { id, q: poly, o: O1, ux: u1, nOut: n1, fw: FRENTE, ld: Math.min(FONDO, dX), seg: A.s, side: n1[0] * A.s.n[0] + n1[1] * A.s.n[1] > 0 ? 1 : -1, w: wq, kind: "esquinaChas",
+          phi: Math.atan2(u1[1], u1[0]), seed: h % 1000000007, vereda: wq < .45 ? "cem" : ["vain", "vain", "gris", "roja"][h % 4], patio: "cem",
+          chas: { tipo: tipos[(h >>> 3) % tipos.length], pisos: wq < .35 || (h >>> 6) % 3 === 0 ? 1 : 2, rol, calles: [A.s.nombre, Bq.s.nombre], generica: true } };
+        lots.push(lot);
+        for (let y = Math.max(0, Math.floor(Math.min(...ys) * LR)); y <= Math.min(LH - 1, Math.ceil(Math.max(...ys) * LR)); y++)
+          for (let x = Math.max(0, Math.floor(Math.min(...xs) * LR)); x <= Math.min(LW - 1, Math.ceil(Math.max(...xs) * LR)); x++) {
+            const wx = (x + .5) / LR, wy = (y + .5) / LR; if (lotGrid[y * LW + x] < 0 && inside(poly, [wx, wy]) > 0 && !classify(wx, wy)) lotGrid[y * LW + x] = id; }
+      } }
     const order = segs.slice().sort((a, b) => b.cls - a.cls || r() - .5);
     for (const s of order) {
       for (const side of [1, -1]) {
@@ -502,13 +548,38 @@ const World = (() => {
         // las casas están horneadas para una sola vista: mejor un lote con el frente a la cámara (al sur), así se ve el cartel
         const fx = l.o[0] + l.ux[0] * l.fw / 2, fy = l.o[1] + l.ux[1] * l.fw / 2, d = Math.hypot(fx - pq.x, fy - pq.y) + (l.nOut[1] < 0 ? 12 : 0); if (d < bd) { bd = d; best = l; } }
       if (best) { best.kind = pq.rubro === "PIZZERIA" ? "negocio_casa" : "negocio"; best.cartel = pq.cartel; best.rubro = pq.rubro || ""; best.nombre = pq.n; } }
-    // ---------- veredas parejas: la vereda no cambia de tipo a mitad de cuadra. Cada lado de cada calle toma el tipo que más frente
-    // ocupa entre sus lotes, y sus lotes lo llevan (ahí miran también los objetos de la vereda); sin lotes, el de siempre
-    for (const s of segs) { s.veredaLado = {};
-      for (const side of [1, -1]) { const L = s.lots[side], peso = new Map(); let kind = null, best = 0;
-        for (const e of L) if (e.lot.vereda) peso.set(e.lot.vereda, (peso.get(e.lot.vereda) || 0) + (e.t1 - e.t0));
-        for (const [k, p] of peso) if (p > best) { best = p; kind = k; }
-        s.veredaLado[side] = kind; if (kind) for (const e of L) e.lot.vereda = kind; } }
+    // ---------- veredas parejas: un solo tipo de vereda por manzana. Las manzanas son lo que queda adentro de las calles (ni calzada
+    // ni vereda), en una grilla de 1 m, por partes conexas. Cada una toma el tipo que más frente ocupa entre sus lotes (las esquinas
+    // también), y ese tipo va en sus lotes (ahí miran los objetos de la vereda) y en cada lado de calle que da a ella; un lado que
+    // no da a ninguna manzana, el que más frente ocupa entre sus lotes
+    { const BW = Math.ceil(MW), BH = Math.ceil(MH), manz = new Int32Array(BW * BH).fill(-1), libre = new Uint8Array(BW * BH), cola = new Int32Array(BW * BH);
+      for (let j = 0; j < BH; j++) for (let i = 0; i < BW; i++) libre[j * BW + i] = classify(i + .5, j + .5) ? 0 : 1;
+      let nM = 0;
+      for (let k0 = 0; k0 < BW * BH; k0++) { if (!libre[k0] || manz[k0] >= 0) continue;
+        let a = 0, b = 0; cola[b++] = k0; manz[k0] = nM;
+        while (a < b) { const k = cola[a++], i = k % BW, j = (k / BW) | 0;
+          for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= BW || jj >= BH) continue;
+            const kk = jj * BW + ii; if (libre[kk] && manz[kk] < 0) { manz[kk] = nM; cola[b++] = kk; } } }
+        nM++; }
+      const manzanaEn = (x, y) => { const i = Math.floor(x), j = Math.floor(y); return i < 0 || j < 0 || i >= BW || j >= BH ? -1 : manz[j * BW + i]; };
+      // la manzana de un lote: la de su centro (un poco hacia adentro desde el frente)
+      const deLote = (l) => { const v = Math.min(3, (l.ld || 6) / 2), c = l.ux && l.nOut ? [l.o[0] + l.ux[0] * (l.fw || 0) / 2 + l.nOut[0] * v, l.o[1] + l.ux[1] * (l.fw || 0) / 2 + l.nOut[1] * v]
+        : [l.q.reduce((a, p) => a + p[0], 0) / l.q.length, l.q.reduce((a, p) => a + p[1], 0) / l.q.length]; return manzanaEn(c[0], c[1]); };
+      // la manzana de un lado de calle: la que está pasando su vereda, a lo largo de la cuadra
+      const deLado = (sg, side) => { for (const f of [.5, .3, .7, .15, .85]) { const t = sg.len * f, off = side * (sg.hw + sg.sw + 1.2);
+          const m = manzanaEn(sg.a[0] + sg.dir[0] * t + sg.n[0] * off, sg.a[1] + sg.dir[1] * t + sg.n[1] * off); if (m >= 0) return m; } return -1; };
+      const votos = new Map();
+      for (const l of lots) { if (!l.vereda) continue; const m = deLote(l); if (m < 0) continue; l._manz = m;
+        let v = votos.get(m); if (!v) votos.set(m, v = new Map()); v.set(l.vereda, (v.get(l.vereda) || 0) + (l.fw || 1)); }
+      const tipoDe = new Map(); for (const [m, v] of votos) { let kind = null, best = 0; for (const [k, p] of v) if (p > best) { best = p; kind = k; } tipoDe.set(m, kind); }
+      for (const l of lots) if (l._manz !== undefined && tipoDe.has(l._manz)) l.vereda = tipoDe.get(l._manz);
+      for (const sg of segs) { sg.veredaLado = {};
+        for (const side of [1, -1]) { const m = deLado(sg, side);
+          if (m >= 0 && tipoDe.has(m)) { sg.veredaLado[side] = tipoDe.get(m); continue; }
+          const peso = new Map(); let kind = null, best = 0;
+          for (const e of sg.lots[side]) if (e.lot.vereda) peso.set(e.lot.vereda, (peso.get(e.lot.vereda) || 0) + (e.t1 - e.t0));
+          for (const [k, p] of peso) if (p > best) { best = p; kind = k; }
+          sg.veredaLado[side] = kind; } } }
     const lotAt = (x, y) => { const gx = (x * LR) | 0, gy = (y * LR) | 0; if (gx < 0 || gy < 0 || gx >= LW || gy >= LH) return null; const i = lotGrid[gy * LW + gx]; return i >= 0 ? lots[i] : null; };
     return { MW, MH, MG, dentro, segs, lots, districts, inters, classify, classifyInto, lotAt, wealthAt, near, raw, plazas, villaAt, zona, real: RM ? RM.nombre : null, carpeta: RM ? (RM.carpeta || "carabobo") : "barrio", estilo: (RM && RM.estilo) || {}, inicio: RM ? RM.inicio : null,
       arbolesReales: RM && RM.arboles ? { especies: RM.especies, lista: RM.arboles } : null, rotondas: ROTONDAS, pasto: PASTO };

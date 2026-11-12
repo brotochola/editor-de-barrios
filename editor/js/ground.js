@@ -118,7 +118,7 @@ const Ground = (() => {
       if (s.mat === "tierra") { if (dd < .6) return grass(ix, iy, .7); }
       else { if (dd < .16) return set(222, 218, 208); if (dd < .2) return set(168, 164, 156); }
       if (W.pitGrid && cazuela(W, wx, wy, ix, iy)) return;
-      let cant = s.cantero && dd < 1.0;
+      let cant = dd < s.cantW;   // la franja de pasto junto al cordón (world.js: cantW, 0 si no tiene)
       if (cant) for (let i = 0; i < s.cross.length; i++) if (Math.abs(c.t - s.cross[i]) < 1.6) cant = false;
       if (cant) return grass(ix, iy, .2);
       // la vereda: la de ese lado de la cuadra, pareja (world.js: veredaLado), también donde no hay lote

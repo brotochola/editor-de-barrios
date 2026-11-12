@@ -353,6 +353,9 @@ function apoyoDe(sheet) { let t = _apoyo.get(sheet); if (t === undefined) { t = 
 // los faros: la luz del propio auto, en el frente de su huella (LightEmitter.offsetX gira con el auto). No más adelante: lo que
 // está al costado del auto quedaba detrás de la luz, y su sombra caía hacia atrás. Sin brillos
 const LUZ_FARO = 0xfff0d0;
+// los cables por su estilo (mundo.json cables[i][4], del editor): [grosor en px de mundo, tinte, alfa]. 0 de luz (los de la cruceta),
+// 1 de teléfono y tele (más gruesos), 2 bajada a una casa, 3 rienda al piso (acero galvanizado)
+const CABLE = [[1, 0x17171b, .9], [1.5, 0x232327, .9], [.9, 0x1c1c20, .85], [.8, 0x6a6a70, .8]];
 // las caras de las casas traen del editor hacia dónde miran y a qué altura están, y WeedJS las ilumina como superficies
 // (lighting.faces): un farol alumbra la pared que lo mira y no la de atrás, y el sol cada cara según su ángulo.
 // ?caras=0: sin esto, para medir lo que cuesta
@@ -597,7 +600,7 @@ export class ConurbanoScene extends Scene {
     physics: { gravity: { x: 0, y: 0 }, sleeping: true, subStepCount: 0, commandRingCapacity: 65536, numberOfPhysicsWorkers: HC >= 8 ? 4 : 2 },
     particle: { maxParticles: 500, decals: false },
     // piezas de casas y árboles, props (y sus sombras), cables y líneas de canchas
-    decoration: { maxDecorations: META.nPiezas + (META.nTiles || 0) + META.nPiezasArboles + 2 * META.nProps + META.nArboles + META.nCables + (META.nLineas || 0) + 8 * ((META.transito && META.transito.n) || 0) + 3000, maxAttachedDecorationsPerEntity: 255 },
+    decoration: { maxDecorations: META.nPiezas + (META.nTiles || 0) + META.nPiezasArboles + 2 * META.nProps + META.nArboles + META.nCables + META.nGrafitis + (META.nLineas || 0) + 8 * ((META.transito && META.transito.n) || 0) + 3000, maxAttachedDecorationsPerEntity: 255 },
     renderer: { backend: 'webgl', ySort: true },
     // las casas son decoraciones: que no se desvanezcan al alejar
     preRender: { startFadingDecorationsAtZoom: .2, hideDecorationsAtZoom: .1, cullingRatio: .3 },
@@ -731,7 +734,8 @@ export class ConurbanoScene extends Scene {
     // su sombra de verdad con el sol (ShadowCaster), y al atardecer quedaba la elipse sola debajo de cada árbol
     for (const a of w.arboles) { const T = w.arbolTipos[a.t]; Arbol.spawn({ x: a.x, y: a.y, fl: a.fl, r: a.r, tipo: T }); if (ash && !T.sil) Decoration.spawn({ x: a.x, y: a.y, texture: 'props_sh_tree', anchorX: ash[0], anchorY: ash[1], alpha: .4, layer: 'sombras' }); }
     for (const c of w.cables) { const dx = c[2] - c[0], dy = c[3] - c[1], L2 = Math.hypot(dx, dy);
-      Decoration.spawn({ x: c[0], y: c[1], texture: '_white', anchorX: 0, anchorY: .5, scaleX: L2 / 8, scaleY: 1 / 8, rotation: Math.atan2(dy, dx), tint: 0x17171b, alpha: .85, layer: 'cables' }); }
+      const k = CABLE[c[4]];
+      Decoration.spawn({ x: c[0], y: c[1], texture: '_white', anchorX: 0, anchorY: .5, scaleX: L2 / 8, scaleY: k[0] / 8, rotation: Math.atan2(dy, dx), tint: k[1], alpha: k[2], layer: 'cables' }); }
     // líneas pintadas de las canchas: finas, pegadas al piso
     for (const c of (w.lineas || [])) { const dx = c[2] - c[0], dy = c[3] - c[1], L2 = Math.sqrt(dx * dx + dy * dy);
       Decoration.spawn({ x: c[0], y: c[1], texture: '_white', anchorX: 0, anchorY: .5, scaleX: (L2 + 1) / 8, scaleY: 1.5 / 8, rotation: Math.atan2(dy, dx), tint: 0xf2f2ea, alpha: .8, layer: 'manchas' }); }

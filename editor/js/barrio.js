@@ -196,7 +196,7 @@ const Barrio = (() => {
     function esquinaChas(lot) {
       const E = lot.chas, O = lot.o, u = lot.ux, n = lot.nOut, r2 = (v) => Math.round(v * 100) / 100;
       const poly = lot.q.map(p => [r2((p[0] - O[0]) * u[0] + (p[1] - O[1]) * u[1]), r2((p[0] - O[0]) * n[0] + (p[1] - O[1]) * n[1])]);
-      addObj("chas", { t: "chas", tipo: E.tipo, p: E.pisos || 2, poly, rol: E.rol, cal: E.calles, cartelEn: E.cartelEn || "", cafe: E.cafe || "", a: aIdx(lot.phi) }, lot, O[0], O[1], qa(lot.phi), null, lot.q.map(p => [p[0], p[1]]));
+      addObj("chas", { t: "chas", tipo: E.tipo, p: E.pisos || 2, poly, rol: E.rol, cal: E.calles, cartelEn: E.cartelEn || "", cafe: E.cafe || "", a: aIdx(lot.phi), ...(E.generica ? { ml: 1 } : {}) }, lot, O[0], O[1], qa(lot.phi), null, lot.q.map(p => [p[0], p[1]]));
       const xs = lot.q.map(p => p[0]), ys = lot.q.map(p => p[1]);
       for (let x = Math.min(...xs); x < Math.max(...xs); x += .4) for (let y = Math.min(...ys); y < Math.max(...ys); y += .4) { const l = W.lotAt(x, y); if (l === lot) occ.add(Math.floor(x / OC) * 100000 + Math.floor(y / OC)); }
       // las mesas del café en la vereda, frente a su lado sobre la calle del café (y en la ochava)
@@ -347,6 +347,15 @@ const Barrio = (() => {
       }
     }
     // ---- veredas: árboles, gente, faroles, postes con cables
+    // cables: curvas 3D partidas en tramos rectos [x0, y0, z0, x1, y1, z1, estilo] (estilo: 0 de luz, 1 de teléfono o tele, 2
+    // bajada a una casa, 3 rienda al piso), un tramo cada 2,5 m o menos. Sorteo aparte (rc), así lo demás del barrio no cambia
+    const rc = R3.rng(SEED ^ 0x632be5ab), lineas_ = [];
+    const curva = (a, b, sag, estilo) => { const n = Math.max(3, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 2.5)); let prev = a;
+      for (let i = 1; i <= n; i++) { const t = i / n, q = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t - sag * 4 * t * (1 - t)];
+        cables.push([prev[0], prev[1], prev[2], q[0], q[1], q[2], estilo]); prev = q; } };
+    // la línea entre dos postes: los tres de luz de la cruceta y los dos de teléfono y tele, más gruesos y más combados
+    const tendido = (A, B) => { for (let k = 0; k < 3; k++) curva(A.luz[k], B.luz[k], .9 + k * .17, 0); for (let k = 0; k < 2; k++) curva(A.tel[k], B.tel[k], 1.5 + k * .35 + rc() * .3, 1); };
+    const SIN_CASA = new Set(["baldio", "plaza", "cancha", "nada", "sendero", "esquinaChas"]);
     // un barrio real con censo de arbolado (Parque Chas, GCBA 2017-2018): cada árbol de vereda donde está y de su especie, en
     // la vereda del tramo más cercano, sobre el cordón. Las calles se corrieron al encajarlas en los rumbos y los árboles con
     // ellas (osm_real.py); queda menos de un par de metros, que se absorbe acá
@@ -379,10 +388,12 @@ const Barrio = (() => {
         if (F.plm_agapanto && s.sw >= 1.6) for (let t = rx.uni(2, 8); t < s.len - 2; t += rx.uni(5, 13)) {
           if (crossNear(t) || rx() > Math.min(.95, (.35 + .3 * s.w) * PL)) continue; const p = at(s, t, side * (s.hw + .5)), c = W.classify(p[0], p[1]); if (!c || c.k !== "walk" || c.s !== s) continue;
           put(rx() < .06 ? "pl_jaula" : rx.pick(s.w > .55 ? ["plm_agapanto", "pl_boj", "plm_agapanto", "plm_jazmin", "plm_formio", "pl_lavanda", "plm_lantana", "plm_strelitzia", "plm_plumbago", "plm_cortadera"] : s.w < .3 ? ["plm_yuyos", "plm_yuyos", "plm_agapanto", "yy_seco_alto", "yy_mostacilla"] : ["plm_agapanto", "plm_yuyos", "pl_boj", "plm_romero", "plm_lantana", "plm_plumbago", "plm_cortadera"]), p[0], p[1]); }
-        // yuyos que salen solos: junto al cordón, en las grietas de la vereda y contra las paredes (más en los barrios pobres y en las calles de tierra)
+        // yuyos que salen solos: junto al cordón y contra las paredes, nunca en medio de la vereda (más en los barrios pobres y en las
+        // calles de tierra). Un solo sorteo para el lugar (q), como antes: así lo demás del barrio no cambia
         if (F.yy_diente_leon && s.sw >= 1) { const dens = (s.mat === "tierra" ? 1.6 : s.mat === "roto" ? 1 : .45) * (1.3 - s.w);
           for (let t = rx.uni(.5, 4); t < s.len - .5; t += rx.uni(1.5, 5) / Math.max(.15, dens)) {
-            if (crossNear(t)) continue; const where = rx(), off = where < .5 ? s.hw + rx.uni(.08, .3) : where < .8 ? s.hw + rx.uni(.4, s.sw - .4) : s.hw + s.sw - rx.uni(.1, .35);
+            if (crossNear(t)) continue; const where = rx(), q = rx();
+            const off = where < .5 ? s.hw + .08 + .22 * q : where < .8 ? (q < .5 ? s.hw + .08 + .44 * q : s.hw + s.sw - .1 - .5 * (q - .5)) : s.hw + s.sw - .1 - .25 * q;
             const p = at(s, t, side * off), c = W.classify(p[0], p[1]); if (!c || c.k !== "walk") continue;
             put(where < .8 ? rx.pick(["yy_diente_leon", "yy_diente_leon_b", "yy_trebol", "yy_llanten", "yy_brotes", "yy_gramilla", "yy_grieta", "yy_pasto_seco", "yy_musgo"])
               : rx.pick(["yy_ortiga", "yy_ortiga_b", "yy_cola_zorro", "yy_avena", "yy_diente_leon", "yy_cardo", "yy_mostacilla"]), p[0], p[1], { rad: .12 }); } }
@@ -406,20 +417,50 @@ const Barrio = (() => {
         put("u_parada", p[0], p[1]);
         if (F.u_banco && rx() < .6) { const b = at(s, t + 2.6, side * (s.hw + 1.3)), q = at(s, t + 2.6, 0); if (W.classify(b[0], b[1])?.k === "walk") put("u_banco", b[0], b[1], { face: [q[0] - b[0], q[1] - b[1]] }); } }
       if (s.type !== "ave" && s.sw > 1) {
-        const side = rx() < .5 ? 1 : -1, phi = Math.atan2(s.dir[1], s.dir[0]), phiQ = qa(phi), luz = s.mat === "tierra" || s.mat === "roto" ? 1 : 0, pts = [], feet = [];
+        const side = rx() < .5 ? 1 : -1, phi = Math.atan2(s.dir[1], s.dir[0]), phiQ = qa(phi), luz = s.mat === "tierra" || s.mat === "roto" ? 1 : 0, pp = [], feet = [];
         for (let t = rx.uni(3, 10); t < s.len - 2; t += rx.uni(24, 32)) {
           const p = at(s, t, side * (s.hw + .3)), c = W.classify(p[0], p[1]); if (!c || c.k !== "walk" || !claim(p[0], p[1], .25)) continue;
           addObj("poste", { t: "poste", a: aIdx(phi), l: luz }, null, p[0], p[1], phiQ, null, null); feet.push(p);
-          pts.push([[0, -.76, 8.18], [0, .09, 8.18], [0, .79, 8.18]].map(([lx, ly, lz]) => [p[0] + Math.cos(phiQ) * lx - Math.sin(phiQ) * ly, p[1] + Math.sin(phiQ) * lx + Math.cos(phiQ) * ly, lz]));
+          const L = (lx, ly, lz) => [p[0] + Math.cos(phiQ) * lx - Math.sin(phiQ) * ly, p[1] + Math.sin(phiQ) * lx + Math.cos(phiQ) * ly, lz];
+          // los aisladores de la cruceta (la luz) y, atados al poste a media altura, el teléfono y la tele
+          pp.push({ t, p, luz: [L(0, -.76, 8.18), L(0, .09, 8.18), L(0, .79, 8.18)], tel: [L(0, .15, 6.3), L(0, -.15, 5.85)] });
         }
         if (feet.length) postes.push({ a: aIdx(phi), phiQ, luz, feet });
-        // cables: curvas 3D partidas en tramos rectos [x0, y0, z0, x1, y1, z1]
-        const curve = (a, b, sag, n) => { let prev = a; for (let i = 1; i <= n; i++) { const t = i / n, q = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t - sag * 4 * t * (1 - t)];
-          cables.push([prev[0], prev[1], prev[2], q[0], q[1], q[2]]); prev = q; } };
-        for (let i = 0; i + 1 < pts.length; i++) for (let k = 0; k < 3; k++) curve(pts[i][k], pts[i + 1][k], .9 + k * .17, 6);
-        for (const cp of pts) if (rx() < .7) { const a = cp[2], sd = side * rx.uni(2, 4.5), al = rx.uni(-3, 3); curve(a, [a[0] + s.n[0] * sd + s.dir[0] * al, a[1] + s.n[1] * sd + s.dir[1] * al, rx.uni(2.6, 3.6)], .35, 4); }
+        for (let i = 0; i + 1 < pp.length; i++) tendido(pp[i], pp[i + 1]);
+        if (pp.length) lineas_.push({ s, pp });
+        // bajadas: del poste a la fachada de las casas de su lado que tiene cerca (la luz y, a veces, el teléfono), a la altura del
+        // techo de la planta baja; en un chalet, a la casa, atrás del jardín. (Los sorteos de antes, cuando la bajada terminaba en el
+        // aire, quedan: así lo demás no cambia)
+        for (const P of pp) {
+          if (rx() < .7) { rx.uni(2, 4.5); rx.uni(-3, 3); rx.uni(2.6, 3.6); }
+          const cerca = [];
+          for (const e of s.lots[side] || []) { const lot = e.lot; if (!lot || SIN_CASA.has(lot.kind) || lot.fw < 2.5) continue;
+            const m = [lot.o[0] + lot.ux[0] * lot.fw / 2, lot.o[1] + lot.ux[1] * lot.fw / 2], d = Math.hypot(m[0] - P.p[0], m[1] - P.p[1]);
+            if (d < 11) cerca.push([d, lot]); }
+          cerca.sort((a, b) => a[0] - b[0]);
+          for (let k = 0; k < Math.min(2, cerca.length); k++) { const lot = cerca[k][1]; if (k && rc() < .5) continue;
+            const u = Math.max(1, Math.min(lot.fw - 1, (P.p[0] - lot.o[0]) * lot.ux[0] + (P.p[1] - lot.o[1]) * lot.ux[1] + rc.uni(-1.5, 1.5)));
+            const v = (lot.kind === "chalet" ? 2.6 : 0) + .03, z = lot.kind === "edificio" || lot.kind === "petit" ? rc.uni(3, 3.3) : rc.uni(2.55, 2.85);
+            const q = [lot.o[0] + lot.ux[0] * u + lot.nOut[0] * v, lot.o[1] + lot.ux[1] * u + lot.nOut[1] * v, z];
+            const a = P.luz.reduce((m, c) => Math.hypot(c[0] - q[0], c[1] - q[1]) < Math.hypot(m[0] - q[0], m[1] - q[1]) ? c : m);
+            curva(a, q, .25 + rc() * .15, 2);
+            if (rc() < .45) curva(P.tel[0], [q[0] + lot.ux[0] * .4, q[1] + lot.ux[1] * .4, z - .25], .35 + rc() * .2, 2); }
+        }
       }
     }
+    // la línea sigue en la cuadra de al lado si la calle sigue derecho (cruza la esquina, aunque el poste esté en la otra vereda);
+    // si no, el poste de la punta lleva una rienda al piso, hacia afuera
+    { const kn = (p) => Math.round(p[0] * 2) + ":" + Math.round(p[1] * 2), puntas = new Map();
+      for (const L of lineas_) { const s = L.s;
+        for (const [nodo, P, sale] of [[s.a, L.pp[0], [-s.dir[0], -s.dir[1]]], [s.b, L.pp[L.pp.length - 1], s.dir]]) {
+          const k = kn(nodo); if (!puntas.has(k)) puntas.set(k, []); puntas.get(k).push({ P, sale, L, unida: false }); } }
+      for (const l of puntas.values()) for (let i = 0; i < l.length; i++) for (let j = i + 1; j < l.length; j++) { const A = l[i], B = l[j];
+        if (A.unida || B.unida || A.L === B.L || A.sale[0] * B.sale[0] + A.sale[1] * B.sale[1] > -.94) continue;   // siguen derecho (menos de 20° de quiebre)
+        if (Math.hypot(A.P.p[0] - B.P.p[0], A.P.p[1] - B.P.p[1]) > 45) continue;
+        tendido(A.P, B.P); A.unida = B.unida = true; }
+      for (const l of puntas.values()) for (const A of l) { if (A.unida) continue;
+        const c = A.P.luz[1], g = [A.P.p[0] + A.sale[0] * 3, A.P.p[1] + A.sale[1] * 3, 0];
+        curva([c[0], c[1], 7.9], g, 0, 3); } }
     // ---- manchas y roturas del piso (gd_*, Gemini, vistas desde arriba): aceite donde estacionan, parches, grietas y baches en la
     // calle (más en las rotas y en los barrios pobres), frenadas antes de las esquinas, charcos, basura junto al cordón; en la
     // vereda baldosas rotas o faltantes, chicles frente a los negocios, el goteo de los aires, hojas secas y alguna rayuela.

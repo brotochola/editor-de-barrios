@@ -707,7 +707,8 @@ const Houses = (() => {
   // ---------- las seis esquinas de la fuente de Parque Chas (Gándara, Ávalos y Av. Victorica), copiadas a mano de la foto 360°
   // desde la fuente (Hernán Apaza, nov. 2018) y de las fotos de Keops y del Café Chas en Google Maps. spec.poly: la planta (CCW, en
   // el marco de la primera calle: x a lo largo de la calle, y hacia adentro); spec.rol: qué es cada lado ("f1"/"f2" frente sobre la
-  // primera o la segunda calle, "o" la ochava, "m" medianera); spec.cal: las dos calles.
+  // primera o la segunda calle, "o" la ochava, "m" medianera); spec.cal: las dos calles. Las mismas sirven para cualquier esquina que no
+  // sea en escuadra (world.js): spec.ml, medianeras lisas (de un color, sin textura: miden distinto en cada esquina).
   const CHAS = {
     keops: { wall: [148, 44, 40], fin: "stucco" },             // Pizzería Keops: roja, tres plantas, cartel amarillo con las pirámides
     ladrillo: { wall: [190, 112, 96], fin: "brick" },          // ladrillo rosado, balcón cerrado blanco en la ochava, terraza con baranda blanca
@@ -729,6 +730,7 @@ const Houses = (() => {
     function fachada(rol, calle, L, i) {
       const t = new Tex(L, Htot, seed + i * 31), wall = T.wall, frente = rol !== "m";
       if (T.fin === "brick") { t.brick(wall); } else if (T.fin === "liso") t.stucco(wall, .15); else { t.stucco(wall, .7); t.runoff(.5, .7); }
+      if (!frente && spec.ml) return mix(wall, [176, 170, 160], .4);   // medianera lisa
       if (!frente) { if (T.fin !== "brick") { t.stucco(mix(wall, [176, 170, 160], .4), .9); t.runoff(.8, 1); } return t; }   // medianera
       // líneas de cada piso y el remate de la terraza
       const banda = T.fin === "brick" ? [236, 232, 222] : T.fin === "liso" ? mul(wall, .82) : add(wall, 18);
@@ -790,14 +792,16 @@ const Houses = (() => {
       }
       return t;
     }
-    // paredes (con su parapeto por dentro) y casters por lado; el techo, en abanico de triángulos
-    const techo = T.fin === "brick" ? [204, 196, 186] : [190, 188, 182];
+    // paredes con su parapeto: la cara de afuera, la tapa de arriba (ESP de ancho: si no, la pared parecía de papel) y la cara de
+    // adentro, corrida ESP hacia adentro; casters por lado; el techo, en abanico de triángulos
+    const techo = T.fin === "brick" ? [204, 196, 186] : [190, 188, 182], tapa = T.fin === "brick" ? [236, 232, 222] : add(T.wall, 26), ESP = .2;
     let cx = 0, cy = 0; for (const q of P) { cx += q[0] / N; cy += q[1] / N; }
     for (let i = 0; i < N; i++) { const a = P[i], b = P[(i + 1) % N], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy); if (L < .05) continue;
       const rol = spec.rol[i], calle = rol === "f1" ? spec.cal[0] : rol === "f2" ? spec.cal[1] : null;
+      const ux = dx / L, uy = dy / L, en = [-uy * ESP, ux * ESP];   // hacia adentro de la planta
       sc.quad([a[0], a[1], Htot], [dx, dy, 0], [0, 0, -Htot], fachada(rol, calle, L, i));
-      sc.quad([b[0], b[1], Htot], [-dx, -dy, 0], [0, 0, -PAR], mix(T.wall, [200, 196, 188], .5));
-      const ux = dx / L, uy = dy / L; sc.casters.push({ c: sc.P([(a[0] + b[0]) / 2 - uy * .15, (a[1] + b[1]) / 2 + ux * .15, Htot / 2]), ax: [sc.V([ux, uy, 0]), sc.V([-uy, ux, 0]), [0, 0, 1]], h: [L / 2, .15, Htot / 2], fid: sc.nid() }); }
+      sc.quad([a[0], a[1], Htot], [en[0], en[1], 0], [dx, dy, 0], tapa);
+      sc.quad([b[0] + en[0], b[1] + en[1], Htot], [-dx, -dy, 0], [0, 0, -PAR], mix(T.wall, [200, 196, 188], .5)); sc.casters.push({ c: sc.P([(a[0] + b[0]) / 2 - uy * .15, (a[1] + b[1]) / 2 + ux * .15, Htot / 2]), ax: [sc.V([ux, uy, 0]), sc.V([-uy, ux, 0]), [0, 0, 1]], h: [L / 2, .15, Htot / 2], fid: sc.nid() }); }
     // (sin contorno: si no, se ven las líneas del abanico cruzando la terraza)
     for (let i = 1; i + 1 < N; i++) { const a = P[0], b = P[i], c = P[i + 1]; sc.quad([a[0], a[1], zr], [c[0] - a[0], c[1] - a[1], 0], [b[0] - a[0], b[1] - a[1], 0], techo, { tri: true }); sc.faces[sc.faces.length - 1].sinContorno = true; }
     tank(sc, cx, cy, zr, seed);   // el tanque de agua (en una de cada seis)

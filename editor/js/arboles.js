@@ -7,8 +7,10 @@ const Arboles = (() => {
   // así hojas y personas tienen el mismo tamaño de píxel y el mismo filtrado.
   const ESCALA = .6, K = R3.K, SYN = R3.SYN, CZ = R3.CZ, SF = R3.SF / ESCALA;
   // otoño: CALVOS de los racimos ya quedaron pelados (sólo la rama) y a los demás les queda HOJAS de sus hojas; en total
-  // les queda ~1/4: se ven las ramas y a través de la copa
-  const CALVOS = .4, HOJAS = .4;
+  // les queda ~1/8: se ven las ramas y bastante a través de la copa
+  const CALVOS = .5, HOJAS = .25;
+  // las ramas, más finas que el tronco del que salen (RAMA_FINA de lo que les tocaba): dejan ver a través del árbol
+  const RAMA_FINA = .6;
   // los árboles de vereda de Buenos Aires pasan los techos: la altura de cada especie, por ALTURA (la copa, más abierta), y
   // RAMAS_MAS ramas principales más que las de su especie (sin hojas, se ve el esqueleto)
   const ALTURA = 1.5, RAMAS_MAS = 1;
@@ -71,10 +73,10 @@ const Arboles = (() => {
       const yaw = yaw0 + (i / n) * Math.PI * 2 + r.uni(-.35, .35), pitch = E.abre * r.uni(.75, 1.15);
       const dir = norm([Math.cos(yaw) * Math.sin(pitch), Math.sin(yaw) * Math.sin(pitch), Math.cos(pitch)]);
       const base = segs[2].a.map((x, k) => x + (segs[2].b[k] - x) * r.uni(.3, 1));
-      rama(base, dir, (H - troncoH) * r.uni(.42, .55), rad * .72, 0, i + 1);
+      rama(base, dir, (H - troncoH) * r.uni(.42, .55), rad * .72 * RAMA_FINA, 0, i + 1);
     }
     // la cima, sobre el tronco (desde y grosor: la guía que la une a él, que se ve cuando la cima pierde las hojas)
-    racimos.push({ c: [p[0], p[1], p[2] + (H - troncoH) * .55], R: 1.2 * E.copa, rama: 1 + r.int(0, n - 1), cima: true, desde: p, grosor: rad * .55 });
+    racimos.push({ c: [p[0], p[1], p[2] + (H - troncoH) * .55], R: 1.2 * E.copa, rama: 1 + r.int(0, n - 1), cima: true, desde: p, grosor: rad * .55 * RAMA_FINA });
     return { E, H, segs, racimos, n, r };
   }
 

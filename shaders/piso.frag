@@ -118,14 +118,14 @@ ivec2 smoothKinds(float wx, float wy) {
 float wealthAt(float x, float y) { return texelFetch(wealth, ivec2(clamp(int(x / 10.0), 0, int(uWG) - 1), clamp(int(y / 10.0), 0, int(uHG) - 1)), 0).r; }
 
 // calle candidata: devuelve d, t, ds y si es calzada (1) o vereda (2)
-struct Seg { vec2 a; vec2 dir; vec2 n; float len, hw, sw, med, cls, w; int type, mat; bool cant; };
+struct Seg { vec2 a; vec2 dir; vec2 n; float len, hw, sw, med, cls, w, cant; int type, mat; };
 float u16(int id, int m) { vec4 t = texelFetch(segs, ivec2(m >> 1, id), 0); return (m & 1) == 0 ? float(b8(t.r) + b8(t.g) * 256) : float(b8(t.b) + b8(t.a) * 256); }
 float dPos(float q) { return q / 50.0 - 20.0; }
 float dUnit(float q) { return q / 32767.5 - 1.0; }
 Seg loadSeg(int id) { Seg s;
   s.a = vec2(dPos(u16(id, 0)), dPos(u16(id, 1))); s.dir = vec2(dUnit(u16(id, 2)), dUnit(u16(id, 3))); s.n = vec2(dUnit(u16(id, 4)), dUnit(u16(id, 5)));
   s.len = u16(id, 6) / 50.0; s.hw = u16(id, 7) / 1000.0; s.sw = u16(id, 8) / 1000.0; s.med = u16(id, 9) / 1000.0; s.cls = u16(id, 10); s.w = u16(id, 11) / 1000.0;
-  s.type = int(u16(id, 12)); s.mat = int(u16(id, 13)); s.cant = u16(id, 14) > .5; return s; }
+  s.type = int(u16(id, 12)); s.mat = int(u16(id, 13)); s.cant = u16(id, 14) / 1000.0; return s; }   // cant: el ancho de la franja de pasto junto al cordón (m; 0, no tiene)
 bool nearCross(int id, float t, float r) {
   for (int m = 16; m < 24; m++) { float q = u16(id, m); if (q > 65534.5) break; if (abs(t - dPos(q)) < r) return true; }
   return false; }
@@ -190,7 +190,7 @@ Mat pixelMat(float wx, float wy, int ix, int iy) {
     if (s.mat == 2) { if (dd < .6) return grassM(.7); }
     else { if (dd < .16) return rgbM(vec3(222, 218, 208)); if (dd < .2) return rgbM(vec3(168, 164, 156)); }
     Mat cz = cazuelaM(wx, wy, ix, iy); if (cz.m != M_NONE) return cz;
-    bool cant = s.cant && dd < 1.0 && !nearCross(wid, wt, 1.6);
+    bool cant = dd < s.cant && !nearCross(wid, wt, 1.6);
     if (cant) return grassM(.2);
     int vk = sk.x; int kind = vk & 15; bool dmg = (vk & 16) != 0;
     if (kind == 0) { kind = s.w < .3 ? 1 : 2; dmg = s.w < .45; }

@@ -228,7 +228,10 @@ const Exportar = (() => {
         archivos.push(["img/caras" + si + ".png", await png(cv)], ["img/caras" + si + ".json", json(hoja(frames, "caras" + si + ".png", cv))]);
       }
       hojasCaras = hojasC.length; variantes = {};
-      for (const id in H.variantes) variantes[id] = H.variantes[id].map(t => [nombreDe[t[0]], ...t.slice(1)]);
+      // las caras lisas van con "_white", la textura blanca de WeedJS, por su nombre (sin cuadro, iban como null: WeedJS les daba la
+      // textura 0, que es _empty, transparente, y no se veían)
+      for (const id in H.variantes) variantes[id] = H.variantes[id].map(t => { const n = t[0] === "_white" ? "_white" : nombreDe[t[0]];
+        if (!n) throw new Error("pieza de cara sin cuadro: " + t[0]); return [n, ...t.slice(1)]; });
       console.log("caras:", H.nDisenos, "diseños,", H.nTexturas, "texturas,", H.piezas.length, "piezas en", hojasCaras, "hojas,", Object.keys(variantes).length, "variantes");
       // ---------- 2'. instancias: el origen de la casa (de ahí cuelgan las piezas), el pie (la entidad), colisionador y sombra
       for (const o of B.objs) {
@@ -357,7 +360,8 @@ const Exportar = (() => {
     // ---------- 5. autos y cables
     const scrRot = (hd) => Math.atan2(-SYN * Math.sin(hd), Math.cos(hd) + K * Math.sin(hd));
     const autos = B.cars.filter(c => !enRot(c.x, c.y, 2)).map(c => { const [x, y] = PW(c.x, c.y); return { c: c.color, x: r1(x), y: r1(y), rot: Math.round(scrRot(c.hd) * 1000) / 1000, m: c.moving ? 1 : 0 }; });
-    const cables = B.cables.map(c => { const a = PW(c[0], c[1], c[2]), b = PW(c[3], c[4], c[5]); return [r1(a[0]), r1(a[1]), r1(b[0]), r1(b[1])]; });
+    // cada tramo de cable: [x0, y0, x1, y1, estilo] (barrio.js: 0 de luz, 1 de teléfono o tele, 2 bajada a una casa, 3 rienda)
+    const cables = B.cables.map(c => { const a = PW(c[0], c[1], c[2]), b = PW(c[3], c[4], c[5]); return [r1(a[0]), r1(a[1]), r1(b[0]), r1(b[1]), c[6]]; });
     const lineas = (B.lineas || []).map(c => { const a = PW(c[0], c[1], 0), b = PW(c[2], c[3], 0); return [r1(a[0]), r1(a[1]), r1(b[0]), r1(b[1])]; });
     // ---------- 6. flowfields
     progreso("flowfields", .7); await espera();
@@ -422,7 +426,7 @@ const Exportar = (() => {
     const NS = W.segs.length, segs = new Uint8Array(NS * 48), ENC = { pos: [20, 50], unit: [1, 32767.5], len: [0, 50], w: [0, 1000], int: [0, 1] };   // pos y len: 2 cm, hasta 1290 m
     W.segs.forEach((s, k) => { s._gid = k; const cr = s.cross.slice(0, 8); while (cr.length < 8) cr.push(null);
       const vals = [[s.a[0], "pos"], [s.a[1], "pos"], [s.dir[0], "unit"], [s.dir[1], "unit"], [s.n[0], "unit"], [s.n[1], "unit"], [s.len, "len"], [s.hw, "w"], [Math.max(0, s.sw), "w"], [s.med || 0, "w"],
-        [s.cls, "int"], [s.w, "w"], [TYPE[s.type], "int"], [MAT[s.mat], "int"], [s.cantero ? 1 : 0, "int"], [0, "int"], ...cr.map(t => [t, "pos"])];
+        [s.cls, "int"], [s.w, "w"], [TYPE[s.type], "int"], [MAT[s.mat], "int"], [s.cantW, "w"], [0, "int"], ...cr.map(t => [t, "pos"])];
       vals.forEach(([v, e], m) => { const [off, sc] = ENC[e]; const q = v == null ? 65535 : Math.max(0, Math.min(65534, Math.round((v + off) * sc))); segs[k * 48 + m * 2] = q & 255; segs[k * 48 + m * 2 + 1] = q >> 8; }); });
     for (let j = 0; j < CHh; j++) { if (j % 64 === 0) { progreso("piso " + Math.round(j / CHh * 100) + "%", .86 + j / CHh * .1); await espera(); }
       for (let i = 0; i < CW; i++) {
