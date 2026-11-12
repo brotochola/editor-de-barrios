@@ -150,10 +150,10 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 
 ## Formato
 
-- [ ] **Un solo formato** — pendiente. El editor exporta y la escena lee un único formato, sin compatibilidad hacia atrás ni
-  caminos de repuesto: fuera las casas en franjas (knob `skew`, `w.franjas`, hojas `casas*`), los flowfields en `.json`
-  (knob `ffBinario`, `META.ffExt`) y el número de `formato`. Las lámparas de los faroles de Gemini (`LAMPARAS`) ya se fueron
-  (fffa219). Los tres barrios ya están en lo nuevo (caras con skew, `.bin`).
+- [ ] **Un solo formato** — en curso. El editor exporta y la escena lee un único formato, sin compatibilidad hacia atrás ni
+  caminos de repuesto. Hecho: los flowfields siempre en `.bin` (fuera el knob `ffBinario`, `META.ffExt` y el repuesto `.json`) y
+  fuera el número de `formato` (HASH_FF); las lámparas de los faroles de Gemini (`LAMPARAS`) (fffa219). Falta: las casas en
+  franjas (knob `skew`, `w.franjas`, hojas `casas*`), después de charlarlo.
   - Las franjas: charlar antes de sacarlas (el dueño, 12/11). Lo que hacían (una persona pegada a una pared se ordena bien)
     hoy lo hacen las caras: cada pared que llega al piso va en columnas donde el pie cambia 8 px como mucho (`PIE_MAX`), cada
     una con su `sortOffsetY` en su base. Sacar las franjas es sacar el camino viejo (casa horneada por rumbo y cortada en

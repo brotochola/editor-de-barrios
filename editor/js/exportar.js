@@ -3,8 +3,8 @@
 //   meta.json        tamaños, proyección, hojas, cuántas franjas/piezas (para dimensionar los pools)
 //   mundo.json       casas, props, árboles, autos, cables (en px de mundo de WeedJS) + catálogos de franjas y árboles
 //   piso.bin         datos del shader del piso (celdas, tabla de calles, riqueza, ruido)
-//   ff_*.json|bin    flowfields estáticos de WeedJS: peatones (varios destinos), vuelta manzana (= veredas), calles; .bin con la
-//                    perilla ffBinario (el formato binario de WeedJS, ver ffBin)
+//   ff_*.bin         flowfields estáticos de WeedJS, en su formato binario (ver ffBin): peatones (varios destinos), vuelta manzana
+//                    (= veredas), calles
 //   img/*.png|json   hojas de sprites tipo TexturePacker: las caras de las casas, los árboles (piezas) y los grafitis de las paredes.
 //                    Los objetos sueltos están en las hojas de img/objetos (herramientas/hojas.js), comunes a todos los barrios:
 //                    META.props dice, de cada uno, su hoja, su cuadro, su ancla, su escala y si se mece
@@ -302,8 +302,6 @@ const Exportar = (() => {
     const GW = Math.ceil(MW), GH = Math.ceil(MH), CELL = 12, FW = Math.ceil(WW / CELL), FH = Math.ceil(WH / CELL);
     const unPW = (X, Y) => { const y = MH - Y / (SYN * SF); return [X / SF - K * y, y]; };
     const toScr = (dx, dy) => { const sx = dx + K * dy, sy = -SYN * dy, l = Math.hypot(sx, sy) || 1; return [r2(sx / l), r2(sy / l)]; };
-    const ffJson = (name, fn) => { const data = []; for (let j = 0; j < FH; j++) { const row = []; for (let i = 0; i < FW; i++) row.push(fn(...unPW((i + .5) * CELL, (j + .5) * CELL))); data.push(row); }
-      return json({ name, metadata: { widthCells: FW, heightCells: FH, widthPx: FW * CELL, heightPx: FH * CELL, cellSizePx: CELL }, data }); };
     // el formato binario de WeedJS (versión 1, little-endian): 24 bytes de encabezado sin comprimir y después las celdas
     //   0 "WEFF" · 4 u8 versión (1) · 5 u8 compresión (0 ninguna, 1 gzip) · 6 u16 0 · 8 u32 ancho en celdas · 12 u32 alto · 16 f64 lado de la celda (px)
     //   24 las celdas fila por fila desde arriba, x e y en Int8 (-127..127 = -1..1; 0, 0 = sin dirección), con gzip si la compresión es 1.
@@ -316,7 +314,7 @@ const Exportar = (() => {
       const crudo = new Uint8Array(cel.buffer), z = typeof CompressionStream !== "undefined" ? await gzip(crudo) : crudo, h = new DataView(new ArrayBuffer(24));
       h.setUint32(0, 0x46464557, true); h.setUint8(4, 1); h.setUint8(5, z === crudo ? 0 : 1); h.setUint32(8, FW, true); h.setUint32(12, FH, true); h.setFloat64(16, CELL, true);
       const out = new Uint8Array(24 + z.length); out.set(new Uint8Array(h.buffer)); out.set(z, 24); return out; };
-    const FF_EXT = C.ffBinario ? ".bin" : ".json", ff = async (name, fn) => ["ff_" + name + FF_EXT, C.ffBinario ? await ffBin(fn) : ffJson(name, fn)];
+    const ff = async (name, fn) => ["ff_" + name + ".bin", await ffBin(fn)];
     // peatones: la vereda es lo más barato, pero la calle se puede cruzar por cualquier lado (sale un poco más caro)
     const COST = { vereda: 10, pasillo: 11, calle: 26, tierra: 18, cantero: 14 }, cost = new Uint8Array(GW * GH), vereda = new Uint8Array(GW * GH);
     for (const s of W.segs) { if (s.sw <= 0) continue; const R = s.hw + s.sw;
@@ -403,9 +401,9 @@ const Exportar = (() => {
     archivos.push(["piso.bin", piso]);
     // ---------- 8. meta y mundo
     const nFranjas = SKEW ? 0 : casas.reduce((a, h) => a + franjas[h.a].length, 0), nPiezas = SKEW ? 0 : casas.reduce((a, h) => a + franjas[h.a].reduce((x, s) => x + s[2].length, 0), 0);
-    const meta = { formato: 1, escalaCasas: Math.round(1 / DET * 1e5) / 1e5, editor: "editor de barrios · Conurbano", fecha: new Date().toISOString(), seed: B.SEED, knobs: { ...C },
+    const meta = { escalaCasas: Math.round(1 / DET * 1e5) / 1e5, editor: "editor de barrios · Conurbano", fecha: new Date().toISOString(), seed: B.SEED, knobs: { ...C },
       MW, MH, MG: W.MG || 0, WW, WH, SF, K, SYN, CZ, GC, CW, CH: CHh, WG: WGc, HG: HGc, PW: PWc, PH: PHc, NS, CELL, PXM: 13.5, pisoPartes: offs,
-      hojasCasas: hojas.length, peatones: targets.length, ...(C.ffBinario ? { ffExt: FF_EXT } : {}), nCasas: casas.length, nSombraPts, nFranjas, nPiezas, skew: SKEW ? 1 : 0, hojasCaras, nTiles, nArboles: arboles.length,
+      hojasCasas: hojas.length, peatones: targets.length, nCasas: casas.length, nSombraPts, nFranjas, nPiezas, skew: SKEW ? 1 : 0, hojasCaras, nTiles, nArboles: arboles.length,
       nPiezasArboles: arboles.reduce((a, t) => a + arbolTipos[t.t].piezas.length, 0), nProps: props.length, nAutos: autos.length, nCables: cables.length, nLineas: lineas.length, props: propsMeta, lamparas, fuentes, nGrafitis: PAR ? PAR.n : 0,
       ...(W.inicio ? { inicio: PW(W.inicio[0], W.inicio[1]).map(v => Math.round(v)), lugar: W.real } : {}),
       // rotondas: centro en px de pantalla (x, y) y en m (mx, my), radios de la isla y de la calzada (m) y las salidas: rumbo de cada

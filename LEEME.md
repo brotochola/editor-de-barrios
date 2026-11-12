@@ -76,7 +76,7 @@ WeedJS usa `SharedArrayBuffer`, así que la página tiene que estar "aislada" (e
    - `meta.js`/`meta.json`: tamaños y cantidades;
    - `mundo.json`: casas, árboles, props, autos y cables;
    - `piso.bin`;
-   - flowfields `ff_*.bin`: peatones, veredas (vuelta manzana) y calles, en el formato binario de WeedJS (con gzip: un 3 o 4 % de lo que pesan en `.json`, y el juego no los parsea). `meta.js` lo dice en `ffExt` y la escena los pide con esa extensión. Con el knob «Flowfields en binario» en 0 salen `ff_*.json`, como antes;
+   - flowfields `ff_*.bin`: peatones, veredas (vuelta manzana) y calles, en el formato binario de WeedJS (con gzip: un 3 o 4 % de lo que pesarían en `.json`, y el juego no los parsea);
    - hojas de sprites en `img/`: las caras de las casas (`caras*`), los árboles y los grafitis de las paredes.
 3. Reemplazás la carpeta `barrio/` del juego por esa.
 

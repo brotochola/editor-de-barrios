@@ -5,7 +5,7 @@
 //   --sal <carpeta>               escribe el barrio exportado ahí y no toca el del juego; sirve para ver qué cambiaría
 //   --con-ventana                 muestra el navegador
 //   --knob <clave>=<valor>        cambia un knob antes de exportar (se puede repetir); queda guardado en el meta.json nuevo.
-//                                 Por ejemplo --knob ffBinario=1 para los flowfields en binario
+//                                 Por ejemplo --knob ancho=1.6 para calles y veredas más anchas
 // La semilla y los knobs salen del meta.json del barrio, que los guarda al exportar: se abre el editor con esos mismos valores, así que
 // sale el mismo barrio salvo lo que haya cambiado en el código del editor. Al final dice qué archivos cambiaron y cuánto tardó.
 const fs = require('fs'), path = require('path'), zlib = require('zlib'), crypto = require('crypto');

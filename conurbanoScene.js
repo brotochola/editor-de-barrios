@@ -682,8 +682,8 @@ SHEETS.arboles = { json: BARRIO + 'img/arboles.json', png: BARRIO + 'img/arboles
 for (let i = 0; i < NLPC; i++) SHEETS['lpc' + i] = { json: 'img/lpc/civil1.json', png: 'img/lpc/c' + i + '.png', excludeAnimations: LPC_EXCLUDE };
 for (const [m, a] of Object.entries(AUTOS)) for (const c of a.colores || ['']) { const h = c ? m + '_' + c : m; SHEETS['auto_' + h] = { json: 'img/autos/' + h + '.json', png: 'img/autos/' + h + '.png' }; }
 for (const h in CHATARRA) SHEETS['auto_' + h] = { json: 'img/autos/' + h + '.json', png: 'img/autos/' + h + '.png' };
-// Los flowfields van en .bin (el formato binario de WeedJS) cuando el editor lo dice en META.ffExt; si no, en .json.
-const FF = META.ffExt || '.json', FLOW = { calles: BARRIO + 'ff_calles' + FF }; PED_FIELDS.forEach(n => FLOW[n] = BARRIO + 'ff_' + n + FF);
+// los flowfields, en el formato binario de WeedJS
+const FLOW = { calles: BARRIO + 'ff_calles.bin' }; PED_FIELDS.forEach(n => FLOW[n] = BARRIO + 'ff_' + n + '.bin');
 const f32 = (v) => ({ value: v, type: 'f32' });
 
 export class ConurbanoScene extends Scene {
