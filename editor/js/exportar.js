@@ -329,6 +329,11 @@ const Exportar = (() => {
     for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) { const l = W.lotAt(x + .5, y + .5);
       if (l && l.kind === "sendero") { cost[y * GW + x] = COST.vereda; vereda[y * GW + x] = 1; }       // los senderos de las plazas se caminan
       else if (cost[y * GW + x] && l) { cost[y * GW + x] = 0; vereda[y * GW + x] = 0; } }
+    // la rotonda (Parque Chas): el anillo es calzada (se cruza como una calle; no es vereda, ni un lugar donde aparece gente: las
+    // veredas de las calles que llegan se metían en él) y en la isla, la de la fuente, no camina nadie
+    for (const q of W.rotondas || []) { const xa = Math.max(0, Math.floor(q[0] - q[3])), xb = Math.min(GW - 1, Math.ceil(q[0] + q[3])), ya = Math.max(0, Math.floor(q[1] - q[3])), yb = Math.min(GH - 1, Math.ceil(q[1] + q[3]));
+      for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) { const dx = x + .5 - q[0], dy = y + .5 - q[1], d2 = dx * dx + dy * dy; if (d2 >= q[3] * q[3]) continue;
+        const i = y * GW + x; cost[i] = d2 < q[2] * q[2] ? 0 : COST.calle; vereda[i] = 0; } }
     // afuera del paredón no camina nadie (ni aparece: el juego pone a la gente donde "veredas" tiene dirección)
     for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (!W.dentro(x + .5, y + .5)) { cost[y * GW + x] = 0; vereda[y * GW + x] = 0; }
     const fg = FlowGrid(GW, GH, cost, COST.calle), nDest = Math.max(3, Math.min(10, Math.round(C.destinos || 6)));
