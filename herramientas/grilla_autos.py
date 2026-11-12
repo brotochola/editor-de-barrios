@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Arma una grilla con los cuadros de una hoja de autos (para pedirle a Gemini que la repinte) y la vuelve a cortar.
 
-  python3 herramientas/grilla_autos.py armar taxi            -> arte/gemini/entrada/taxi.png (+ .json con la grilla)
+  python3 herramientas/grilla_autos.py armar taxi            -> arte/autos_gemini/taxi.png (+ .json con la grilla)
   python3 herramientas/grilla_autos.py cortar taxi <png de Gemini> <hoja nueva>   -> img/autos/<hoja nueva>.png/json
 
 Grilla de 5 columnas, celdas iguales, fondo magenta, cada pixel x4 (sin suavizar) para que Gemini vea el detalle.
@@ -35,14 +35,14 @@ def armar(hoja):
         cx, cy = (k % COLS) * cw + (cw - f["w"]) // 2, (k // COLS) * ch + (ch - f["h"]) // 2
         g.alpha_composite(fr, (cx, cy))
     g = g.convert("RGB").resize((g.width * ESC, g.height * ESC), Image.NEAREST)
-    out = os.path.join(ROOT, "arte/gemini/entrada", hoja + ".png")
+    out = os.path.join(ROOT, "arte/autos_gemini", hoja + ".png")
     g.save(out)
     json.dump({"hoja": hoja, "cw": cw, "ch": ch, "cols": COLS, "rows": rows, "names": names}, open(out[:-4] + ".json", "w"))
     print(out, g.size)
 
 
 def cortar(hoja, png, nueva):
-    meta = json.load(open(os.path.join(ROOT, "arte/gemini/entrada", hoja + ".json")))
+    meta = json.load(open(os.path.join(ROOT, "arte/autos_gemini", hoja + ".json")))
     j = json.load(open(os.path.join(ROOT, "img/autos", hoja + ".json")))
     orig = Image.open(os.path.join(ROOT, "img/autos", hoja + ".png")).convert("RGBA")
     g = Image.open(png).convert("RGB")

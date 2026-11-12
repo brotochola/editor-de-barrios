@@ -9,21 +9,18 @@
     const g = cv.getContext("2d"); g.drawImage(im, 0, 0); let x = 0, y = im.height + 2, rowH = 0;
     for (const t of Arboles.TIPOS) { const v = Arboles.render(t).vista; if (x + v.w > 2048) { x = 0; y += rowH + 2; rowH = 0; }
       g.drawImage(v.canvas, x, y); ASSETS.frames["arbol_" + t] = { x, y, w: v.w, h: v.h, ox: Math.round(v.ox), oy: Math.round(v.oy) }; x += v.w + 2; rowH = Math.max(rowH, v.h); }
-    // props HD (Gemini, 30 px/m): el visor los usa achicados a la escala del barrio; el exportador copia el original (f.hd)
-    if (typeof HD_ASSETS !== "undefined") { const hi = await loadImg(HD_PNG); x = 0; y += rowH + 2; rowH = 0;
-      g.imageSmoothingQuality = "high";
-      for (const [n, h] of Object.entries(HD_ASSETS.frames)) { const e = h.e || HD_ASSETS.escala, w = Math.ceil(h.w * e), hh = Math.ceil(h.h * e); if (x + w > 2048) { x = 0; y += rowH + 2; rowH = 0; }
-        g.drawImage(hi, h.x, h.y, h.w, h.h, x, y, h.w * e, h.h * e);
-        ASSETS.frames[n] = { x, y, w, h: hh, ox: Math.round(h.ox * e), oy: Math.round(h.oy * e), hd: { img: hi, ...h, e } }; x += w + 2; rowH = Math.max(rowH, hh); } }
-    // objetos de arte/objetos (recursos/objetos.js: plantas, macetas, basura, sillas, faroles…, a la escala de los personajes LPC): cada uno
-    // en su png; el visor los usa a la escala del barrio (sin suavizar: son pixel art) y el exportador copia el original (f.hd, con f.hd.zip).
+    // objetos (recursos/objetos.js: plantas, macetas, basura, sillas, faroles…, en las hojas de img/objetos, a la escala de los
+    // personajes LPC; y lo que queda de la hoja vieja: carteles, piletas, el semáforo, las sombras): una imagen por hoja. El visor los usa a
+    // la escala del barrio (sin suavizar: son pixel art); el exportador dice en qué hoja y cuadro está cada uno (f.hd).
     // Los grafitis no van al visor: el exportador los pone en las paredes, casa por casa
-    if (typeof OBJETOS !== "undefined") { const e = OBJETOS.escala; x = 0; y += rowH + 2; rowH = 0; g.imageSmoothingEnabled = false;
-      const imgs = await Promise.all(Object.entries(OBJETOS.frames).map(async ([n, o]) => [n, o, await loadImg(OBJETOS.base + o.src)]));
-      for (const [n, o, img] of imgs) { const hd = { img, x: 0, y: 0, w: o.w, h: o.h, ox: o.ox, oy: o.oy, e, zip: true, tierra: o.tierra, luz: o.luz, on: o.on, grafiti: o.grafiti };
+    if (typeof OBJETOS !== "undefined") { x = 0; y += rowH + 2; rowH = 0; g.imageSmoothingEnabled = false;
+      const hojas = {}; for (const o of Object.values(OBJETOS.frames)) hojas[o.hoja] ||= loadImg(OBJETOS.hojas + o.hoja + ".png");
+      for (const k in hojas) hojas[k] = await hojas[k];
+      for (const [n, o] of Object.entries(OBJETOS.frames)) { const e = o.e || OBJETOS.escala, img = hojas[o.hoja];
+        const hd = { img, x: o.x, y: o.y, w: o.w, h: o.h, ox: o.ox, oy: o.oy, e, zip: true, hoja: o.hoja, cuadro: o.cuadro, mece: o.mece, tierra: o.tierra, luz: o.luz, on: o.on, grafiti: o.grafiti };
         if (o.grafiti) { ASSETS.frames[n] = { x: 0, y: 0, w: 0, h: 0, ox: 0, oy: 0, hd }; continue; }
         const w = Math.ceil(o.w * e), hh = Math.ceil(o.h * e); if (x + w > 2048) { x = 0; y += rowH + 2; rowH = 0; }
-        g.drawImage(img, 0, 0, o.w, o.h, x, y, o.w * e, o.h * e);
+        g.drawImage(img, o.x, o.y, o.w, o.h, x, y, o.w * e, o.h * e);
         ASSETS.frames[n] = { x, y, w, h: hh, ox: Math.round(o.ox * e), oy: Math.round(o.oy * e), hd }; x += w + 2; rowH = Math.max(rowH, hh); }
       g.imageSmoothingEnabled = true;
       if (y + rowH > cv.height) console.warn("el atlas del visor no alcanza:", y + rowH, ">", cv.height); }

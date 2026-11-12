@@ -70,11 +70,11 @@ WeedJS usa `SharedArrayBuffer`, así que la página tiene que estar "aislada" (e
    - `mundo.json`: casas, árboles, props, autos y cables;
    - `piso.bin`;
    - flowfields `ff_*.bin`: peatones, veredas (vuelta manzana) y calles, en el formato binario de WeedJS (con gzip: un 3 o 4 % de lo que pesan en `.json`, y el juego no los parsea). `meta.js` lo dice en `ffExt` y la escena los pide con esa extensión. Con el knob «Flowfields en binario» en 0 salen `ff_*.json`, como antes;
-   - hojas de sprites en `img/`.
+   - hojas de sprites en `img/`: las caras de las casas (`caras*`), los árboles y los grafitis de las paredes.
 3. Reemplazás la carpeta `barrio/` del juego por esa.
-4. Opcional, para que el celu cargue rápido: con `python3 servir.py` corriendo, `node herramientas/hornear_atlas.js` hornea `barrio/atlas/` y lo marca en `meta.js`.
 
-El editor no arma el bigAtlas, porque no sabe qué otras entidades va a tener el juego. Eso queda para el paso 4 o para el build final.
+El editor arma sólo las hojas del barrio (casas, árboles, piso). Los objetos están en `img/objetos/`, comunes a todos los barrios. El
+juego carga las hojas enteras y WeedJS arma el bigAtlas al cargar.
 
 ## El barrio real: Av. Carabobo al 1500 y la villa 1-11-14 (Bajo Flores)
 
@@ -84,13 +84,12 @@ pasa al siguiente. Una sola escena sirve para todos: `barrios.js` junta los `met
 después de exportar) y la escena toma el que diga su URL.
 
 En el editor, con el parámetro `real` en 1 o 2 no se inventa el barrio: se arma con datos de verdad y el zip trae la carpeta
-`carabobo/` o `parquechas/`; con `real` en 0, el inventado, en `barrio/`. El atlas de cada uno se hornea aparte:
-`node herramientas/hornear_atlas.js http://localhost:8000 parquechas`.
+`carabobo/` o `parquechas/`; con `real` en 0, el inventado, en `barrio/`.
 
 - **Qué entra:** una franja de 480 × 1080 m jugables (más 40 m de margen), girada 15,5° para que la grilla de Bajo Flores quede casi derecha en pantalla. Arriba, Av. Carabobo con Balbastro, Lautaro y Saraza (el juego arranca en Carabobo al 1500); en el medio, Av. Castañares, Bonorino y el Barrio Rivadavia I con sus pasajes peatonales; abajo, la villa 1-11-14 hasta Av. Riestra.
 - **Calles:** las de OSM, clasificadas (avenida, calle, pasaje, pasillo de villa), con su ancho, y encajadas en los 48 rumbos de los autos: cada tramo toma el rumbo más cercano y los nodos se mueven por mínimos cuadrados (en promedio 1,7 m), así las esquinas son las mismas.
 - **Villa:** las manzanas de la 1-11-14 mapeadas en OSM, con sus pasillos. Las casillas son de ladrillo, de 2 a 4 pisos, pegadas, con contrapiso y tierra entre medio.
-- **Barrio Coreano:** los locales sobre Carabobo tienen frente coreano (supermercado, restaurante, ropa, peluquería, panadería, iglesia, karaoke, almacén; Gemini, `arte/gemini/locales_02`).
+- **Barrio Coreano:** los locales sobre Carabobo tienen frente coreano (supermercado, restaurante, ropa, peluquería, panadería, iglesia, karaoke, almacén; piezas de fachada de Gemini, `arte/fachadas/gemini/locales_02`).
 - **Plazas y canchas** de OSM: las plazas con sus senderos, las canchas con arcos y líneas pintadas.
 - **Rehacerlo:** `editor/recursos/osm_carabobo.json` son los datos bajados de la API de OSM (calles, usos del suelo, edificios, comercios, en metros); `python3 herramientas/osm_real.py --png vista.png` escribe `editor/recursos/real_carabobo.js` (ventana, giro y tamaño arriba del archivo). Después, exportar desde el editor como siempre.
 
@@ -113,8 +112,7 @@ nombres de ciudades europeas (Berlín, Ginebra, La Haya, Londres, Cádiz…), y 
 - **Casas:** bajas, de los años 30 a 60: casas de una y dos plantas y PH, algún chalet y casi sin comercio adentro (los locales van
   sobre las avenidas). Un 28 % de las casas tiene techo de tejas (`estilo.tejas`); las tejas son un material compartido del horneado
   con skew, como los techos planos y la chapa.
-- **La esquina de seis:** una rotonda con la fuente revestida de trencadís (el mosaico que pusieron los vecinos en 2016;
-  `herramientas/fuente_mosaico.py`). Los autos le dan la vuelta en sentido antihorario y cada uno elige por qué calle sale.
+- **La esquina de seis:** una rotonda con una fuente en el medio (la de `arte/objetos`). Los autos le dan la vuelta en sentido antihorario y cada uno elige por qué calle sale.
 - **Las seis esquinas de la fuente, copiadas a mano** de la foto 360° desde la fuente (Hernán Apaza, 2018) y de las fotos de Google
   Maps (`ESQUINAS` en `osm_real.py`, `Houses.chas`): cada una con la planta de la esquina (la ochava frente a la fuente) y su edificio.
   Victorica y Gándara: la Pizzería Keops (roja, tres plantas, cartel amarillo con las pirámides); Gándara y Ávalos al este: ladrillo
@@ -155,11 +153,15 @@ nombres de ciudades europeas (Berlín, Ginebra, La Haya, Londres, Cádiz…), y 
 
 Los objetos sueltos del barrio salen de `arte/objetos/`: dibujos de varios packs (0-mem0ry, Cainos, GandalfHardcore, LPC Revised,
 karsiori), elegidos y unificados con los personajes LPC (misma escala, 31,25 px/m; misma saturación; el contorno con la regla de los
-personajes; sin sombras dibujadas). `arte/objetos/indice.csv` los lista y `CREDITOS_Y_LICENCIAS.txt` dice de quién es cada uno. De
-Gemini quedan la plaza, los semáforos, los locales coreanos, las manchas del piso, la rejilla, la tapa y las piezas de fachada y murales.
+personajes; sin sombras dibujadas). `arte/objetos/indice.csv` los lista y `CREDITOS_Y_LICENCIAS.txt` dice de quién es cada uno. Los
+objetos que había dibujado Gemini se borraron (estaban a otra escala y no gustaban); de Gemini quedan sólo las piezas de fachada (abajo).
 
-1. `node herramientas/objetos.js` arma `editor/recursos/objetos.js`: los cuadros (nombre, archivo, tamaño) y qué objeto del juego hace
-   cada uno. El editor sigue pidiendo los objetos por su nombre de siempre (`u_farola`, `pl_malvon`, `yy_avena`…), que ahora es un
+1. `node herramientas/hojas.js` (con el juego servido en el 8010) arma las hojas que lee el juego, `img/objetos/<pack>.png|json`: una por
+   pack de `arte/objetos` (según `indice.csv`), con los dibujos tal cual, y `viejos`, lo que queda de la hoja vieja del editor y se
+   sigue usando (carteles, piletas, pizarras, el semáforo y las sombras). También `img/objetos/hojas.js`, la lista de hojas que importa
+   la escena, y la hoja de fachadas del editor. Después corre el paso 2.
+2. `node herramientas/objetos.js` arma `editor/recursos/objetos.js`: los cuadros (nombre, hoja, dónde está, tamaño) y qué objeto del
+   juego hace cada uno. El editor sigue pidiendo los objetos por su nombre de siempre (`u_farola`, `pl_malvon`, `yy_avena`…), que ahora es un
    **rol**: cada rol sale de una o más listas con su peso, y el cuadro sale del lugar (no del sorteo), así el resto del barrio no
    cambia. Las medidas (cuánto ocupa, si choca, su sombra) siguen siendo las del rol.
    - **Macetas armadas:** un recipiente (balde, tambor, goma, inodoro) y una planta encima (flores, hojas, huerta, brotes), elegidos
@@ -170,16 +172,18 @@ Gemini quedan la plaza, los semáforos, los locales coreanos, las manchas del pi
      `u_farol_*` faroles, `z_*` lo demás (quieto).
    - **Faroles:** el farol de hierro, apagado de día y con el vidrio prendido mientras su luz está prendida (el juego cambia el cuadro a la
      hora de la luz). `META.lamparas` dice dónde está la lámpara, a qué altura (2,3 m) y cuál es el cuadro prendido.
-   - Lo de Gemini que no tiene reemplazo (contenedores, kioscos, paradas, motos, bicis, puestos, volquetes, mesas, parrillas, el
-     Gauchito, la Virgen…) no se pone más (`OBJETOS.quitar`).
+   - `META.props` le dice al juego, por cada objeto que usa el barrio, su hoja y su cuadro, su ancla, su escala (si no es 1) y si se mece.
+   - Lo que era de Gemini y no tiene reemplazo en los packs no se pone: contenedores, kioscos, paradas, motos, bicis, puestos, volquetes,
+     mesas, parrillas, el Gauchito, la Virgen (`OBJETOS.quitar`), y tampoco los juegos, bancos, monumentos y glorietas de las plazas ni
+     las manchas del piso (no tienen dibujo). La fuente de las plazas y de la rotonda es la de `arte/objetos`.
    - Las casas ya no traen la soga con ropa pintada en las paredes; la ropa colgada son los tendederos de `arte/objetos`, en los patios.
    - Ni balcones que salgan de la pared (dejaban pedazos de pared en medio de la vereda): las ventanas que daban a ellos son ventanas comunes.
-   - Son de frente, como la gente: van en cualquier lado (no sólo a 50° como las cajas isométricas de Gemini) y no tienen vista de
-     atrás. El exportador los copia tal cual (a la escala de la gente, 0,6; sin achicar, sin contorno agregado, sin sacarles el cian).
-2. **Grafitis en las paredes, casa por casa** (`editor/js/paredes.js`): las casas salen de un catálogo compartido, así que lo que se
+   - Son de frente, como la gente: van en cualquier lado y no tienen vista de atrás. El juego los muestra tal cual, a la escala de la
+     gente (0,6).
+3. **Grafitis en las paredes, casa por casa** (`editor/js/paredes.js`): las casas salen de un catálogo compartido, así que lo que se
    pinta en el diseño se repite en cada casa igual. Los grafitis de `arte/objetos` (9 grandes, en 6 colores cada uno; letras sueltas
    que se juntan en firmas teñidas; 6 carteles que se pegan de a varios) van aparte, como piezas de cada casa (`casas[].g` en
-   `mundo.json`), encima de su pared, con la misma escala, skew, luz y orden que ella.
+   `mundo.json`), encima de su pared, con la misma escala, skew, luz y orden que ella. Van en una hoja del barrio, `img/grafitis`.
    - Dónde: `caras.js` marca en cada pared que llega al piso (lisa o con dibujo) las celdas de 4 texeles que son pared (del color de la
      pared: sin aberturas, carteles, murales ni pintadas), entre 0,25 y 3,4 m, y sin nada de la casa adelante.
    - Cuántos: más en lo pobre (3 de 4 paredes), en tapiales y paredones (y varios por paredón), menos en lo rico; knob `grafitis`.
@@ -189,45 +193,39 @@ Gemini quedan la plaza, los semáforos, los locales coreanos, las manchas del pi
      que se pueden, el menos usado. Unos más gastados que otros. Las firmas y los grupos de carteles salen distintos cada vez.
    - El visor del editor no los muestra: salen al exportar. Las pintadas con frases (`graffiti.js`) siguen como estaban.
 
-## Arte con Gemini (plaza, semáforos, locales coreanos, manchas del piso y piezas de fachada)
+## Piezas de fachada (Gemini)
 
-Lo que queda de Gemini; los objetos sueltos ya salen de `arte/objetos` (arriba). El editor todavía carga los props HD de Gemini, pero los que tienen reemplazo no se ponen.
+Ventanas, puertas, rejas, cortinas, carteles, aires acondicionados, murales y los frentes de los locales coreanos: piezas dibujadas por
+Gemini, de frente, a 30 px/m, que R3 pega en las caras de las casas (sin suavizar).
 
+- `arte/fachadas/fd_*.png`: las piezas, ya limpias (sin fondo y en la grilla de pixeles de Gemini). `arte/fachadas/gemini/`: las hojas
+  originales de Gemini (1376×768, fondo plano) con el JSON que decía qué pieza es cada recorte y cuánto mide, y `camara_juego.png`, la
+  vista del juego que se le pasaba de referencia. Estilo: pixel art duro con contorno de color (el más oscuro de cada material, nunca
+  negro), sombreado de 3 a 5 tonos que tira a violeta en la sombra y a amarillo en la luz, luz desde arriba a la izquierda.
+- `node herramientas/hojas.js` las junta en `editor/recursos/fachada.png|js` (estantes de 1024 px); si la hoja sale igual pixel por
+  pixel, no reescribe el PNG.
+- Las herramientas que limpiaban y achicaban lo de Gemini (`pixelar.py`, `achicar.py`, `armar_hd.py`, `variantes.py`) se borraron
+  con los objetos; si hiciera falta limpiar una pieza nueva, están en la historia de git.
 
-Estilo: pixel art duro con contorno de color (el más oscuro de cada material, nunca negro), sombreado de 3 a 5 tonos que tira a violeta en la sombra y a amarillo en la luz, luz desde arriba a la izquierda.
+## Rehacer un barrio
 
-1. Se le pide a Gemini (Nano Banana, razonamiento alto) una hoja de objetos sobre fondo plano: magenta, o cian si hay flores rosas. Para que todo salga con el mismo tamaño de pixel, conviene que la hoja traiga una persona de referencia y que los objetos estén a escala real al lado. Las hojas originales (1376×768) están en `arte/gemini/*.png`.
-2. `arte/gemini/<hoja>.json` dice qué objeto es cada uno (`at` = centro aproximado en coordenadas de la vista de 1024 px, o `box` = recorte a mano) y cuánto mide (`h` alto y `d` fondo en metros, o `w` ancho). Con `persona` (dónde está la persona de referencia) la escala sale de ella para toda la hoja. Con `uniforme` usa la mediana de la hoja.
-3. `python3 herramientas/achicar.py` (sin argumentos: todas las hojas) saca el fondo y achica cada objeto del original de Gemini **2×**: cada pixel es el promedio de un bloque de 2×2, sólo con los pixeles del dibujo. Lo que Gemini dibujó a menos del doble de su tamaño en el juego (la calesita, la glorieta, la hoja del Gauchito) va tal cual, porque si se achica el juego lo vuelve a agrandar y queda borroso. El tamaño real lo da `k`: el juego muestra el sprite a 0,6·k para que mida lo que tiene que medir a 30 px/m. Todo queda en `arte/gemini/achicado/`.
-   - El 2× se eligió a ojo en `variantes.html` (lo arma `herramientas/variantes.py`): cada objeto tal cual, como era antes y achicado 2×…8× con promedio, nearest, bilineal y bicúbico, en el juego, con `?filtro=linear|nearest|mip`.
-   - Antes se usaba `herramientas/pixelar.py`, que buscaba la grilla de Gemini y tomaba un pixel por celda. Como esa grilla no es entera (2,5, 2,83 o 3,6 px), algunas filas salían dobles y otras se perdían. Todavía arma `arte/gemini/limpio/`, de donde salen las piezas de fachada.
-4. `arte/hd.json` dice qué nombre del juego usa cada objeto. Por ejemplo, `u_farola` es la luminaria LED y `u_contenedor` / `u_contenedor_b` son variantes. Los `pl_*` son plantas en maceta, los `plm_*` plantas que se mecen y los `yy_*` yuyos, que también se mecen.
-   - Vistas de atrás: `arte/gemini/<hoja>_atras.png` es la misma hoja redibujada por Gemini con cada objeto girado 180°. Se le pasa la original y se le pide «EDIT the attached sprite sheet… turn EVERY object around 180 degrees on its vertical axis so we now see its BACK side», con la herramienta de imágenes y en 16:9. Hay de mobiliario, postes y plaza. Sus specs usan `"ref": 1376`, o sea coordenadas en pixeles de la hoja.
-   - Esos objetos se llaman igual que el original pero con `_atras`, por ejemplo `u_banco_atras`. El editor y el exportador eligen el cuadro según hacia dónde mira el objeto (`face`, en `Barrio.vista`): si mira a la cámara usa el frente, y si mira para arriba usa la vista de atrás. Con el espejo salen las cuatro diagonales.
-   - Lo que no mira a nada en especial (contenedores, semáforos, kioscos, paradas) mira a una diagonal que sale de su posición. Los semáforos de espaldas no muestran la luz.
-5. `python3 herramientas/armar_hd.py` arma dos hojas:
-   - `editor/recursos/hd_props.png/js`: los props, cada uno con su escala `e`;
-   - `editor/recursos/fachada.png/js`: las piezas de fachada `fd_*`.
-6. El editor usa los props HD en lugar de los v4 del mismo nombre y R3 pega las piezas de fachada en las paredes, sin suavizar. El exportador (sección de props de `editor/js/exportar.js`) arma `img/props.png` y `META.escalas` le dice al juego a qué escala mostrar cada cuadro. Con los props HD hace esto:
-   - **Sin contorno agregado.** Gemini ya los dibuja con el suyo. Antes se pintaba otro por fuera (2 texeles, oscuro, con el alfa en duro) y eso los dejaba chamuscados: las plantas tenían un 41 % más de área que el dibujo, casi toda de borde oscuro. Los pocos props que no son de Gemini (`cartel`, `pileta`, `pizarra_*`) lo siguen llevando.
-   - **Los achica hasta 0,45** (`E_HD`): un texel mide 0,45 px de mundo, con 2,2 texeles por píxel con zoom 1 y 1,8 píxeles por texel con zoom 4. El promedio es en luz lineal (en sRGB el contorno oscuro de Gemini se come el color de al lado), premultiplicado por el alfa y con pesos de Mitchell. Después devuelve lo que el promedio le saca al dibujo: el cuerpo de lo fino (un texel cubierto un 30 % o más va opaco, `ALFA_LLENO`; si no, una hoja queda medio transparente) y la saturación (un 12 % en las plantas: se recupera con el knob `sat`, la misma cuenta que las casas).
-   - **Saca el turquesa** de plantas y yuyos: las hojas con fondo cian dejan cian mezclado entre tallos finos y al borde de lo claro. El pixel turquesa que toca lo transparente toma el color de sus vecinos limpios.
-   - **Por qué 0,45 y no mipmaps.** El atlas no tiene mipmaps: la placa toma 4 texeles por píxel, así que a 0,3 (3,3 por píxel con zoom 1) se veían granulados, y a 0,6 o más se borronean al acercar. Medido contra el dibujo, con zoom 1 van parejos de 0,4 a 0,6, y al acercar gana el más chico. Los mipmaps (`renderer.autoGenerateMipmaps`, `?mip=1`) se ven mejor muy alejado, pero son de todo el atlas: con zoom 1 las caras de las casas muestran costuras (cada cara son piezas, y el margen transparente entre cuadros, `atlasPadding` 2, ya entra en el primer nivel), ladrillos y tejas se borronean, y rejas y cables casi desaparecen. Además suman un tercio de memoria de placa.
-7. Para rehacer un barrio después de tocar el exportador: `node herramientas/reexportar.js <barrio|carabobo|parquechas>`, con el juego servido en `http://127.0.0.1:8010` (o `--url …`). Lee la semilla y los knobs del `meta.json` del barrio, abre el editor con ellos en Chromium sin ventana, exporta, descomprime sobre la carpeta, hornea el atlas, corre `barrios.js` y dice qué archivos cambiaron y cuánto tardó (un barrio entero, menos de 2 minutos). Sale igual byte a byte salvo lo que haya cambiado en el código (`fecha` aparte). `--sal <carpeta>` escribe en otro lado y no toca el barrio, para ver qué cambiaría; `--sin-atlas` no hornea. Usa el Playwright de WeedJS si el juego no tiene uno a mano (`herramientas/playwright.js`; otra carpeta con `WEED_REPO`).
+`node herramientas/reexportar.js <barrio|carabobo|parquechas>`, con el juego servido en `http://127.0.0.1:8010` (o `--url …`). Lee
+la semilla y los knobs del `meta.json` del barrio, abre el editor con ellos en Chromium sin ventana, exporta, descomprime sobre la
+carpeta, borra lo que el exportador ya no escribe, corre `barrios.js` y dice qué archivos cambiaron y cuánto tardó (un barrio entero,
+menos de 2 minutos). Sale igual byte a byte salvo lo que haya cambiado en el código (`fecha` aparte). `--sal <carpeta>` escribe en
+otro lado y no toca el barrio, para ver qué cambiaría. Usa el Playwright de WeedJS si el juego no tiene uno a mano
+(`herramientas/playwright.js`; otra carpeta con `WEED_REPO`).
 
 ## Límites conocidos
 
-- Los props de Gemini que son cajas (los juegos de plaza, los bancos de la plaza) están dibujados en isométrica: sólo se
-  ponen donde la casa, la plaza o la calle está girada 50° ± 6° (módulo 90°), que es como se ve esa caja en la vista del juego. En
-  los demás lugares no van. Nada se pone delante de una puerta o un portón (las puertas salen del dibujo de cada casa). No hay
-  animales.
+- Nada se pone delante de una puerta o un portón (las puertas salen del dibujo de cada casa). No hay animales.
 - Contorno: las casas y los árboles llevan el mismo borde fino, del color de la cosa oscurecido (las caras lisas y los techos de
-  material, con una tira de 1 px); los props de Gemini y los de `arte/objetos`, el que trae el dibujo; los personajes y los autos, el suyo, más marcado. Los
+  material, con una tira de 1 px); los objetos de `arte/objetos`, el que trae el dibujo; los personajes y los autos, el suyo, más marcado. Los
   personajes LPC van un 6 % más angostos.
 
 - El catálogo de casas se reparte entre lotes para entrar en el atlas único de WeedJS. Por eso algunas casas son un poco más angostas que su lote y quedan pasillos laterales.
-- Ese atlas (hasta 8192×4096 píxeles) lleva casas, gente, árboles, props y autos. Con WeedJS ff32c939 o posterior no hay tope de cuadros (antes, con más de 8192, no se dibujaba ningún sprite: N-111). Si un barrio no entra en los píxeles, el juego no carga («Could not fit … into atlas»): bajá la «variedad» de casas.
-- Sin giro de cámara, porque los sprites están horneados para una sola vista. Los props de Gemini tienen frente y espalda (y espejo): cuatro diagonales, no ocho rumbos.
+- Ese atlas (hasta 8192×4096 píxeles, lo arma WeedJS al cargar) lleva casas, gente, árboles, objetos y autos. Con WeedJS ff32c939 o posterior no hay tope de cuadros (antes, con más de 8192, no se dibujaba ningún sprite: N-111). Si un barrio no entra en los píxeles, el juego no carga («Could not fit … into atlas»): bajá la «variedad» de casas.
+- Sin giro de cámara, porque los sprites están horneados para una sola vista.
 - Manejando, la cámara sigue al auto sin el límite de la cámara libre: muy alejado y en una esquina del paredón se puede llegar a ver el borde del mundo.
 - Las texturas float (`rgba32float`) de las capas worldRect no suben bien en WebGL en esta versión de WeedJS: se suben como bytes con tipo FLOAT. Por eso la tabla de calles va en RGBA8 con punto fijo.
 

@@ -6,10 +6,12 @@
 // más listas (pools) con su peso, y cada lista tiene cuadros sueltos o macetas armadas (un recipiente y una planta que se mece encima).
 // El cuadro sale del lugar (no del sorteo), así el resto del barrio no cambia.
 //
-// Nombres de los cuadros (el juego se fija en el prefijo): yy_z_* yuyos y pasto, se mecen; plm_z_* plantas en la tierra, se mecen;
-// plm_t_* plantas que van arriba de una maceta, se mecen; u_farol_* faroles (luz); z_* lo demás, quieto.
+// Los dibujos están en las hojas de img/objetos (herramientas/hojas.js: una por pack, más «viejos», lo que queda de la hoja vieja del
+// editor). Cada cuadro del catálogo dice su hoja, su cuadro y su rectángulo en ella, su ancla, y si se mece (mece: yuyos, pasto y
+// plantas). Nombres de los cuadros: yy_z_* yuyos y pasto; plm_z_* plantas en la tierra; plm_t_* plantas que van arriba de una maceta;
+// u_farol_* faroles (luz); z_* lo demás.
 const fs = require('fs'), path = require('path');
-const R = path.join(__dirname, '..'), DIR = path.join(R, 'arte', 'objetos');
+const R = path.join(__dirname, '..'), DIR = path.join(R, 'arte', 'objetos'), HOJAS = path.join(R, 'img', 'objetos');
 
 // ---------- el índice del zip (CSV con comillas: alguna subcategoría lleva coma)
 function csv(txt) {
@@ -22,11 +24,14 @@ function csv(txt) {
   return filas;
 }
 const filas = csv(fs.readFileSync(path.join(DIR, 'indice.csv'), 'utf8')), cab = filas.shift();
-const iA = cab.indexOf('archivo'), iW = cab.indexOf('ancho_px'), iH = cab.indexOf('alto_px');
-const ARCH = {};   // nombre corto del archivo → { src, w, h }
-for (const f of filas) { if (!f[iA]) continue; const src = f[iA], b = path.basename(src, '.png');
-  if (!fs.existsSync(path.join(DIR, src))) throw new Error('falta ' + src);
-  ARCH[b] = { src, w: +f[iW], h: +f[iH] }; }
+const iA = cab.indexOf('archivo'), iP = cab.indexOf('pack_origen');
+// la hoja de cada pack (el mismo nombre que le pone herramientas/hojas.js) y sus cuadros
+const slug = (s) => s.toLowerCase().replace(/^0-/, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+const hojaJson = {}, leerHoja = (h) => hojaJson[h] || (hojaJson[h] = JSON.parse(fs.readFileSync(path.join(HOJAS, h + '.json'), 'utf8')));
+const ARCH = {};   // nombre del archivo → { hoja, cuadro, x, y, w, h } (el rectángulo en la hoja)
+for (const f of filas) { if (!f[iA]) continue; const b = path.basename(f[iA], '.png'), hoja = slug(f[iP]), r = leerHoja(hoja).frames[b];
+  if (!r) throw new Error(b + ' no está en la hoja ' + hoja + ': correr herramientas/hojas.js');
+  ARCH[b] = { hoja, cuadro: b, x: r.frame.x, y: r.frame.y, w: r.frame.w, h: r.frame.h }; }
 const arch = (b) => { const a = ARCH[b]; if (!a) throw new Error('no está en el índice: ' + b); return a; };
 
 // ---------- nombres cortos
@@ -92,6 +97,8 @@ lista('SILLON', 'z_', ['makeshift_furnitureset_1_22', 'makeshift_furnitureset_33
 lista('BANCO', 'z_', ['makeshift_furnitureset_258_322']);
 lista('COLCHON', 'z_', ['shelter_furniture_32x32_420_242', 'shelter_furniture_32x32_456_100']);
 lista('TENDEDERO', 'z_', ['messy_exterior_32x32_161_75', 'messy_exterior_32x32_97_75', 'decor_27_354']);
+// la fuente de la rotonda (Parque Chas): más grande que los demás dibujos (e: la escala a la que se muestra), para que llene la isla
+lista('FUENTE', 'z_', ['fuente_01_0_0'], { e: .9 });
 lista('TAMBOR', 'z_', ['postapoc_workshop_70_161', 'postapoc_workshop_71_194', 'shelter_furniture_32x32_71_449', 'shelter_furniture_32x32_71_481', ...['102_0', '198_0', '294_0', '6_0'].map(s => gp('oilbarrel_' + s))]);
 // el farol de hierro: apagado de día, prendido de noche (el juego cambia el cuadro a la hora de su luz). luz: dónde está la lámpara (px del dibujo)
 FR.u_farol_hierro = { ...arch('faroles_02_0_0'), luz: [[9, 20]], on: 'u_farol_hierro_on' };
@@ -121,6 +128,7 @@ rol(['u_banco'], [['BANCO', 1]]);
 rol(['k_colchon'], [['COLCHON', 1]]);
 rol(['b_tendedero'], [['TENDEDERO', 1]]);
 rol(['b_tacho_azul'], [['TAMBOR', 1]]);
+rol(['pz_fuente'], [['FUENTE', 1]]);
 rol(['u_macetero'], [['M_GRANDE', 1]]);
 // macetas: lindas (casas de más plata), comunes y precarias (baldes, gomas, tambores, un inodoro)
 rol(['pl_hortensia', 'pl_ficus', 'pl_limonero', 'pl_monstera', 'pl_helecho', 'pl_calas', 'pl_boj', 'pl_lavanda', 'pl_azalea', 'pl_begonias', 'pl_coleo', 'pl_clivia', 'pl_gomero',
@@ -176,10 +184,14 @@ const G = {}; for (const k in GRAF) G[k] = GRAF[k].map(b => { const n = 'gr_' + 
 for (const [n, ps] of Object.entries(ROLES)) for (const [p] of ps) {
   if (typeof p === 'string') { if (!P[p]) throw new Error(n + ': no hay lista ' + p); }
   else { if (!p.m.length) throw new Error(n + ': maceta sin recipiente'); for (const t of p.p) if (!P[t]) throw new Error(n + ': no hay lista ' + t); } }
-for (const n of Object.keys(FR)) { const f = FR[n]; f.ox = Math.floor(f.w / 2); f.oy = f.h >= 16 ? f.h - 2 : f.h - 1; }
-const salida = { base: '../arte/objetos/', escala: .6, frames: FR, pools: P, roles: ROLES, quitar: QUITAR, grafitis: G };
-const js = '// generado por herramientas/objetos.js — no editar a mano. Los objetos de arte/objetos (dibujados a 31,25 px/m, la escala de los\n'
-  + '// personajes LPC: el juego los muestra a 0,6, como a la gente) y qué objeto del juego hace cada uno\n'
+for (const n of Object.keys(FR)) { const f = FR[n]; f.ox = Math.floor(f.w / 2); f.oy = f.h >= 16 ? f.h - 2 : f.h - 1; if (/^(yy_z_|plm_z_|plm_t_)/.test(n)) f.mece = 1; }
+// lo que queda de la hoja vieja (carteles, piletas, pizarras, el semáforo, las sombras): con el nombre de siempre, su ancla y escala 1
+{ const v = leerHoja('viejos');
+  for (const [n, r] of Object.entries(v.frames)) { const a = v.anclas[n];
+    FR[n] = { hoja: 'viejos', cuadro: n, x: r.frame.x, y: r.frame.y, w: r.frame.w, h: r.frame.h, ox: a[0] * r.frame.w, oy: a[1] * r.frame.h, e: 1 }; } }
+const salida = { hojas: '../img/objetos/', escala: .6, frames: FR, pools: P, roles: ROLES, quitar: QUITAR, grafitis: G };
+const js = '// generado por herramientas/objetos.js — no editar a mano. Los objetos (las hojas de img/objetos: los de arte/objetos, dibujados a\n'
+  + '// 31,25 px/m, la escala de los personajes LPC, que el juego muestra a 0,6; y los viejos, a 1) y qué objeto del juego hace cada uno\n'
   + 'const OBJETOS = ' + JSON.stringify(salida) + ';\n';
 fs.writeFileSync(path.join(R, 'editor', 'recursos', 'objetos.js'), js);
 const usados = new Set(Object.values(P).flat());

@@ -48,7 +48,7 @@ const Paredes = (() => {
       if (clave === -Infinity) clave = y;
       const z = s.O3[2] + s.E1[2] * uc / s.Tw + s.E2[2] * vc / s.Th;
       usados.add(nombre); n++;
-      return ["props_" + nombre, r2(x), r2(y), r4(a[0]), r4(b[1]), r4(b[0] / b[1]), r4(a[1] / a[0]), tinte, r2(clave + .01 + extra * .001 - y), s.iz, s.n[0], s.n[1], s.n[2], r2(z), r2(alfa)];
+      return ["grafitis_" + nombre, r2(x), r2(y), r4(a[0]), r4(b[1]), r4(b[0] / b[1]), r4(a[1] / a[0]), tinte, r2(clave + .01 + extra * .001 - y), s.iz, s.n[0], s.n[1], s.n[2], r2(z), r2(alfa)];
     }
     // ---- las tres clases
     function grande(s, libre, rng, x, y, out) {
@@ -116,7 +116,7 @@ const Paredes = (() => {
     function cuadros() {
       const out = [], sat = R3.LIGHT.sat;
       for (const nm of usados) { const m = /^(.*)_t(\d)$/.exec(nm), base = m ? m[1] : nm, t = m ? +m[2] : 0, d = dim(base);
-        const cv = document.createElement("canvas"); cv.width = d.w; cv.height = d.h; const g = cv.getContext("2d"); g.drawImage(d.img, 0, 0);
+        const cv = document.createElement("canvas"); cv.width = d.w; cv.height = d.h; const g = cv.getContext("2d"); g.drawImage(d.img, d.x, d.y, d.w, d.h, 0, 0, d.w, d.h);
         const im = g.getImageData(0, 0, d.w, d.h), px = im.data;
         for (let i = 0; i < px.length; i += 4) { if (!px[i + 3]) continue; let r = px[i], gg = px[i + 1], b = px[i + 2];
           if (t) [r, gg, b] = girarTono(r, gg, b, t * 360 / TONOS);

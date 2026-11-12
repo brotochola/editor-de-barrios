@@ -1,8 +1,7 @@
-// Reexporta un barrio con el editor y hornea su atlas: lo mismo que abrir el editor, tocar 📦 Exportar, descomprimir el zip sobre la
-// carpeta y correr hornear_atlas.js y barrios.js, pero sin manos. Para rehacer un barrio después de cambiar el exportador.
-// Con el juego servido (python3 servir.py o lo que haya): node herramientas/reexportar.js <barrio|carabobo|parquechas> [--opción …]
+// Reexporta un barrio con el editor: lo mismo que abrir el editor, tocar 📦 Exportar, descomprimir el zip sobre la carpeta y correr
+// barrios.js, pero sin manos. Para rehacer un barrio después de cambiar el exportador. El atlas lo arma WeedJS al cargar el juego.
+// Con el juego servido (node herramientas/servir.js 8010): node herramientas/reexportar.js <barrio|carabobo|parquechas> [--opción …]
 //   --url http://127.0.0.1:8010   dónde está servido (por defecto, ese)
-//   --sin-atlas                   no hornea el atlas: deja el barrio con META.atlas apagado (el juego lo arma al cargar)
 //   --sal <carpeta>               escribe el barrio exportado ahí y no toca el del juego; sirve para ver qué cambiaría
 //   --con-ventana                 muestra el navegador
 //   --knob <clave>=<valor>        cambia un knob antes de exportar (se puede repetir); queda guardado en el meta.json nuevo.
@@ -10,7 +9,7 @@
 // La semilla y los knobs salen del meta.json del barrio, que los guarda al exportar: se abre el editor con esos mismos valores, así que
 // sale el mismo barrio salvo lo que haya cambiado en el código del editor. Al final dice qué archivos cambiaron y cuánto tardó.
 const fs = require('fs'), path = require('path'), zlib = require('zlib'), crypto = require('crypto');
-const { playwright } = require('./playwright.js'), { hornear } = require('./hornear_atlas.js');
+const { playwright } = require('./playwright.js');
 const args = process.argv.slice(2), arg = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 && i + 1 < args.length ? args[i + 1] : d; }, hay = (k) => args.includes('--' + k);
 const KNOBS = args.flatMap((a, i) => a === '--knob' && i + 1 < args.length ? [args[i + 1]] : []);
 const DIR = args[0], R = path.join(__dirname, '..'), URL0 = arg('url', 'http://127.0.0.1:8010').replace(/\/$/, ''), SAL = arg('sal', null);
@@ -27,14 +26,14 @@ function leerZip(b) {
   return out;
 }
 const huella = (b) => crypto.createHash('sha1').update(b).digest('hex');
-// lo que cambia siempre al exportar y no es un cambio: la fecha de meta y la marca del atlas (la pone hornear_atlas.js)
+// lo que cambia siempre al exportar y no es un cambio: la fecha de meta
 function sinFecha(nombre, b) {
   if (!/^meta\.js(on)?$/.test(nombre)) return b;
-  return Buffer.from(b.toString('utf8').replace(/"fecha":"[^"]*",?/, '').replace(/"atlas":true,?/, '').replace(/,\}/, '}'));
+  return Buffer.from(b.toString('utf8').replace(/"fecha":"[^"]*",?/, '').replace(/,\}/, '}'));
 }
 
 (async () => {
-  if (!['barrio', 'carabobo', 'parquechas'].includes(DIR)) { console.log('uso: node herramientas/reexportar.js <barrio|carabobo|parquechas> [--url …] [--sin-atlas] [--sal carpeta] [--con-ventana] [--knob clave=valor]'); process.exit(1); }
+  if (!['barrio', 'carabobo', 'parquechas'].includes(DIR)) { console.log('uso: node herramientas/reexportar.js <barrio|carabobo|parquechas> [--url …] [--sal carpeta] [--con-ventana] [--knob clave=valor]'); process.exit(1); }
   try { await fetch(URL0 + '/editor/index.html'); } catch (e) { throw new Error('no hay nada servido en ' + URL0 + ': levantá el juego o pasá --url'); }
   const B = path.join(R, DIR), meta = JSON.parse(fs.readFileSync(path.join(B, 'meta.json'), 'utf8')), t0 = Date.now();
   if (!meta.seed || !meta.knobs) throw new Error(DIR + '/meta.json no trae la semilla o los knobs');
@@ -83,9 +82,8 @@ function sinFecha(nombre, b) {
   if (nuevos.length) console.log(`nuevos: ${nuevos.join(', ')}`);
   if (sobran.length) console.log(`${SAL ? 'sobrarían' : 'borrados'}: ${sobran.join(', ')}`);
 
-  if (!SAL && !hay('sin-atlas')) { const t2 = Date.now(), atlas = path.join(B, 'atlas', 'bigAtlas.png'), antes = fs.existsSync(atlas) ? fs.statSync(atlas).size : 0;
-    console.log('horneando el atlas…'); await hornear(URL0, DIR);
-    console.log(`atlas en ${seg(t2)}: ${(antes / 1048576).toFixed(1)} → ${(fs.statSync(atlas).size / 1048576).toFixed(1)} MB de PNG`); }
-  else if (!SAL) require('child_process').execFileSync('node', [path.join(__dirname, 'barrios.js')], { stdio: 'inherit' });
+  // el atlas horneado de antes (ahora lo arma WeedJS al cargar)
+  if (!SAL && fs.existsSync(path.join(B, 'atlas'))) { fs.rmSync(path.join(B, 'atlas'), { recursive: true }); console.log('borrado: atlas/ (lo arma WeedJS al cargar)'); }
+  if (!SAL) require('child_process').execFileSync('node', [path.join(__dirname, 'barrios.js')], { stdio: 'inherit' });
   console.log(`listo en ${seg(t0)}`);
 })().catch(e => { console.error(e); process.exit(1); });

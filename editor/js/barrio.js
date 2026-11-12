@@ -7,7 +7,6 @@ const Barrio = (() => {
   const aIdx = (a) => World.angIdx(a), qa = (a) => World.ANG[World.angIdx(a)], Q = Math.PI / 24;
   const Wb = (w, step) => Math.max(3, Math.floor(w / step + 1e-6) * step);
   const Db = (d, deep) => deep ? (d < 6 ? 5 : d < 8 ? 7 : d < 10 ? 9 : 11) : d;
-  const DIAG = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
   const EN_CALLE = /^(u_valla|u_cono|c_volquete|u_contenedor|c_palomas|yy_|gd_|obra_material)/;
   // ocupación (m): lo que reserva cada cosa, para que nada se pise
   const RAD = [["k_gauchito", .9], ["k_virgen", .7], ["k_mantero", .9], ["k_pelopincho", 1.2], ["k_cucha", .6], ["k_", .35], ["b_tendedero", 1.6], ["b_mesa_patio", 1.4], ["b_arco", 1.4], ["b_bolsones", .7], ["b_pallets", .6], ["b_viejo", .45], ["b_mujer", .4], ["b_", .3], ["c_volquete", 2.2], ["c_puesto", 1.3], ["c_chori", 1.1], ["c_mesa_bar", 1], ["c_moto", .7], ["c_bici", .6], ["c_perro", .35], ["c_gato", .2], ["c_palomas", .5], ["c_buzon", .3], ["c_hidrante", .2], ["pz_monumento", 2.2], ["pz_fuente", 2.5], ["pz_calesita", 2.6], ["pz_glorieta", 3], ["pz_jacaranda", .5], ["pz_palo_borracho", .5], ["pz_", 1.2], ["plm_santarita", .7], ["plm_", .35], ["pl_", .22], ["yy_", .2], ["arbol", .4], ["u_farol", .2], ["u_semaforo", .18], ["u_cono", .14], ["u_valla", .45], ["u_contenedor", .8], ["u_campana", .5], ["u_tablero", .35], ["u_caja", .3],
@@ -16,20 +15,16 @@ const Barrio = (() => {
   const COLR = [["k_gauchito", .6], ["k_virgen", .45], ["k_heladera", .35], ["k_cucha", .45], ["b_tendedero", .1], ["b_mesa_patio", .9], ["b_bolsones", .5], ["b_pallets", .45], ["b_tacho", .3], ["b_viejo", .25], ["b_mujer", .2], ["c_volquete", 1.6], ["c_puesto", .8], ["c_chori", .7], ["c_moto", .4], ["c_buzon", .2], ["c_hidrante", .12], ["pz_monumento", 1.6], ["pz_fuente", 2.2], ["pz_calesita", 2.2], ["pz_glorieta", 2.4], ["pz_jacaranda", .3], ["pz_palo_borracho", .35], ["pz_hamacas", .9], ["pz_pingpong", .9], ["arbol", .28], ["u_farol", .14], ["u_semaforo", .12], ["cartel", .07], ["canasto", .08], ["u_contenedor", .75], ["u_campana", .55],
     ["u_refugio", .9], ["u_kiosco", 1.1], ["carro_cartonero", .7], ["u_tanque", .45], ["u_banco", .45], ["u_parada", .08], ["u_cesto", .1], ["u_poste_trafo", .22], ["u_valla", .35], ["obra_material", .5], ["parrilla", .55], ["pileta", 1.3], ["u_tablero", .3], ["u_caja", .25]];
   const lookup = (tbl, n, d) => { for (const [p, v] of tbl) if (n.startsWith(p)) return v; return d; };
-  // sin animales (palomas, perros, gatos)
-  const ANIMAL = /palomas|perro|gato|cucha/;
-  // Los props de Gemini que son cajas (parrillas, bancos, contenedores, juegos de plaza…) están dibujados en isométrica: sus
-  // aristas bajan ~26° a cada lado. En la vista oblicua del juego eso es una caja girada 50° (cos 50 + K sen 50 contra SYN sen 50):
-  // sólo quedan bien donde lo de alrededor (la casa del lote, la plaza, la calle) está a 50° ± 6° (módulo 90°). En otro lado no
-  // van. Lo redondo (plantas, macetas, tachos, faroles, la gente) va en cualquier lado.
-  const CAJA = /^(parrilla|u_contenedor|u_kiosco|u_parada|u_banco|u_tablero|u_macetero|obra_material|carro_cartonero|chango|silla|cajones|chapas|pz_hamacas|pz_tobogan|pz_subibaja|pz_banco|pz_pingpong|pz_ajedrez|pz_reja|pz_cantero|c_volquete|c_puesto|c_chori|c_moto|c_bici|b_tendedero|b_mesa_patio|b_arco|b_pallets|b_chango|k_colchon|k_heladera|k_cajones|k_sillas|k_tele|k_mantero|k_pelopincho|k_co_carrito)/;
-  const diagonalOk = (phi) => { const m = ((phi % (Math.PI / 2)) + Math.PI / 2) % (Math.PI / 2); return Math.abs(m - 50 * Math.PI / 180) <= 6 * Math.PI / 180; };
   const SH = (n) => n.startsWith("plm_") ? "sh_small" : n.startsWith("u_farol") || n.startsWith("u_poste") || n.startsWith("u_parada") ? "sh_pole" : n.startsWith("u_cesto") || n.startsWith("u_banco") || n.startsWith("u_kiosco") ? "sh_small" : n.startsWith("u_contenedor") || n.startsWith("canasto") || n.startsWith("u_campana") ? "sh_small" : null;
   // colores de autos: el juego elige el modelo y usa este color si el modelo lo tiene; "poli" = patrullero, "burnt" = chatarra
   const COLORES = [["red", 1.6], ["white", 1.6], ["black", 1.4], ["blue", 1.4], ["yellow", 1], ["poli", .4]];
   const pickW = (r, tbl) => { let t = tbl.reduce((a, b) => a + b[1], 0) * r(); for (const [n, w] of tbl) { t -= w; if (t <= 0) return n; } return tbl[0][0]; };
 
-  function generate(SEED, C, F) {
+  function generate(SEED, C, F0) {
+    // los objetos de arte/objetos se piden por su rol (el nombre de siempre: u_farola, pl_malvon…): un rol cuenta como cuadro aunque no
+    // haya uno con ese nombre (los cuadros del zip se llaman de otra forma), así los «F.x &&» de abajo los siguen poniendo
+    const OBJR = typeof OBJETOS !== "undefined" ? OBJETOS.roles : {}, ROL = { rol: true };
+    const F = new Proxy(F0, { get: (t, k) => t[k] || (OBJR[k] ? ROL : undefined) });
     const W = World.generate(SEED), r = R3.rng(SEED ^ 0x5bd1e995), rx = R3.rng(SEED ^ 0x27d4eb2f);
     const rz = R3.rng(SEED ^ 0x1b873593);   // yuyos nuevos (yuyos_03): sorteo aparte, así lo demás no cambia   // rx: props nuevos (no corre el sorteo de lo demás)
     const occ = new Set(), OC = .4;
@@ -44,7 +39,7 @@ const Barrio = (() => {
     function addObj(kind, spec, lot, x0, y0, phiQ, place, collider, extra = {}) { const e = want(spec); const o = { kind, e, x0, y0, phiQ, place, collider, lot, ...extra }; objs.push(o); return o; }
     // ---- registros
     const props = [], arboles = [], people = [], cables = [], cars = [], postes = [], pits = [], lineas = [];
-    const VAR = {}; for (const n of Object.keys(F)) { const m = /^(.+)_([b-z])$/.exec(n); if (m && F[m[1]]) (VAR[m[1]] ||= [m[1]]).push(n); }
+
     // Los objetos de arte/objetos (recursos/objetos.js): el nombre que se pide es un rol (u_farola, pl_malvon, yy_avena…) y el cuadro
     // sale de sus listas, por el lugar (no del sorteo, así el resto del barrio no cambia). Una maceta armada son dos props: el
     // recipiente y la planta, subida hasta la tierra (o: texeles del dibujo sobre el pie del recipiente), que se mece. Lo de Gemini
@@ -62,19 +57,15 @@ const Barrio = (() => {
       const h = Math.abs(Math.imul(Math.round(x * 10), 73856093) ^ Math.imul(Math.round(y * 10), 19349663));
       if (QUITAR.has(name)) return null;
       const rol = name, ob = OBJ && OBJ.roles[name] ? elegir(name, h) : null;
-      if (ob) name = ob.f; else if (VAR[name]) name = VAR[name][h % VAR[name].length];
-      if (!F[name] || ANIMAL.test(rol)) return null;
-      if (!ob && CAJA.test(name)) { const l = W.lotAt(x, y), c = l ? null : W.classify(x, y);
-        const phi = l ? (l.plaza ? Math.atan2(l.plaza.u[1], l.plaza.u[0]) : l.phi) : c ? Math.atan2(c.s.dir[1], c.s.dir[0]) : opt.face ? Math.atan2(opt.face[1], opt.face[0]) : null;
-        if (phi == null || !diagonalOk(phi)) return null; }
+      if (ob) name = ob.f;
+      if (!F0[name]) return null;
       if (rol.startsWith("yy_") && !W.dentro(x, y)) return null;   // afuera del paredón, sin yuyos (son la mayoría de los props)
       // en la calzada sólo lo que va en la calle (vallas, conos, volquetes, contenedores); lo demás que caiga ahí (una maceta de un
       // lote de esquina, un hidrante corrido) no se pone
       if (!EN_CALLE.test(rol)) { const ck = W.classify(x, y); if (ck && ck.k === "road") return null; }
       if (!opt.noClaim && !claim(x, y, opt.rad ?? lookup(RAD, rol, .3))) return null;
-      // face: hacia dónde mira (m del mundo). Lo que tiene vista de atrás y no mira a nada en especial mira a una diagonal
-      // sacada del lugar (no del sorteo, así el resto del barrio no cambia)
-      const face = opt.face || (F[name + "_atras"] ? DIAG[(h >>> 7) & 3] : null);
+      // face: hacia dónde mira (m del mundo), si mira a algo (un farol a la calle): decide el espejo del dibujo
+      const face = opt.face || null;
       const e = { f: name, x, y, flip: !!opt.flip, cr: opt.noCollide ? 0 : lookup(COLR, rol, 0), sh: opt.shadow ?? SH(rol), face, ...(ob ? { rol } : {}) };
       props.push(e);
       if (ob && ob.top) props.push({ f: ob.top, x, y, flip: !!(mezcla(h, 6) & 1), cr: 0, sh: null, face: null, o: ob.tierra - 2, rol });
@@ -218,7 +209,7 @@ const Barrio = (() => {
     }
 
     // ---- la fuente de la rotonda (Parque Chas: trencadís de los vecinos, 2016), con su colisionador
-    for (const q of W.rotondas || []) put(F.pz_fuente_mosaico ? "pz_fuente_mosaico" : "pz_fuente", q[0], q[1], { noClaim: true, face: [0, -1] });
+    for (const q of W.rotondas || []) put("pz_fuente", q[0], q[1], { noClaim: true });
 
     // ---- casas y tapiales
     for (const lot of W.lots) {
@@ -601,14 +592,7 @@ const Barrio = (() => {
     if (spec.t === "tapial") return Houses.tapial(spec.W, 500 + spec.s, spec.tk, phi);
     return Houses.poste(7, phi, !!spec.l);
   }
-  // Qué cuadro y qué espejo usa un prop que mira hacia (sx, sy) en pantalla (sy > 0: hacia abajo, hacia la cámara).
-  // Los props de Gemini con vista de atrás (nombre + "_atras") la usan cuando miran para arriba (se alejan de la cámara).
-  // MIRA: hacia qué lado mira el dibujo sin espejo, [frente, atrás] (true: a la derecha). Lo común: el frente a la
-  // derecha y la espalda (girada 180°) a la izquierda; el banco de hormigón al revés; la farola LED, con el brazo a la derecha en las dos.
-  const MIRA = { u_banco: [false, true], u_farola: [true, true] };
-  function vista(F, name, sx, sy) {
-    const atras = sy < 0 && !!F[name + "_atras"], m = MIRA[name] || [true, false], der = m[atras ? 1 : 0];
-    return [atras ? name + "_atras" : name, der ? sx < 0 : sx > 0];
-  }
+  // Qué cuadro y qué espejo usa un prop que mira hacia (sx, sy) en pantalla: el dibujo mira a la derecha; si mira a la izquierda, en espejo
+  function vista(F, name, sx, sy) { return [name, sx < 0]; }
   return { generate, build3D, Q, aIdx, vista };
 })();

@@ -1,0 +1,3 @@
+// generado por herramientas/hojas.js — no editar a mano. Las hojas de objetos (img/objetos/<nombre>.png|json): la escena
+// las carga enteras y WeedJS arma el atlas
+export const HOJAS = ["lpc_revised_recortado","mem0ry_garden_planters","gandalfhardcore_platformer","karsiori_flower_pack","karsiori_mountains_deco","karsiori_rock_pile_pack","mem0ry_messy_asset_pack","mem0ry_post_apoc_office_asset_pack","mem0ry_post_apoc_shelter_asset_pack","cainos_village_props","karsiori_ac_units","karsiori_trash_pack","karsiori_vending_machines","lpc_revised_hojas","mem0ry_coastal_furniture","mem0ry_makeshift","mem0ry_postapoc_workshop","mem0ry_public_bathroom","karsiori_bar_cafe","viejos"];

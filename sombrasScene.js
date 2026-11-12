@@ -98,7 +98,7 @@ export class SombrasScene extends Scene {
   };
   static assets = { spritesheets: {
     arboles: { json: BARRIO + 'img/arboles.json', png: BARRIO + 'img/arboles.png' },
-    props: { json: BARRIO + 'img/props.json', png: BARRIO + 'img/props.png' },
+    viejos: { json: u('./img/objetos/viejos.json'), png: u('./img/objetos/viejos.png') },   // la sombra horneada de los árboles (?viejas)
     lpc0: { json: u('./img/lpc/civil1.json'), png: u('./img/lpc/c3.png') },
     ...Object.fromEntries(MODELOS.map(m => ['auto_' + m, { json: u('./img/autos/' + m + '.json'), png: u('./img/autos/' + m + '.png') }])),
   } };
@@ -115,9 +115,9 @@ export class SombrasScene extends Scene {
     const yG = Y0 + MODELOS.length * FILA + 40;
     for (let i = 0; i < 8; i++) GenteP.spawn({ x: X0 + i * 60, y: yG, anim: ['idle_down', 'idle_left', 'idle_up', 'idle_right'][i % 4] });
     try {
-      const w = await (await fetch(BARRIO + 'mundo.json')).json(), tipos = Object.keys(w.arbolTipos).filter(t => !t.endsWith('_c')).slice(0, 6), ash = (w && META.anclas.sh_tree) || null;
+      const w = await (await fetch(BARRIO + 'mundo.json')).json(), tipos = Object.keys(w.arbolTipos).filter(t => !t.endsWith('_c')).slice(0, 6), ST = META.props.sh_tree;
       tipos.forEach((t, i) => { const x = X0 + 600 + i * 260, y = yG + 260; ArbolP.spawn({ x, y, tipo: w.arbolTipos[t], verSil: Q.has('silueta'), fl: i & 1, mece: Q.has('mece') });
-        if (Q.has('viejas') && ash) Decoration.spawn({ x, y, texture: 'props_sh_tree', anchorX: ash[0], anchorY: ash[1], alpha: .4, layer: 'sombras' }); });
+        if (Q.has('viejas')) Decoration.spawn({ x, y, texture: ST.h + '_' + ST.c, anchorX: ST.a[0], anchorY: ST.a[1], alpha: .4, layer: 'sombras' }); });
     } catch (e) { console.error('árboles', e); }
   }
   create() {

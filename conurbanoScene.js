@@ -8,8 +8,8 @@
 // ---------- el barrio exportado por el editor: barrio/ (el inventado), carabobo/ (Av. Carabobo al 1500 y la villa 1-11-14) o parquechas/ (Parque Chas).
 // barrios.js junta los meta de los dos (herramientas/barrios.js) y lo importan todos los hilos. Cuál se juega lo dice ?barrio=… en la
 // URL de esta escena (index.html la arma así); en los workers import.meta.url es esa misma URL, así todos los hilos eligen el mismo.
-// META.atlas lo pone herramientas/hornear_atlas.js cuando hay atlas pre-horneado en <carpeta>/atlas/ (si no, el juego lo arma al cargar)
 import { BARRIOS } from './barrios.js';
+import { HOJAS } from './img/objetos/hojas.js';
 // autos: modelos, colores y medidas que hornea herramientas/hornear_autos.js (img/autos/)
 import { AUTOS, CHATARRA } from './img/autos/autos.js';
 import { APOYO } from './img/autos/apoyo.js';
@@ -188,7 +188,6 @@ function frenteEn(H, x) {
     m = Math.max(m, a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]));
   } return m;
 }
-const LAMPARAS = { u_farola: [[.65, .09]], u_farola_orn: [[.5, .2]], u_farol_doble: [[.17, .27], [.77, .18]] };
 // árboles, faroles, semáforos, contenedores… (lo que frena un auto); lo demás va como Decoration
 export class Prop extends GameObject {
   static isStatic = true;
@@ -196,27 +195,27 @@ export class Prop extends GameObject {
   static components = [RigidBody, Collider, SpriteRenderer, ShadowCaster, LightEmitter, LuzHora];
   onSpawned(c = {}) {
     this.rigidBody.static = 1;
-    this.setSprite('props', c.f, 0);
-    const an = META.anclas[c.f]; this.spriteRenderer.anchorX = an[0]; this.spriteRenderer.anchorY = an[1];
-    const e = (META.escalas && META.escalas[c.f]) || 1;      // props HD: dibujados a 30 px/m, se muestran a 0.6
+    // su dibujo: la hoja y el cuadro (img/objetos), el ancla y la escala, de META.props
+    const P = META.props[c.f]; this.setSprite(P.h, P.c, 0);
+    const an = P.a; this.spriteRenderer.anchorX = an[0]; this.spriteRenderer.anchorY = an[1];
+    const e = P.e || 1;      // los de arte/objetos, dibujados a la escala de los personajes LPC, se muestran a 0,6
     this.setScale(c.fl ? -e : e, e);
     this.collider.shapeType = ShapeType.Circle; this.collider.radius = Math.max(1.5, c.r);
     this.collider.visualRange = 200;
     this.shadowCaster.heightMultiplier = .8;
     const L = this.lightEmitter, top = this.spriteRenderer.originalHeight * an[1] * e;
-    const f = c.f.endsWith('_atras') ? c.f.slice(0, -6) : c.f;   // vista de atrás: el mismo objeto
-    // los faroles de arte/objetos traen sus lámparas en META.lamparas (y un cuadro prendido, que se pone a la hora de la luz)
-    const LM = META.lamparas && META.lamparas[c.f];
-    this._fOff = c.f; this._fOn = LM && LM.on ? LM.on : null; this._prendido = -1;
-    if (f.startsWith('u_farol')) {            // farol: charco de luz en la vereda + brillo en la lámpara
-      L.lightColor = LUZ; L.height = 0; L.glowHeightOffset = LM ? top * (an[1] - LM.l[0][1]) / an[1] : top * (f === 'u_farola' ? .97 : .88);
+    // un farol trae sus lámparas en META.lamparas (dónde están, y su cuadro prendido, que se pone a la hora de la luz)
+    const LM = META.lamparas[c.f];
+    this._fOff = P; this._fOn = LM && LM.on ? META.props[LM.on] : null; this._prendido = -1;
+    if (LM) {            // farol: charco de luz en la vereda + brillo en la lámpara
+      L.lightColor = LUZ; L.height = 0; L.glowHeightOffset = top * (an[1] - LM.l[0][1]) / an[1];
       // la luz sale de la lámpara (sourceHeight, a media altura del poste: el charco queda más parejo) y por eso más fuerte
-      L.sourceHeight = top * .5; L.lightIntensity = (f === 'u_farol_doble' ? 2600 : f === 'u_farola' ? 2200 : 1800) * FAROL_K; L.hasGlowSprite = .55; L.active = 1;
+      L.sourceHeight = top * .5; L.lightIntensity = 1800 * FAROL_K; L.hasGlowSprite = .55; L.active = 1;
       this.collider.visualRange = alcanceLuz(L.lightIntensity) || 260;   // alcance para las sombras que proyecta su luz (y, con ?raycast=1, las casas que la tapan)
       // brillo en cada lámpara (se prende con la luz): un centro chico y un halo, en la capa 'noche' (aditiva, arriba de todo:
       // debajo de la luz, multiplicados por el charco, no se veían). Esa capa no se ordena con las casas: el farol que tiene su
       // lámpara detrás de una casa (c.tp, ConurbanoScene._lamparasTapadas, al cargar) va sin brillo
-      const ls = c.tp ? null : (LM ? LM.l : LAMPARAS[f]) || null, sw = this.spriteRenderer.originalWidth * e, sh = this.spriteRenderer.originalHeight * e;
+      const ls = c.tp ? null : LM.l, sw = this.spriteRenderer.originalWidth * e, sh = this.spriteRenderer.originalHeight * e;
       if (ls) for (const [fx, fy] of ls) {
         const dx = (fx - an[0]) * sw * (c.fl ? -1 : 1), dy = (fy - an[1]) * sh;
         this.addDecoration('_lightGradient', dx, dy, .26, .26, 1, { tint: 0xfff2d0, alpha: 1, anchorX: .5, anchorY: .5, layer: 'noche' });
@@ -226,7 +225,6 @@ export class Prop extends GameObject {
     } else {
       L.lightIntensity = 0; L.active = 0; this.luzHora.base = 0;
       // semáforo: sin luz al piso, sólo un punto de color en la lámpara (el gradiente de WeedJS, en una capa aditiva);
-      // de atrás (u_semaforo_atras) no se ven las luces
       // con datos de tránsito: rojo, amarillo y verde (y una tapa para la roja, que en el dibujo está prendida), pegados al semáforo
       // y apagados; la escena los prende según el ciclo de su cruce. Si no, una luz fija
       if (c.f === 'u_semaforo' && c.sk >= 0 && TR.n) {
@@ -243,7 +241,7 @@ export class Prop extends GameObject {
   tick() {
     luzHora(this);
     // el farol con cuadro prendido: el vidrio se ve encendido mientras su luz está prendida
-    if (this._fOn) { const on = LuzHora.on[this.index] === 1 ? 1 : 0; if (on !== this._prendido) { this._prendido = on; this.setSprite('props', on ? this._fOn : this._fOff, 0); } }
+    if (this._fOn) { const on = LuzHora.on[this.index] === 1 ? 1 : 0; if (on !== this._prendido) { this._prendido = on; const P = on ? this._fOn : this._fOff; this.setSprite(P.h, P.c, 0); } }
   }
 }
 
@@ -649,7 +647,9 @@ function elegirModelos(autos, props) {
 const SHEETS = {};
 for (let i = 0; i < META.hojasCasas; i++) SHEETS['casas' + i] = { json: BARRIO + 'img/casas' + i + '.json', png: BARRIO + 'img/casas' + i + '.png' };
 for (let i = 0; i < (META.hojasCaras || 0); i++) SHEETS['caras' + i] = { json: BARRIO + 'img/caras' + i + '.json', png: BARRIO + 'img/caras' + i + '.png' };
-SHEETS.props = { json: BARRIO + 'img/props.json', png: BARRIO + 'img/props.png' };
+// los objetos: las hojas de img/objetos (herramientas/hojas.js), enteras, comunes a todos los barrios; los grafitis de las paredes, la del barrio
+for (const h of HOJAS) SHEETS[h] = { json: 'img/objetos/' + h + '.json', png: 'img/objetos/' + h + '.png' };
+SHEETS.grafitis = { json: BARRIO + 'img/grafitis.json', png: BARRIO + 'img/grafitis.png' };
 SHEETS.arboles = { json: BARRIO + 'img/arboles.json', png: BARRIO + 'img/arboles.png' };
 for (let i = 0; i < NLPC; i++) SHEETS['lpc' + i] = { json: 'img/lpc/civil1.json', png: 'img/lpc/c' + i + '.png', excludeAnimations: LPC_EXCLUDE };
 for (const [m, a] of Object.entries(AUTOS)) for (const c of a.colores || ['']) { const h = c ? m + '_' + c : m; SHEETS['auto_' + h] = { json: 'img/autos/' + h + '.json', png: 'img/autos/' + h + '.png' }; }
@@ -657,7 +657,6 @@ for (const h in CHATARRA) SHEETS['auto_' + h] = { json: 'img/autos/' + h + '.jso
 // Los flowfields van en .bin (el formato binario de WeedJS) cuando el editor lo dice en META.ffExt; si no, en .json.
 const FF = META.ffExt || '.json', FLOW = { calles: BARRIO + 'ff_calles' + FF }; PED_FIELDS.forEach(n => FLOW[n] = BARRIO + 'ff_' + n + FF);
 const f32 = (v) => ({ value: v, type: 'f32' });
-const PACK = typeof globalThis.location?.search === 'string' && new URLSearchParams(globalThis.location.search).has('empaquetar');
 
 export class ConurbanoScene extends Scene {
   static config = {
@@ -702,7 +701,7 @@ export class ConurbanoScene extends Scene {
           }
         }
       },
-      // manchas, roturas y basura del piso (gd_*): arriba del piso, debajo de las sombras
+      // lo pintado en el piso (las líneas de las canchas): arriba del piso, debajo de las sombras
       manchas: { zIndex: 1.4, ySorting: false, maxItems: Math.max(6000, META.nProps + (META.nLineas || 0)) },
       // las sombras de casas y autos son VolumeShadowCaster: WeedJS pone su capa (volumeShadows), en zIndex 1.5, y las compone una
       // sola vez, así que dos sombras que se pisan no oscurecen doble; de noche se apagan solas
@@ -716,9 +715,7 @@ export class ConurbanoScene extends Scene {
       noche: { zIndex: 5.6, blendMode: BLEND_MODES.ADD, shader: { containerBlend: BLEND_MODES.ADD }, ySorting: false, maxItems: 2000 },
     },
   };
-  // atlas pre-horneado (herramientas/hornear_atlas.js): el celu no tiene que decodificar y empaquetar ~60 imágenes al arrancar
-  // (con ?empaquetar en la URL se arma en el navegador, para volver a hornearlo después de cambiar los sprites)
-  static assets = { ...(PACK || !META.atlas ? {} : { bigAtlas: { json: BARRIO + 'atlas/bigAtlas.json', png: BARRIO + 'atlas/bigAtlas.png' } }), spritesheets: SHEETS, flowfields: FLOW };
+  static assets = { spritesheets: SHEETS, flowfields: FLOW };   // WeedJS arma el atlas al cargar, con todas las hojas
   static sharedResources = [
     [PisoData, {
       cellA: { type: Uint8Array, length: META.CW * META.CH * 4 }, cellB: { type: Uint8Array, length: META.CW * META.CH * 4 },
@@ -744,9 +741,8 @@ export class ConurbanoScene extends Scene {
       for (let g = Math.floor(x0 / G); g <= Math.floor(x1 / G); g++) { let l = grilla.get(g); if (!l) grilla.set(g, l = []); l.push(c); }
     }
     for (const p of w.props || []) {
-      if (!(p.r > 0) || !p.f || !p.f.startsWith('u_farol')) continue;
-      const lm = META.lamparas && META.lamparas[p.f];   // los de arte/objetos dicen a qué altura está su lámpara
-      const hz = lm ? lm.z : p.f.startsWith('u_farola_orn') ? 4 : p.f.startsWith('u_farola') ? 6.5 : 5.5, hy = p.y - hz * KZ, l = grilla.get(Math.floor(p.x / G));
+      const lm = META.lamparas[p.f]; if (!(p.r > 0) || !lm) continue;   // un farol: a qué altura está su lámpara
+      const hz = lm.z, hy = p.y - hz * KZ, l = grilla.get(Math.floor(p.x / G));
       if (l) for (const c of l) if (p.x >= c.x0 && p.x <= c.x1 && dentroConvexo(c.sil, p.x, hy) && p.y < frenteEn(c.pie, p.x)) { out.add(p); break; }
     }
     return out;
@@ -808,26 +804,25 @@ export class ConurbanoScene extends Scene {
     }
     const tapadas = this._lamparasTapadas(w); this.lamparasTapadas = tapadas.size;
     for (const p of w.props) {
-      if (p.sh && !(p.r > 0)) { const a = META.anclas[p.sh]; Decoration.spawn({ x: p.x, y: p.y, texture: 'props_' + p.sh, anchorX: a[0], anchorY: a[1], alpha: .45, layer: 'sombras' }); }
+      if (p.sh && !(p.r > 0)) { const S = META.props[p.sh]; Decoration.spawn({ x: p.x, y: p.y, texture: S.h + '_' + S.c, anchorX: S.a[0], anchorY: S.a[1], alpha: .45, layer: 'sombras' }); }
       if (p.r > 0) {
         let sk = -1; if (p.f === 'u_semaforo' && p.cr >= 0 && this._sem.length < (TR.nSem || 0)) { sk = this._sem.length; this._sem.push({ cid: p.cr, eje: p.ej, sk, f: -1 }); }
         Prop.spawn({ x: p.x, y: p.y, f: p.f, r: p.r, fl: p.fl, sk, tp: tapadas.has(p) ? 1 : 0 });
       }
       else {
-        const a = META.anclas[p.f], e = (META.escalas && META.escalas[p.f]) || 1, mece = p.f.startsWith('plm_') || p.f.startsWith('yy_');   // plantas que se mecen (skew: la base queda fija)
+        const P = META.props[p.f], a = P.a, e = P.e || 1, mece = !!P.m;   // plantas que se mecen (skew: la base queda fija)
         // la planta de una maceta (p.o: px sobre el pie de la maceta) se dibuja subida, sobre la tierra, y se ordena justo delante de la maceta
         const o = p.o || 0;
         Decoration.spawn({
-          x: p.x, y: p.y - o, texture: 'props_' + p.f, anchorX: a[0], anchorY: a[1], scaleX: p.fl ? -e : e, scaleY: e, sortOffsetY: o ? o + .05 : 0,
-          ...(mece ? { swaySkew: 1, swayAmplitude: .02 + rng() * .02, swayFrequency: .45 + rng() * .4 } : {}),
-          ...(p.f.startsWith('gd_') ? { layer: 'manchas' } : {})
+          x: p.x, y: p.y - o, texture: P.h + '_' + P.c, anchorX: a[0], anchorY: a[1], scaleX: p.fl ? -e : e, scaleY: e, sortOffsetY: o ? o + .05 : 0,
+          ...(mece ? { swaySkew: 1, swayAmplitude: .02 + rng() * .02, swayFrequency: .45 + rng() * .4 } : {})
         });
-      }   // manchas y roturas: pegadas al piso, debajo de todo
+      }
     }
-    const ash = META.anclas.sh_tree;
+    const ST = META.props.sh_tree;
     // la mancha horneada (una elipse fija debajo del tronco) sólo para los árboles sin silueta: los que la tienen ya proyectan
     // su sombra de verdad con el sol (ShadowCaster), y al atardecer quedaba la elipse sola debajo de cada árbol
-    for (const a of w.arboles) { const T = w.arbolTipos[a.t]; Arbol.spawn({ x: a.x, y: a.y, fl: a.fl, r: a.r, tipo: T }); if (ash && !T.sil) Decoration.spawn({ x: a.x, y: a.y, texture: 'props_sh_tree', anchorX: ash[0], anchorY: ash[1], alpha: .4, layer: 'sombras' }); }
+    for (const a of w.arboles) { const T = w.arbolTipos[a.t]; Arbol.spawn({ x: a.x, y: a.y, fl: a.fl, r: a.r, tipo: T }); if (!T.sil) Decoration.spawn({ x: a.x, y: a.y, texture: ST.h + '_' + ST.c, anchorX: ST.a[0], anchorY: ST.a[1], alpha: .4, layer: 'sombras' }); }
     for (const c of w.cables) {
       const dx = c[2] - c[0], dy = c[3] - c[1], L2 = Math.hypot(dx, dy);
       const k = CABLE[c[4]];
@@ -849,7 +844,7 @@ export class ConurbanoScene extends Scene {
     this._gCur = 0; this.gente = 0; this.genteMax = Math.min(GENTE_MAX, NG_); this.genteFija = !!GENTE_FIJA;
     this.sumarGente(Math.min(GENTE_INICIAL, this.genteMax), false);
     // ?prueba=x,y[,prop];x,y… pone props fijos donde se pida (para revisar a mano el orden de dibujo)
-    if (Q.get('prueba')) for (const t of Q.get('prueba').split(';')) { const [x, y, f] = t.split(','); if (f === 'p') Persona.spawn({ x: +x, y: +y, quieta: 1 }); else Prop.spawn({ x: +x, y: +y, f: f || 'u_farola', r: 1 }); }
+    if (Q.get('prueba')) for (const t of Q.get('prueba').split(';')) { const [x, y, f] = t.split(','); if (f === 'p') Persona.spawn({ x: +x, y: +y, quieta: 1 }); else Prop.spawn({ x: +x, y: +y, f: f || 'u_farol_hierro', r: 1 }); }
     let first = null;
     const modelos = elegirModelos(w.autos, w.props);
     w.autos.forEach((c, i) => {
