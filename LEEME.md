@@ -29,14 +29,14 @@ WeedJS usa `SharedArrayBuffer`, así que la página tiene que estar "aislada" (e
 - **Orden de dibujo (ySort) de las casas:** cada casa se dibuja en franjas verticales. En la proyección oblicua la altura sólo sube en pantalla, así que cada columna del sprite es un pedazo fijo de piso, y su profundidad es la base de la pared ahí. El horneado calcula esa base desde las cajas 3D apoyadas en el piso, y junta columnas mientras la base no cambie más de 8 px (64 px de ancho como máximo). Cada franja es una entidad `Franja` ubicada en la base, de donde sale su y de orden. Lleva colgadas piezas de 64 px de alto como decoraciones: se ordenan con la y del padre, pero se recortan cada una por su propio centro, así las paredes altas no desaparecen en el borde al hacer zoom. Las piezas se pisan 1 px para que no queden rayas. La entidad `Casa` sólo tiene el colisionador y la luz de la ventana.
 - **Casas por caras con skew** (parámetro `skew` del editor, 1 por defecto; necesita WeedJS con DX-DECOSKEW, PR #7). En vez de hornear la casa entera una vez por rumbo, cada diseño se arma una sola vez en R3, sin rumbo, y se hornean sus caras planas. El juego dibuja cada cara con escala y skew, porque una cara plana vista en la proyección oblicua es un paralelogramo.
   - **Qué va al atlas:**
-    - las caras con dibujo propio (fachadas, medianeras), con su contorno y la oclusión del piso, en piezas de hasta 128 px;
+    - las caras con dibujo propio (fachadas, medianeras), con su contorno y la oclusión del piso, en piezas de hasta 128 px (en una pared que corre hacia el fondo, columnas más finas: ver el orden de dibujo);
     - los techos, como baldosas de material compartidas por todas las casas;
-    - los tanques, aires, antenas y macetas, como un sprite compartido cada uno, como el tanque de los props;
+    - los tanques (en una de cada seis casas), aires, antenas y macetas, como un sprite compartido cada uno, como el tanque de los props;
     - las caras de color liso no van al atlas: se dibujan con la textura blanca del motor, teñida.
   - **Luz:** la pone WeedJS (`lighting.faces`). Cada pieza dice hacia dónde mira su cara (la normal, ya girada con el rumbo) y a qué altura está su centro, y el motor la ilumina como una superficie: un farol alumbra la pared que lo mira y no la de atrás, una pared a la que no le llega luz queda oscura, y el sol ilumina cada cara según su ángulo, a cada hora. El exportador sólo les pone el tinte de una superficie plana al sol. `?caras=0` lo apaga, para medir lo que cuesta. No hay sombras proyectadas sobre las paredes.
   - **Orden de dibujo:**
     - dentro de la casa, el de pintor entre las caras (`innerZ`);
-    - con el resto, la base de su pared, o la de la casa en su columna, subida lo justo para no quedar detrás de una pieza de la misma casa que la tapa.
+    - con el resto (la gente, los árboles, los objetos): una pared, el punto del piso que tiene debajo; lo que no es vertical (techos, tapas de muros, pisos), su borde de atrás sobre el piso; subida lo justo para no quedar detrás de una pieza de la misma casa que la tapa. Una pared que corre hacia el fondo va en columnas en las que su pie no cambia más de 8 px (las lisas también: no van en una pieza sola), así la gente parada al pie, adelante, no queda detrás. Cada textura se corta una sola vez, con la columna más fina que pida cualquiera de sus usos.
   - **En el juego:** las piezas son decoraciones del mundo, no colgadas (la casa no se mueve), así no pasan por el paso de las decoraciones colgadas en cada cuadro. Se cargan con un solo objeto de configuración reusado.
   - **Barrio inventado:** el atlas pasó de 7982 × 4094 a 6071 × 4094 (las casas, de unos 17 a 10,7 Mpx). En 0, `skew` hornea como antes.
 - **Árboles:** salen del editor (esqueleto tipo L-system, hojas en rosetas). Cada uno es una entidad `Arbol`: el tronco es su sprite y cada rama es una decoración colgada, anclada en su base, que se mece (`sway`).
@@ -138,6 +138,7 @@ nombres de ciudades europeas (Berlín, Ginebra, La Haya, Londres, Cádiz…), y 
 - **Villas:** grupos de 2 a 5 manzanas en la zona más pobre, rodeadas de calles comunes (como la 1-11-14). Adentro tienen calles de tierra entre manzanas y pasillos que serpentean y salen a la calle.
 - **Plazas:** una manzana entera cada 5 o 6 cuadras, con senderos de baldosa roja, monumento o fuente, árboles, faroles, bancos y juegos.
 - **Lotes** hasta la mitad de la manzana. En los hondos casi siempre hay algo construido en el fondo.
+- **Calles y veredas parejas:** cada calle lleva un solo material de punta a punta (asfalto, asfalto roto, adoquín o tierra: el que más largo tiene entre sus cuadras). Una calle son las cuadras del mismo nombre o, sin nombre, las que siguen derecho en la esquina. Cada lado de cada cuadra lleva un solo tipo de vereda (el que más frente ocupa entre sus lotes), también donde no hay lote.
 - **Plantas:** macetas contra los frentes, plantas en los patios, canteros y cazuelas de vereda, y enredaderas, jardineras y helechos colgados en las fachadas. El parámetro `plantas` (1,8× por defecto) multiplica todas esas chances.
 - **Esquinas con ochava:** en las esquinas de manzana casi en escuadra (no en la villa ni en calles de tierra) va una casa de esquina de 10 × 10 m con la ochava a 45°: el negocio en la ochava (almacén, bar, kiosco, farmacia, pizzería, panadería, café…) con cartel y a veces toldo, vidrieras sobre las dos calles, uno o dos pisos. Los bares y cafés sacan mesitas a la vereda. Parámetro `ochavas`.
 - **Borde del mapa:** el área jugable (`mapW` × `mapH`) está cerrada por un **paredón** de 3 m con pilares, pintadas y alambre de púas, con colisionador. Del otro lado se genera ciudad, `margen` m de cada lado (45 por defecto), sin gente, sin autos andando y sin yuyos, para no cargar el juego. Los lotes que el paredón cruza quedan vacíos.
@@ -168,6 +169,8 @@ Gemini quedan la plaza, los semáforos, los locales coreanos, las manchas del pi
      hora de la luz). `META.lamparas` dice dónde está la lámpara, a qué altura (2,3 m) y cuál es el cuadro prendido.
    - Lo de Gemini que no tiene reemplazo (contenedores, kioscos, paradas, motos, bicis, puestos, volquetes, mesas, parrillas, el
      Gauchito, la Virgen…) no se pone más (`OBJETOS.quitar`).
+   - Las casas ya no traen la soga con ropa pintada en las paredes; la ropa colgada son los tendederos de `arte/objetos`, en los patios.
+   - Ni balcones que salgan de la pared (dejaban pedazos de pared en medio de la vereda): las ventanas que daban a ellos son ventanas comunes.
    - Son de frente, como la gente: van en cualquier lado (no sólo a 50° como las cajas isométricas de Gemini) y no tienen vista de
      atrás. El exportador los copia tal cual (a la escala de la gente, 0,6; sin achicar, sin contorno agregado, sin sacarles el cian).
 2. **Grafitis en las paredes, casa por casa** (`editor/js/paredes.js`): las casas salen de un catálogo compartido, así que lo que se
@@ -177,6 +180,8 @@ Gemini quedan la plaza, los semáforos, los locales coreanos, las manchas del pi
    - Dónde: `caras.js` marca en cada pared que llega al piso (lisa o con dibujo) las celdas de 4 texeles que son pared (del color de la
      pared: sin aberturas, carteles, murales ni pintadas), entre 0,25 y 3,4 m, y sin nada de la casa adelante.
    - Cuántos: más en lo pobre (3 de 4 paredes), en tapiales y paredones (y varios por paredón), menos en lo rico; knob `grafitis`.
+   - **Enredaderas en su espaldera** (las plantas con tutor de `arte/objetos`): van igual, casa por casa, paradas en el piso contra la pared y
+     quietas; más en las casas de más plata (knob `plantas`). No salen sueltas en la vereda.
    - Sin que se note la repetición: el mismo dibujo no se repite a menos de 45 m, ni el mismo dibujo y color a menos de 160 m; entre los
      que se pueden, el menos usado. Unos más gastados que otros. Las firmas y los grupos de carteles salen distintos cada vez.
    - El visor del editor no los muestra: salen al exportar. Las pintadas con frases (`graffiti.js`) siguen como estaban.

@@ -67,7 +67,6 @@ lista('G_AGAVE', 'plm_z_', ['plantas_23_0_0']);
 lista('G_ARBUSTO', 'plm_z_', ['plantas_12_0_0', 'plantas_18_30_0', 'tx_village_props_356_580', 'tx_village_props_452_573', 'tx_village_props_576_572']);
 lista('G_ALTA', 'plm_z_', ['tx_village_props_869_262', 'tx_village_props_899_257', 'tx_village_props_930_261', ...['64_65', '96_64', '97_192', '128_64', '129_130', '290_0', '322_0', '353_0'].map(s => gp('plantbases_' + s))]);
 lista('G_SECO', 'plm_z_', ['tx_village_props_514_494', 'tx_village_props_545_485', 'tx_village_props_613_490', 'tx_village_props_644_496', 'wheat_102_7', 'wheat_133_0', 'tall_grass_0_12']);
-lista('G_ENREDADERA', 'plm_z_', ['grid_2', 'grid_6', 'grid_7']);
 // yuyos (yy_z_, se mecen), hongos y piedras (quietos)
 lista('Y_FLOR', 'yy_z_', [...Object.keys(ARCH).filter(b => /^yuyos_\d+_0_0$/.test(b)), ...rango('flores_', 34, 55)]);
 lista('Y_PASTO', 'yy_z_', ['grass_1', 'grass_2', 'grass_4_1', 'grass_4_2', 'grass_4_3', 'grass_4_4', 'grass_4_5', 'grass_4_6', 'tx_village_props_421_469', 'tx_village_props_427_503', 'plantas_07_0_0', 'plantas_13_0_0',
@@ -135,8 +134,8 @@ rol(['pl_balde', 'pl_botellas', 'pl_cubierta', 'pl_jaula'],
 // plantas en la tierra
 rol(['plm_agapanto'], [['G_FLOR', 1], ['G_HOJA', 1]]);
 rol(['plm_lantana', 'plm_plumbago', 'plm_rosal'], [['G_FLOR', 1]]);
-rol(['plm_jazmin'], [['G_FLOR', 1], ['G_ENREDADERA', .3]]);
-rol(['plm_santarita'], [['G_ENREDADERA', 1], ['G_FLOR', .4]]);
+rol(['plm_jazmin'], [['G_FLOR', 1]]);
+rol(['plm_santarita'], [['G_ARBUSTO', 1], ['G_FLOR', .4]]);   // (las enredaderas en espaldera van a las paredes, con los grafitis)
 rol(['plm_romero'], [['G_ARBUSTO', 1], ['G_FLOR', 1]]);
 rol(['plm_formio', 'plm_strelitzia'], [['G_HOJA', 1]]);
 rol(['plm_cortadera'], [['G_HOJA', 1], ['G_SECO', .6]]);
@@ -162,12 +161,14 @@ const QUITAR = ['u_refugio', 'u_poste_trafo', 'u_contenedor', 'u_contenedor_b', 
   'b_cartel_vende', 'b_sombrilla', 'k_gauchito', 'k_virgen', 'k_heladera', 'k_tele', 'k_mantero', 'k_pizarra_helado', 'k_pelopincho', 'k_cucha', 'k_banderines',
   'parrilla', 'parrilla_tambor', 'parrilla_b'];
 
-// ---------- grafitis (van a las paredes, casa por casa: editor/js/exportar.js): los grandes (con variantes de color), las letras
-// sueltas (firmas: se arman de a varias, teñidas) y los carteles pegados (de a varios)
+// ---------- grafitis (van a las paredes, casa por casa: editor/js/paredes.js): los grandes (con variantes de color), las letras
+// sueltas (firmas: se arman de a varias, teñidas), los carteles pegados (de a varios) y las enredaderas en su espaldera (paradas
+// en el piso contra la pared, quietas)
 const GRAF = {
   grandes: ['graffiti_0_0_1', 'graffiti_0_0_2', 'graffiti_169_73', 'graffiti_172_7', 'graffiti_260_12', 'graffiti_265_66', 'graffiti_273_104', 'graffiti_66_10', 'graffiti_76_71'],
   letras: ['graffiti_elements_148_2_1', 'graffiti_elements_148_2_2', 'graffiti_elements_194_18_1', 'graffiti_elements_194_18_2', 'graffiti_elements_194_18_3'],
   carteles: ['posters_102_69', 'posters_135_67', 'posters_3_39', 'posters_39_35', 'posters_44_71', 'posters_67_35'],
+  enredaderas: ['grid_2', 'grid_6', 'grid_7'],
 };
 const G = {}; for (const k in GRAF) G[k] = GRAF[k].map(b => { const n = 'gr_' + corto(b); FR[n] = { ...arch(b), grafiti: k }; return n; });
 

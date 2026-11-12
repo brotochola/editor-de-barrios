@@ -150,14 +150,36 @@ const World = (() => {
       else if (type === "calle" && mat !== "tierra" && w > .34 && r() < .38 * (C.adoquines ?? 1)) mat = "adoquin";      // calles de adoquines, como en Flores
       const hw = extra.hwR ?? { ave: C.avenida / 2, calle: C.calle / 2 * (extra.ancha ? 1.25 : 1), pasaje: C.pasaje / 2, pasillo: C.pasillo / 2 }[type];
       const VER = (RM && RM.estilo && RM.estilo.vereda) || C.vereda;   // el ancho de vereda del barrio real, si lo trae
-      let sw = { ave: VER * 1.45, calle: VER * (w < .3 ? .8 : 1), pasaje: VER * (w < .4 ? .45 : .56), pasillo: 0 }[type];
+      let sw = { ave: VER * 1.45, calle: VER * (w < .3 ? .8 : 1), pasaje: VER * (w < .4 ? .45 : .56), pasillo: 0 }[type]; const sw0 = sw;
       if (mat === "tierra" && type !== "pasillo") sw = Math.max(sw, extra.tierra ? 1.6 : 2.6);
-      const s = { id: segs.length, a, b, len, dir: [(b[0] - a[0]) / len, (b[1] - a[1]) / len], type, mat, hw, sw, w, cls: CLS[type],
+      const s = { id: segs.length, a, b, len, dir: [(b[0] - a[0]) / len, (b[1] - a[1]) / len], type, mat, hw, sw, sw0, w, cls: CLS[type],
         med: type === "ave" ? Math.max(0, Math.min(hw - 2.5, extra.medR ?? C.cantCentral / 2)) : 0, nombre: extra.nombre || "", cantero: type !== "pasillo" && mat !== "tierra" && sw >= 2.5 && r() < (w < .35 ? .45 : .85), cross: [], lots: { 1: [], "-1": [] }, district: d };
       s.n = [-s.dir[1], s.dir[0]];
       segs.push(s); return s;
     };
     for (const e of red) addSeg(e.a, e.b, e.type, e.d, e);
+    // ---------- calles parejas: una calle lleva un solo material de punta a punta (no cambia cuadra por cuadra ni en las esquinas).
+    // Las del mismo nombre son una; sin nombre, los tramos que siguen derecho en una esquina. Su material es el que más largo tiene
+    // entre sus cuadras (los sorteos de cada cuadra quedan como estaban, así no cambia el resto del barrio)
+    { const P = segs.map((s, i) => i), raiz = (i) => { while (P[i] !== i) i = P[i] = P[P[i]]; return i; }, unir = (a, b) => { a = raiz(a); b = raiz(b); if (a !== b) P[b] = a; };
+      const parejo = (s) => s.type === "calle" || s.type === "ave", porNombre = new Map(), nodos = new Map(), kn = (p) => Math.round(p[0] * 10) + ":" + Math.round(p[1] * 10);
+      for (const s of segs) { if (!parejo(s)) continue;
+        if (s.nombre) { const k = s.type + ":" + s.nombre; if (porNombre.has(k)) unir(porNombre.get(k), s.id); else porNombre.set(k, s.id); }
+        for (const [p, sale] of [[s.a, s.dir], [s.b, [-s.dir[0], -s.dir[1]]]]) { const k = kn(p); if (!nodos.has(k)) nodos.set(k, []); nodos.get(k).push({ s, sale }); } }
+      // en cada esquina, de a pares, los tramos del mismo tipo que siguen más derecho (menos de 25° de quiebre)
+      for (const L of nodos.values()) { const pares = [];
+        for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) { const A = L[i], B = L[j];
+          if (A.s.type !== B.s.type || (A.s.nombre && B.s.nombre && A.s.nombre !== B.s.nombre)) continue;
+          const c = A.sale[0] * B.sale[0] + A.sale[1] * B.sale[1]; if (c < -.9) pares.push([c, A.s, B.s]); }
+        pares.sort((x, y) => x[0] - y[0]); const usado = new Set();
+        for (const [, a, b] of pares) { if (usado.has(a) || usado.has(b)) continue; usado.add(a); usado.add(b); unir(a.id, b.id); } }
+      const largo = new Map();
+      for (const s of segs) { if (!parejo(s)) continue; const g = raiz(s.id); let m = largo.get(g); if (!m) largo.set(g, m = new Map()); m.set(s.mat, (m.get(s.mat) || 0) + s.len); }
+      for (const s of segs) { if (!parejo(s)) continue; let mat = s.mat, best = 0; for (const [k, l] of largo.get(raiz(s.id))) if (l > best) { best = l; mat = k; }
+        if (mat === s.mat) continue;
+        // lo que depende del material: la vereda de tierra es más ancha, y el cantero (con un sorteo propio de la cuadra)
+        s.mat = mat; s.sw = mat === "tierra" ? Math.max(s.sw0, 2.6) : s.sw0;
+        s.cantero = mat !== "tierra" && s.sw >= 2.5 && (Math.imul(s.id + 1, 0x9e3779b1) >>> 0) / 4294967296 < (s.w < .35 ? .45 : .85); } }
 
     // ---------- índice espacial de calles
     const B = 16, GW = Math.ceil(MW / B) + 2, GH = Math.ceil(MH / B) + 2, buckets = Array.from({ length: GW * GH }, () => []);
@@ -480,6 +502,13 @@ const World = (() => {
         // las casas están horneadas para una sola vista: mejor un lote con el frente a la cámara (al sur), así se ve el cartel
         const fx = l.o[0] + l.ux[0] * l.fw / 2, fy = l.o[1] + l.ux[1] * l.fw / 2, d = Math.hypot(fx - pq.x, fy - pq.y) + (l.nOut[1] < 0 ? 12 : 0); if (d < bd) { bd = d; best = l; } }
       if (best) { best.kind = pq.rubro === "PIZZERIA" ? "negocio_casa" : "negocio"; best.cartel = pq.cartel; best.rubro = pq.rubro || ""; best.nombre = pq.n; } }
+    // ---------- veredas parejas: la vereda no cambia de tipo a mitad de cuadra. Cada lado de cada calle toma el tipo que más frente
+    // ocupa entre sus lotes, y sus lotes lo llevan (ahí miran también los objetos de la vereda); sin lotes, el de siempre
+    for (const s of segs) { s.veredaLado = {};
+      for (const side of [1, -1]) { const L = s.lots[side], peso = new Map(); let kind = null, best = 0;
+        for (const e of L) if (e.lot.vereda) peso.set(e.lot.vereda, (peso.get(e.lot.vereda) || 0) + (e.t1 - e.t0));
+        for (const [k, p] of peso) if (p > best) { best = p; kind = k; }
+        s.veredaLado[side] = kind; if (kind) for (const e of L) e.lot.vereda = kind; } }
     const lotAt = (x, y) => { const gx = (x * LR) | 0, gy = (y * LR) | 0; if (gx < 0 || gy < 0 || gx >= LW || gy >= LH) return null; const i = lotGrid[gy * LW + gx]; return i >= 0 ? lots[i] : null; };
     return { MW, MH, MG, dentro, segs, lots, districts, inters, classify, classifyInto, lotAt, wealthAt, near, raw, plazas, villaAt, zona, real: RM ? RM.nombre : null, carpeta: RM ? (RM.carpeta || "carabobo") : "barrio", estilo: (RM && RM.estilo) || {}, inicio: RM ? RM.inicio : null,
       arbolesReales: RM && RM.arboles ? { especies: RM.especies, lista: RM.arboles } : null, rotondas: ROTONDAS, pasto: PASTO };

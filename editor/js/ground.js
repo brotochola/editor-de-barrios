@@ -121,9 +121,9 @@ const Ground = (() => {
       let cant = s.cantero && dd < 1.0;
       if (cant) for (let i = 0; i < s.cross.length; i++) if (Math.abs(c.t - s.cross[i]) < 1.6) cant = false;
       if (cant) return grass(ix, iy, .2);
-      let kind = s.w < .3 ? "tierra" : "vain", dmg = s.w < .45;
-      const L = s.lots[sgn];
-      for (let i = 0; i < L.length; i++) { const e = L[i]; if (c.t >= e.t0 && c.t < e.t1) { kind = e.lot.vereda; if (kind === "vain_d") { kind = "vain"; dmg = true; } break; } }
+      // la vereda: la de ese lado de la cuadra, pareja (world.js: veredaLado), también donde no hay lote
+      let kind = s.veredaLado && s.veredaLado[sgn], dmg = false;
+      if (!kind) { kind = s.w < .3 ? "tierra" : "vain"; dmg = s.w < .45; } else if (kind === "vain_d") { kind = "vain"; dmg = true; }
       if (kind === "roja") kind = "gris";
       return tiles(c.t, dd, ix, iy, kind, dmg);
     }

@@ -11,8 +11,8 @@
 // Para cada rumbo en que se usa un diseño (una "variante"): qué se ve; para cada pieza su lugar, escala y skew (la cara
 // plana proyectada en la vista oblicua es un paralelogramo: escala + skewX + skewY la dibujan exacta), el tinte, hacia
 // dónde mira y la altura de su centro (con eso WeedJS la ilumina como una superficie: lighting.faces), el orden de pintor
-// dentro de la casa (innerZ) y la y de orden (la base de su pared o de la casa en su columna, subida lo justo para no quedar
-// detrás de una pieza de la casa que tapa).
+// dentro de la casa (innerZ) y la y de orden (en una pared, el punto del piso que tiene debajo; en lo demás, su borde de atrás sobre
+// el piso; subida lo justo para no quedar detrás de una pieza de la casa que tapa; las paredes van en columnas finas, ver PIE_MAX).
 const Caras = (() => {
   const { SF, K, SYN, CZ } = R3;
   const VIEW = R3.norm([-K, 1, -SYN / CZ]);
@@ -21,6 +21,8 @@ const Caras = (() => {
   // de una hoja y el anillo de un árbol, y el anillo de un accesorio), en las caras lisas desde BORDE_MIN de lado (10 px de
   // textura: le quedan 6 de color)
   const GROSOR = 2, BORDE_MIN = .35;
+  // lo que puede cambiar el pie de una pared lisa (px de pantalla) a lo ancho de una de sus columnas (ver el orden de las piezas)
+  const PIE_MAX = 8;
   const len = (v) => Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
   const rot = (c, s, v) => [c * v[0] - s * v[1], s * v[0] + c * v[1], v[2]];
   const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], sc3 = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
@@ -141,35 +143,30 @@ const Caras = (() => {
     }
     const rank = new Int32Array(n); orden.forEach((i, r) => rank[i] = r); return rank;
   }
-  // la base de la casa en pantalla: para cada x, la y más baja del borde de abajo de las cajas apoyadas en el piso
-  function base(casters, c, s) {
-    const quads = [];
-    for (const cs of casters) { if (cs.c[2] - cs.h[2] > .3) continue;
-      quads.push([[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => J(rot(c, s, [cs.c[0] + sx * cs.h[0] * cs.ax[0][0] + sy * cs.h[1] * cs.ax[1][0], cs.c[1] + sx * cs.h[0] * cs.ax[0][1] + sy * cs.h[1] * cs.ax[1][1], 0])))); }
-    let maxY = 0; for (const q of quads) for (const p of q) maxY = Math.max(maxY, p[1]);
-    return (x) => { let y = -Infinity;
-      for (const q of quads) for (let k = 0; k < 4; k++) { const a = q[k], b = q[(k + 1) & 3]; if ((x < a[0]) === (x < b[0])) continue;
-        y = Math.max(y, a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0])); }
-      return y > -Infinity ? y : maxY; };
-  }
-
   // ---------- todo el catálogo
   // entries: las claves del catálogo (cada una con su rumbo spec.a). Devuelve { piezas: [{nombre, T, x0, y0, w, h}],
   // variantes: { id: [[cuadro, dx, dy, sx, sy, kx, ky, tinte, sortDy, innerZ(, nx, ny, nz, z)], …] }, pies: { id: {foot, casters} } }
   function hornear(entries, DET, progreso = () => {}) {
     const TILE = Math.round(128 * DET), disenos = new Map(), texturas = new Map(), piezas = [], variantes = {}, pies = {}, ranurasDe = {};
     const st = { caras: 0, lisas: 0, material: 0, propias: 0, accesorios: 0 };
-    // una textura deduplicada, cortada en piezas de hasta TILE px (más 1 px de solape): su grilla de cuadros
-    function registrar(T, prefijo) {
-      const hsh = hash(T); let e = texturas.get(hsh); if (e) return e;
+    // una textura deduplicada, cortada en piezas de hasta cu × cv px (TILE, o columnas más finas en una pared que corre hacia el
+    // fondo: ver más abajo), más 1 px de solape: su grilla de cuadros
+    const hashDe = (T) => T.hsh ?? (T.hsh = hash(T));
+    function registrar(T, prefijo, cu = TILE, cv = TILE) {
+      const hsh = hashDe(T) + ":" + cu + "x" + cv; let e = texturas.get(hsh); if (e) return e;
       const id = texturas.size, grid = [];
-      for (let y0 = 0; y0 < T.h; y0 += TILE) for (let x0 = 0; x0 < T.w; x0 += TILE) {
-        const w = Math.min(T.w - x0, TILE + 1), h = Math.min(T.h - y0, TILE + 1);
+      for (let y0 = 0; y0 < T.h; y0 += cv) for (let x0 = 0; x0 < T.w; x0 += cu) {
+        const w = Math.min(T.w - x0, cu + 1), h = Math.min(T.h - y0, cv + 1);
         let algo = false; for (let y = y0; y < y0 + h && !algo; y++) for (let x = x0; x < x0 + w; x++) if (T.d[(y * T.w + x) * 4 + 3]) { algo = true; break; }
         if (!algo) continue;   // una pieza toda transparente no va (los huecos de un triángulo, de una reja)
-        const nombre = prefijo + id + "_" + (x0 / TILE) + "_" + (y0 / TILE); piezas.push({ nombre, T, x0, y0, w, h }); grid.push({ nombre, x0, y0, w, h }); }
+        const nombre = prefijo + id + "_" + (x0 / cu) + "_" + (y0 / cv); piezas.push({ nombre, T, x0, y0, w, h }); grid.push({ nombre, x0, y0, w, h }); }
       e = { id, w: T.w, h: T.h, grid }; texturas.set(hsh, e); return e;
     }
+    // el ancho de columna (texeles a lo largo de la pared) para que el pie no cambie más de PIE_MAX px de pantalla dentro de una
+    // pieza: TILE, o TILE/2, TILE/4… E: el borde horizontal de la pieza; n: sus texeles. Una textura se corta una sola vez (si no,
+    // va repetida al atlas): con la columna más fina que pida cualquiera de las variantes que la usan (cortes, por su hash y eje)
+    const cortes = new Map();
+    function columna(E, n) { const porTexel = Math.abs(J(E)[1]) / n; let c = TILE; while (c > 8 && c * porTexel > PIE_MAX) c = Math.ceil(c / 2); return c; }
     const BLANCO = { w: 8, h: 8, grid: [{ nombre: "_white", x0: 0, y0: 0, w: 8, h: 8 }] };
     // un accesorio: su sprite de R3 (iluminado, con contorno) por tipo y octavo de vuelta, y dónde cae su origen en él
     const sprites = new Map();
@@ -184,8 +181,10 @@ const Caras = (() => {
     const claveDiseno = (spec) => { const { a, ...resto } = spec; return JSON.stringify(resto); };
     Houses.setKit(true);
     try {
+    // primera pasada: las caras y piezas de cada variante, y el corte que pide cada textura de pared
+    const fase = [];
     entries.forEach((e, n) => {
-      if (n % 16 === 0) progreso(n / entries.length);
+      if (n % 16 === 0) progreso(n / entries.length * .3);
       const kd = claveDiseno(e.spec); let D = disenos.get(kd);
       if (!D) { const B3 = Barrio.build3D({ ...e.spec, a: 0 }), s = B3.sc;
         D = { faces: s.faces.filter(f => f.both || f.n[2] > -.5), casters: s.casters, acc: s.acc || [], tex: new Map(), puertas: B3.puertas || [], frenteY: B3.frenteY || 0 }; disenos.set(kd, D); }
@@ -196,6 +195,8 @@ const Caras = (() => {
         const F = { O: rot(c, s, F0.O), E1: rot(c, s, F0.E1), E2: rot(c, s, F0.E2), tri: F0.tri, n: n3 };
         const A = J(F.E1), B = J(F.E2); if (Math.hypot(A[0], A[1]) < .5 || Math.hypot(B[0], B[1]) < .5 || Math.abs(A[0] * B[1] - A[1] * B[0]) < 1) continue;   // de canto
         st.caras++; const sub = [];
+        // una pared que llega al piso: sus piezas se ordenan por el pie de su columna (y llevan grafitis: ranuras)
+        const zMin = Math.min(F.O[2], F.O[2] + F.E1[2], F.O[2] + F.E2[2], F.O[2] + F.E1[2] + F.E2[2]), pared = Math.abs(F.n[2]) < .1 && zMin <= .3;
         if (!F0.tex && !F0.tri) {
           // color liso: la textura blanca del motor, teñida con el color iluminado
           st.lisas++; const col = saturar(F0.col[0] * L[0], F0.col[1] * L[1], F0.col[2] * L[2]);
@@ -234,36 +235,64 @@ const Caras = (() => {
           const qn = Math.min(Math.abs(A2[0]) / la, Math.abs(B2[1]) / lb), qt = Math.min(Math.abs(B2[0]) / lb, Math.abs(A2[1]) / la);
           if (q.girable && qt > qn) { const k = "t:" + q.clave; let Tt = D.tex.get(k); if (!Tt) { Tt = transponer(q.T); D.tex.set(k, Tt); }
             q.O = add(q.O, q.E1); const e1 = q.E1; q.E1 = q.E2; q.E2 = sc3(e1, -1); q.T = Tt; q.trans = true; }
-          q.reg = registrar(q.T, "c"); }
+          // en una pared, columnas tan finas como haga falta para que cada pieza se ordene bien con lo que está al pie
+          if (pared) { const hor1 = Math.abs(q.E1[2]) <= Math.abs(q.E2[2]), k = hashDe(q.T) + (hor1 ? "u" : "v"), cu = hor1 ? columna(q.E1, q.T.w) : columna(q.E2, q.T.h);
+            q.corte = k; cortes.set(k, Math.min(cortes.get(k) ?? TILE, cu)); } }
         const el = elementoCara(F), idx = E.length; E.push(el);
-        const zMin = Math.min(F.O[2], F.O[2] + F.E1[2], F.O[2] + F.E2[2], F.O[2] + F.E1[2] + F.E2[2]), pared = Math.abs(F.n[2]) < .1 && zMin <= .3;
         for (const q of sub) items.push({ el: idx, q, pared, F });
         // una pared que llega al piso, lisa o con su dibujo, sin trasponer: candidata para grafitis (ranuras, más abajo)
         if (pared) { const q0 = sub.find(q => q.principal); if (q0 && !q0.trans) cands.push({ el: idx, q: q0, F, T: q0.reg === BLANCO ? null : q0.T, caja: el.caja }); }
       }
+      fase.push({ e, D, phi, c, s, E, items, cands });
+    });
+    // segunda pasada: cada textura al atlas (una vez, con su corte), los accesorios, el orden y lo demás de cada variante
+    fase.forEach(({ e, D, phi, c, s, E, items, cands }, n) => {
+      if (n % 16 === 0) progreso(.3 + .7 * n / fase.length);
+      for (const it of items) { const q = it.q; if (!q || q.reg) continue;
+        const k = q.corte, cu = k ? cortes.get(k) : TILE;
+        q.reg = !k ? registrar(q.T, "c") : k.endsWith("u") ? registrar(q.T, "c", cu, TILE) : registrar(q.T, "c", TILE, cu); }
       // ---- accesorios: un sprite cada uno, parado en su punto
       for (const a of D.acc) { const P = rot(c, s, [a.x, a.y, a.z]), oct = a.tipo === "tanque" || a.tipo === "maceta" ? 0 : ((Math.round(phi / (Math.PI / 4)) % 8) + 8) % 8;
         const sp = spriteAcc(a, oct), p = J(P), k = 1 / DET, x0 = p[0] - sp.ax * k, y0 = p[1] - sp.ay * k, w = sp.reg.w * k, h = sp.reg.h * k;
         const poli = [[x0, y0], [x0 + w, y0], [x0 + w, y0 + h], [x0, y0 + h]], dc = R3.dot(add(P, [0, 0, .5]), VIEW);
         st.accesorios++; const idx = E.length; E.push({ poli, caja: caja(poli), centro: dc, prof: () => dc });
-        items.push({ el: idx, acc: { sp, p } }); }
+        items.push({ el: idx, acc: { sp, p, P } }); }
       // ---- orden: innerZ por el orden de pintor; la y de orden de cada pieza, subida lo justo
-      const rank = ordenPintor(E), nE = E.length, baseX = base(D.casters, c, s), tiles = [];
+      const rank = ordenPintor(E), nE = E.length, tiles = [];
       for (const it of items) {
         const r = rank[it.el], iz = nE <= 250 ? r - 125 : Math.round(r * 250 / (nE - 1)) - 125;
-        if (it.acc) { const { sp, p } = it.acc, k = 1 / DET, x0 = p[0] - sp.ax * k, y0 = p[1] - sp.ay * k, w = sp.reg.w * k, h = sp.reg.h * k;
-          // el sprite del accesorio: el cuadro entero, anclado donde cae su origen, sin skew
+        if (it.acc) { const { sp, p, P } = it.acc, k = 1 / DET, x0 = p[0] - sp.ax * k, y0 = p[1] - sp.ay * k, w = sp.reg.w * k, h = sp.reg.h * k;
+          // el sprite del accesorio: el cuadro entero, anclado donde cae su origen, sin skew; se ordena por el punto del piso que tiene
+          // debajo (con el frente de la casa, uno de atrás hacía subir a las paredes que se pintan después: ver la y de orden)
           const g = sp.reg.grid[0]; if (sp.reg.grid.length !== 1) console.warn("accesorio en más de una pieza", g.nombre);
-          tiles.push({ rank: r, cuadro: g.nombre, p: [x0 + w / 2, y0 + h / 2], sx: k, sy: k, kx: 0, ky: 0, tn: 0xffffff, iz, objetivo: baseX(p[0]), poli: [[x0, y0], [x0 + w, y0], [x0 + w, y0 + h], [x0, y0 + h]] });
+          tiles.push({ rank: r, cuadro: g.nombre, p: [x0 + w / 2, y0 + h / 2], sx: k, sy: k, kx: 0, ky: 0, tn: 0xffffff, iz, objetivo: J([P[0], P[1], 0])[1], poli: [[x0, y0], [x0 + w, y0], [x0 + w, y0 + h], [x0, y0 + h]] });
           continue; }
         const q = it.q, T = q.reg, A = J(q.E1), B = J(q.E2), a = [A[0] / T.w, A[1] / T.w], b = [B[0] / T.h, B[1] / T.h];
         const sx = a[0], sy = b[1], kx = b[0] / b[1], ky = a[1] / a[0];
+        // una pared lisa (la textura blanca teñida) va en columnas: una pieza sola se ordena por el pie de su centro, y en una pared
+        // que corre hacia el fondo el pie sube o baja decenas de px de punta a punta (la gente parada al pie, adelante, quedaba
+        // tapada). Cada columna, de lo que el pie cambia a lo sumo PIE_MAX px de pantalla, se ordena por el pie de la suya
+        if (it.pared && T === BLANCO) {
+          const hor1 = Math.abs(q.E1[2]) <= Math.abs(q.E2[2]), Eh = hor1 ? q.E1 : q.E2, n = Math.max(1, Math.ceil(Math.abs(J(Eh)[1]) / PIE_MAX - 1e-6));
+          const e1 = hor1 ? sc3(q.E1, 1 / n) : q.E1, e2 = hor1 ? q.E2 : sc3(q.E2, 1 / n), A1 = J(e1), B1 = J(e2);
+          for (let k = 0; k < n; k++) {
+            const O = add(q.O, sc3(Eh, k / n)), P = add(O, add(sc3(e1, .5), sc3(e2, .5))), j0 = J(O);
+            // el pie de la columna: el punto del piso bajo su centro (la pared es vertical)
+            tiles.push({ rank: r, cuadro: "_white", p: J(P), sx: A1[0] / 8, sy: B1[1] / 8, kx: B1[0] / B1[1], ky: A1[1] / A1[0], tn: q.tinte, iz, objetivo: J([P[0], P[1], 0])[1], borde: !!q.borde, n: it.F.n, z: P[2], el: it.el,
+              uv: hor1 ? [k / n, 0, (k + 1) / n, 1] : [0, k / n, 1, (k + 1) / n], poli: [j0, [j0[0] + A1[0], j0[1] + A1[1]], [j0[0] + A1[0] + B1[0], j0[1] + A1[1] + B1[1]], [j0[0] + B1[0], j0[1] + B1[1]]] });
+          }
+          continue;
+        }
         for (const g of T.grid) {
           const cu = g.x0 + g.w / 2, cv = g.y0 + g.h / 2, P = add(q.O, add(sc3(q.E1, cu / T.w), sc3(q.E2, cv / T.h))), p = J(P);
-          let objetivo;
-          if (it.pared) { const F = it.F, d = sub3(P, F.O), L1 = len(F.E1), uu = Math.max(0, Math.min(1, (d[0] * F.E1[0] + d[1] * F.E1[1] + d[2] * F.E1[2]) / (L1 * L1))), Gp = add(F.O, add(sc3(F.E1, uu), F.E2)); objetivo = J([Gp[0], Gp[1], 0])[1]; }
-          else objetivo = baseX(p[0]);
           const q0 = add(q.O, add(sc3(q.E1, g.x0 / T.w), sc3(q.E2, g.y0 / T.h))), da = J(sc3(q.E1, g.w / T.w)), db = J(sc3(q.E2, g.h / T.h)), j0 = J(q0);
+          // la y de orden buscada: una pared, el punto del piso que tiene debajo (sus columnas son finas); lo que no es vertical (techos,
+          // tapas de muros, pisos), su borde de atrás sobre el piso: lo que va encima o adelante se pinta después y sube hasta ella (más
+          // abajo), así nunca empuja hacia adelante a lo que tiene al lado. (Con el frente de la casa, que era la de techos y pisos, o con
+          // su centro, una pieza de atrás o una tapa larga hacía subir a las paredes que se pintan después, y la gente parada al costado
+          // de una pared quedaba detrás)
+          const objetivo = Math.abs(it.F.n[2]) < .1 ? J([P[0], P[1], 0])[1] : Math.min(...[[0, 0], [1, 0], [0, 1], [1, 1]].map(([i, j]) => {
+            const C = add(q0, add(sc3(q.E1, i * g.w / T.w), sc3(q.E2, j * g.h / T.h))); return J([C[0], C[1], 0])[1]; }));
           tiles.push({ rank: r, cuadro: g.nombre, p, sx: g.nombre === "_white" ? A[0] / 8 : sx, sy: g.nombre === "_white" ? B[1] / 8 : sy, kx, ky, tn: q.tinte, iz, objetivo, borde: !!q.borde, n: it.F.n, z: P[2], el: it.el, g,
             poli: [j0, [j0[0] + da[0], j0[1] + da[1]], [j0[0] + da[0] + db[0], j0[1] + da[1] + db[1]], [j0[0] + db[0], j0[1] + db[1]]] });
         }
@@ -316,7 +345,7 @@ const Caras = (() => {
           const u = (i + .5) * CELDA, v = (j + .5) * CELDA; if (dentro4(t.poli, O[0] + a[0] * u + b[0] * v, O[1] + a[1] * u + b[1] * v)) { mask[m] = 0; hay--; } } }
       if (!hay) continue;
       const pz = []; for (const t of tiles) { if (t.el !== c.el || t.borde) continue;
-        pz.push(t.cuadro === "_white" ? [0, 0, Tw, Th, t.clave] : [t.g.x0, t.g.y0, t.g.x0 + t.g.w, t.g.y0 + t.g.h, t.clave]); }
+        pz.push(t.uv ? [t.uv[0] * Tw, t.uv[1] * Th, t.uv[2] * Tw, t.uv[3] * Th, t.clave] : t.cuadro === "_white" ? [0, 0, Tw, Th, t.clave] : [t.g.x0, t.g.y0, t.g.x0 + t.g.w, t.g.y0 + t.g.h, t.clave]); }
       out.push({ O, a, b, Tw, Th, nx, ny, mask, pz, iz, n: c.F.n.map(v => Math.round(v * 100) / 100), O3: q.O, E1: q.E1, E2: q.E2, L: len(q.E1) });
     }
     return out;

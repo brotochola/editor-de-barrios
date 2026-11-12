@@ -6,9 +6,10 @@
 //   - grafitis grandes (9 dibujos, cada uno en 6 colores): el mismo dibujo no se repite a menos de LEJOS_MISMO m, y el mismo dibujo con
 //     el mismo color, a menos de LEJOS_IGUAL; entre los que se pueden, el menos usado. Unos más gastados que otros (alfa);
 //   - firmas: de 2 a 4 letras sueltas, juntas, de un color (el tinte del juego sobre la letra blanca);
-//   - carteles pegados: de 1 a 4, distintos y en cualquier orden.
-// Cuántos: según el lugar (más en lo pobre, en tapiales y paredones) y el knob «grafitis». Todo sale de la posición de la casa (no
-// del sorteo del barrio), así el resto no cambia.
+//   - carteles pegados: de 1 a 4, distintos y en cualquier orden;
+//   - enredaderas en su espaldera: paradas en el piso contra la pared, quietas (una por pared, a lo sumo).
+// Cuántos: según el lugar (grafitis: más en lo pobre, en tapiales y paredones; enredaderas: más en lo de más plata) y los knobs
+// «grafitis» y «plantas». Todo sale de la posición de la casa (no del sorteo del barrio), así el resto no cambia.
 const Paredes = (() => {
   const TONOS = 6, LEJOS_MISMO = 45, LEJOS_IGUAL = 160, CELDA = 40;
   const FIRMA = [[44, 44, 50], [44, 44, 50], [44, 44, 50], [200, 48, 56], [56, 88, 196], [206, 210, 218], [58, 156, 84], [236, 204, 64], [214, 92, 168]];
@@ -17,7 +18,7 @@ const Paredes = (() => {
 
   // F: los cuadros del editor (los grafitis llevan f.hd.img y f.hd.grafiti); C: los knobs; L: la luz de una superficie plana al sol (caras.js)
   function nuevo(F, C, L) {
-    const K = C.grafitis ?? 1, G = OBJETOS.grafitis, usos = new Map(), grilla = new Map(), usados = new Set(); let n = 0;
+    const K = C.grafitis ?? 1, KE = C.plantas ?? 1, G = OBJETOS.grafitis, usos = new Map(), grilla = new Map(), usados = new Set(); let n = 0;
     const dim = (nm) => F[nm].hd;
     const tinteL = (c, k = 1) => hex(c.map(v => v * L * k));
     // lo que ya se puso cerca (x, y en m): clave → lista de [x, y]
@@ -74,13 +75,33 @@ const Paredes = (() => {
       for (const [c, du, d] of elegidos) out.push(pieza(s, c, pos[0] + du, pos[1] + 1 + ((rng() * 3) | 0), d.w, d.h, tinteL([255, 255, 255], .82 + rng() * .18), .85 + rng() * .15, out.length));
       return true; }
 
+    // la enredadera en su espaldera: parada en el piso contra la pared (el pie en la base de la pared), donde todo lo que tapa está
+    // libre (las celdas de menos de 0,25 m no se miran: no se marcan)
+    function enredadera(s, libre, rng, out) {
+      if (!G.enredaderas || !G.enredaderas.length) return false;
+      const C4 = Caras.CELDA, nm = G.enredaderas[(rng() * G.enredaderas.length) | 0], d = dim(nm), cw = Math.ceil(d.w / C4) + 1;
+      if (cw > s.nx || d.h > s.Th) return false;
+      const v0 = s.E2[2] < 0 ? s.Th - d.h : 0, j0 = Math.floor(v0 / C4), j1 = Math.min(s.ny - 1, Math.floor((v0 + d.h - 1) / C4));
+      const zf = (j) => s.O3[2] + s.E2[2] * (j + .5) * C4 / s.Th;
+      for (let intento = 0; intento < 10; intento++) {
+        const i0 = (rng() * (s.nx - cw + 1)) | 0; let ok = true;
+        for (let j = j0; j <= j1 && ok; j++) { if (zf(j) < .25) continue; for (let i = i0; i < i0 + cw; i++) if (!libre[j * s.nx + i]) { ok = false; break; } }
+        if (!ok) continue;
+        for (let j = j0; j <= j1; j++) for (let i = i0; i < i0 + cw; i++) libre[j * s.nx + i] = 0;
+        out.push(pieza(s, nm, Math.round(i0 * C4 + (cw * C4 - d.w) / 2), v0, d.w, d.h, tinteL([255, 255, 255]), 1, out.length));
+        return true; }
+      return false; }
+
     // las piezas de una casa: ranuras (de caras.js, de su variante), dónde está (m), qué es (spec.t) y la riqueza del lugar
     function poner(ranuras, x, y, tipo, riqueza) {
-      if (!ranuras || !ranuras.length || K <= 0 || tipo === "poste") return null;
+      if (!ranuras || !ranuras.length || (K <= 0 && KE <= 0) || tipo === "poste") return null;
       const rng = R3.rng((Math.imul(Math.round(x * 10), 0x27d4eb2d) ^ Math.imul(Math.round(y * 10), 0x165667b1) ^ 0x5eed6a11) >>> 0);
       const largo = tipo === "paredon" || tipo === "tapial", p = Math.min(1, K * (largo ? .85 : riqueza < .35 ? .75 : riqueza < .6 ? .55 : .3)), out = [];
+      const pe = Math.min(1, KE * (riqueza < .3 ? .06 : riqueza < .6 ? .14 : .2));
       for (const s of ranuras) {
         const max = largo ? Math.max(1, Math.floor(s.L / 5)) : s.L > 8 ? 2 : 1; let libre = null;
+        // primero la enredadera (va abajo, contra el piso), después los grafitis en lo que quede libre
+        if (rng() < pe) { libre = s.mask.slice(); enredadera(s, libre, rng, out); }
         // dónde queda esta pared (m, más o menos: el pie de su centro), para no repetir cerca
         const xs = x + (s.O[0] + s.a[0] * s.Tw / 2) / R3.SF, ys = y - (s.O[1] + s.b[1] * s.Th) / (R3.SYN * R3.SF);
         for (let k = 0; k < max; k++) { if (rng() >= p) continue;

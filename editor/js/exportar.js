@@ -432,8 +432,9 @@ const Exportar = (() => {
         const id = (k) => cand[k] ? cand[k][3]._gid + 1 : 0, a = id(0), b = id(1), c = id(2);
         cellA[o] = a & 255; cellA[o + 1] = a >> 8; cellA[o + 2] = b & 255; cellA[o + 3] = b >> 8; cellB[o] = c & 255; cellB[o + 1] = c >> 8;
         W.classifyInto(x, y, cl);
-        if (cl.k === 2) { const sgn = cl.ds >= 0 ? 1 : -1, s = cl.s; let kind = s.w < .3 ? "tierra" : "vain", dmg = s.w < .45;
-          for (const e of s.lots[sgn]) if (cl.t >= e.t0 && cl.t < e.t1) { kind = e.lot.vereda; if (kind === "vain_d") { kind = "vain"; dmg = true; } break; }
+        // la vereda: la de ese lado de la cuadra, pareja (world.js: veredaLado), también donde no hay lote
+        if (cl.k === 2) { const sgn = cl.ds >= 0 ? 1 : -1, s = cl.s; let kind = s.veredaLado && s.veredaLado[sgn], dmg = false;
+          if (!kind) { kind = s.w < .3 ? "tierra" : "vain"; dmg = s.w < .45; } else if (kind === "vain_d") { kind = "vain"; dmg = true; }
           cellB[o + 2] = (VER[kind] || 2) | (dmg ? 16 : 0); }
         // patio: el piso del lote (baldosa, cemento…) sólo en los primeros 13 m desde el frente (la casa y su patio); más al fondo,
         // pasto (tierra en los barrios pobres), como el fondo de las manzanas de Buenos Aires

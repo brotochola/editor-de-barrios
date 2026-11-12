@@ -247,7 +247,7 @@ export class Arbol extends GameObject {
       if (p[5] === 0 && (!S || TEX)) { this.setSprite('arboles', p[0], 0); this.spriteRenderer.anchorX = fl > 0 ? p[3] : 1 - p[3]; this.spriteRenderer.anchorY = p[4]; this.setScale(E * fl, E); continue; }
       // las ramas de adelante (y su follaje) se ordenan casi 3 m más cerca de la cámara que el tronco: la copa está arriba y se
       // abre hacia adelante, así tapa la mesa o el banco que está debajo (si no, la silla salía encima de las hojas)
-      this.addDecoration('arboles_' + p[0], p[1] * fl, p[2], E * fl, E, p[5], { anchorX: p[3], anchorY: p[4], sway: !!p[6], swayAmplitude: .022 + rng() * .02, swayFrequency: .45 + rng() * .4, sortOffsetY: p[5] > 0 ? COPA_ADELANTE : 0 });
+      this.addDecoration('arboles_' + p[0], p[1] * fl, p[2], E * fl, E, p[5], { anchorX: p[3], anchorY: p[4], sway: !!p[6], swayAmplitude: .01 + rng() * .01, swayFrequency: .4 + rng() * .3, sortOffsetY: p[5] > 0 ? COPA_ADELANTE : 0 });
     }
   }
 }
@@ -350,10 +350,9 @@ const _huella = [0, 0];
 // donde toca el piso y no tapa a los árboles y a la gente que tiene adelante
 const _apoyo = new Map();
 function apoyoDe(sheet) { let t = _apoyo.get(sheet); if (t === undefined) { t = APOYO[sheet.slice(5)] || null; _apoyo.set(sheet, t); } return t; }
-// los faros: la luz del propio auto, corrida hacia adelante (LightEmitter.offsetX gira con el auto), y dos brillos pegados al
-// auto, con las entidades: delante de la carrocería si el auto mira hacia la cámara, detrás si le da la espalda, y tapados
-// por lo que tenga delante (casas, árboles)
-const LUZ_FARO = 0xfff0d0, FARO_ADELANTE = 18;   // px delante del frente de la huella
+// los faros: la luz del propio auto, en el frente de su huella (LightEmitter.offsetX gira con el auto). No más adelante: lo que
+// está al costado del auto quedaba detrás de la luz, y su sombra caía hacia atrás. Sin brillos
+const LUZ_FARO = 0xfff0d0;
 // las caras de las casas traen del editor hacia dónde miran y a qué altura están, y WeedJS las ilumina como superficies
 // (lighting.faces): un farol alumbra la pared que lo mira y no la de atrás, y el sol cada cara según su ángulo.
 // ?caras=0: sin esto, para medir lo que cuesta
@@ -380,11 +379,10 @@ export class Auto extends GameObject {
     const [sh, sk] = altoAuto(c.hoja);
     this.volumeShadowCaster.setBox(A.ha * 2, A.hb * 2, sh, { topScale: sk, floorScaleY: AUTO_S });
     const L = this.lightEmitter; A.faros = c.faros ? 1 : 0;
-    if (c.faros) {   // los dos brillos son las decoraciones 0 y 1 del auto (_frame las pone en los faros, y corre la luz)
-      L.lightColor = LUZ_FARO; L.height = 0; L.hasGlowSprite = 0; L.lightIntensity = c.i || 700; L.offsetX = A.hl + FARO_ADELANTE; L.offsetY = 0; L.active = 1;
-      if (RAYCAST) this.collider.visualRange = alcanceLuz(L.lightIntensity) + A.hl + FARO_ADELANTE;   // la luz está corrida adelante
-      for (let k = 0; k < 2; k++) this.addDecoration('_lightGradient', 0, 0, .18, .18, 1, { tint: LUZ_FARO, alpha: .9, anchorX: .5, anchorY: .5, offsetY: -8 });
-      luzNace(this, 2, .9, .9);   // los faros se prenden a su hora, con sus dos brillos
+    if (c.faros) {   // _frame corre la luz al frente de la huella cuando el auto gira
+      L.lightColor = LUZ_FARO; L.height = 0; L.hasGlowSprite = 0; L.lightIntensity = c.i || 700; L.offsetX = A.hl; L.offsetY = 0; L.active = 1;
+      if (RAYCAST) this.collider.visualRange = alcanceLuz(L.lightIntensity) + A.hl;   // la luz está en el frente
+      luzNace(this, 0, 0, 0);   // los faros se prenden a su hora
     } else { L.lightIntensity = 0; L.offsetX = 0; L.offsetY = 0; L.active = 0; this.luzHora.base = 0; }
     this._frame();
   }
@@ -411,14 +409,11 @@ export class Auto extends GameObject {
     let best = 0, bd = -2; for (let k = 0; k < ks.length; k++) { const d = c * ks[k].c + s * ks[k].s; if (d > bd) { bd = d; best = k; } }
     if (last !== best) { AutoComp.lastKey[i] = best; const k = ks[best]; this.setAnimation(k.n); this.flipX = k.f === 1;
       const ap = apoyoDe(SpriteSheetRegistry.getSpritesheetName(sid) || ''); this.spriteRenderer.anchorY = (ap && ap[k.n]) || .5;
-      // el colisionador, a la medida de la huella con este rumbo; los brillos de los faros, en el frente de la huella
+      // el colisionador, a la medida de la huella con este rumbo; la luz de los faros, en el frente de la huella
       const [L, W] = huellaAuto(AutoComp, i, k.c, k.s, _huella);
       if (Math.abs(L * .5 - AutoComp.hl[i]) > .5 || Math.abs(W * .5 - AutoComp.hw[i]) > .5) { this.collider.width = L; this.collider.height = W; AutoComp.hl[i] = L * .5; AutoComp.hw[i] = W * .5; }
-      if (AutoComp.faros[i]) { LightEmitter.offsetX[i] = L * .5 + FARO_ADELANTE;   // la luz, delante del frente de la huella
-        // el brillo se ordena en la línea de pie del auto (el borde de abajo de su dibujo) más sortOffsetY: si el frente mira
-        // hacia la cámara, encima de la carrocería; si no, un largo más atrás, debajo de ella (de espaldas no se ven los faros)
-        const atras = k.s < -.25 ? -L : 0;
-        if (this.getAttachedDecorationCount() >= 2) for (let q = 0; q < 2; q++) { const d = this.getAttachedDecoration(q); if (d) { d.localX = L * .5 - 2; d.localY = (q ? .3 : -.3) * W; d.sortOffsetY = atras; } } } }
+      if (AutoComp.faros[i]) LightEmitter.offsetX[i] = L * .5;   // la luz, en el frente de la huella
+    }
   }
   tick() { const i = this.index; if (!Transform.active[i]) return; this._friction(); this._frame(); luzHora(this); }
 }
@@ -728,7 +723,7 @@ export class ConurbanoScene extends Scene {
         // la planta de una maceta (p.o: px sobre el pie de la maceta) se dibuja subida, sobre la tierra, y se ordena justo delante de la maceta
         const o = p.o || 0;
         Decoration.spawn({ x: p.x, y: p.y - o, texture: 'props_' + p.f, anchorX: a[0], anchorY: a[1], scaleX: p.fl ? -e : e, scaleY: e, sortOffsetY: o ? o + .05 : 0,
-          ...(mece ? { swaySkew: 1, swayAmplitude: .05 + rng() * .05, swayFrequency: .5 + rng() * .6 } : {}),
+          ...(mece ? { swaySkew: 1, swayAmplitude: .02 + rng() * .02, swayFrequency: .45 + rng() * .4 } : {}),
           ...(p.f.startsWith('gd_') ? { layer: 'manchas' } : {}) }); }   // manchas y roturas: pegadas al piso, debajo de todo
     }
     const ash = META.anclas.sh_tree;
