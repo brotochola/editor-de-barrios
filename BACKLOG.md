@@ -70,7 +70,7 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 - [ ] **Veredas y calles más anchas** — hecho (2bfae69). Knob `ancho` (1,5): multiplica calzadas y veredas (también las
   de un barrio real y la calzada de la rotonda). La franja de pasto junto al cordón mide un tercio de la vereda (entre 1 y
   2,2 m; antes 1 m fijo). Parque Chas: 3379 casas (antes 4140; las manzanas quedaron más chicas).
-- [ ] **Gente caminando por la calzada de la rotonda** — hecho (HASH_ROT). La grilla de costos de los peatones marcaba vereda todo
+- [ ] **Gente caminando por la calzada de la rotonda** — hecho (bf17c6f). La grilla de costos de los peatones marcaba vereda todo
   lo que estaba a menos de hw + sw de una calle, sin mirar la rotonda: el anillo de la calzada contaba como vereda (barato, y un lugar
   donde aparecía gente). Ahora el anillo es calzada (se cruza como una calle) y en la isla de la fuente no camina nadie.
 - [ ] **Calles parejas** — hecho (f00925d). Un solo material por calle (asfalto, asfalto roto, adoquín, tierra), el
