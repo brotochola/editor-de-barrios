@@ -111,13 +111,13 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 
 ## Imágenes y atlas
 
-- [ ] **Ordenar las imágenes; repo limpio** — hecho (HASH_HOJAS). Cada pack de `arte/objetos` es una hoja con su JSON en
+- [ ] **Ordenar las imágenes; repo limpio** — hecho (fffa219). Cada pack de `arte/objetos` es una hoja con su JSON en
   `img/objetos/` (`herramientas/hojas.js`; 19 packs y `viejos`, lo que queda de la hoja vieja del editor: carteles, piletas,
   pizarras, el semáforo y las sombras). La escena carga esas hojas enteras y WeedJS arma el bigAtlas al cargar: ya no se hornea
   (`hornear_atlas.js` y las carpetas `atlas/` de los barrios, fuera). El editor sólo arma lo del barrio: caras, árboles, piso y
   la hoja de grafitis de las paredes (`img/grafitis`). `META.props` dice la hoja, el cuadro, el ancla, la escala y si se mece de
   cada objeto (antes, `META.anclas` y `META.escalas` y una hoja `img/props` por barrio).
-- [ ] **Fuera los objetos de Gemini** — hecho (HASH_HOJAS). Se borraron sus dibujos (`arte/gemini`, `hd_props`, el .rar) y las
+- [ ] **Fuera los objetos de Gemini** — hecho (fffa219). Se borraron sus dibujos (`arte/gemini`, `hd_props`, el .rar) y las
   herramientas que los limpiaban y achicaban (`achicar.py`, `armar_hd.py`, `pixelar.py`, `variantes.py`, `fuente_mosaico.py`,
   `variantes.html`). Quedan las piezas de fachada (`arte/fachadas`, con las hojas originales en `arte/fachadas/gemini`); su hoja
   la arma ahora `herramientas/hojas.js` (salió igual pixel por pixel). Las grillas de autos para Gemini pasaron a
@@ -135,7 +135,7 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 - [ ] **Un solo formato** — pendiente. El editor exporta y la escena lee un único formato, sin compatibilidad hacia atrás ni
   caminos de repuesto: fuera las casas en franjas (knob `skew`, `w.franjas`, hojas `casas*`), los flowfields en `.json`
   (knob `ffBinario`, `META.ffExt`) y el número de `formato`. Las lámparas de los faroles de Gemini (`LAMPARAS`) ya se fueron
-  (HASH_HOJAS). Los tres barrios ya están en lo nuevo (caras con skew, `.bin`).
+  (fffa219). Los tres barrios ya están en lo nuevo (caras con skew, `.bin`).
 
 ## Una sola escena: la del demo de WeedJS
 
@@ -154,5 +154,5 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 
 ## Barrios y rama
 
-- [ ] **Reexportar el barrio inventado y Carabobo** — hecho (HASH_HOJAS): los tres barrios, reexportados juntos.
+- [ ] **Reexportar el barrio inventado y Carabobo** — hecho (fffa219): los tres barrios, reexportados juntos.
 - [x] **Rama `objetos-zip`** — mergeada a main el 12/11 (sin subir a GitHub).
