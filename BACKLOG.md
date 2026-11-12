@@ -51,8 +51,14 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 - [ ] **Casas de la rotonda: huecos y paredes «de papel»** — hecho (2bfae69). Entre el techo y la pared quedaba una rayita (el triángulo
   compartido de los techos, ahora más fino y pasado de la diagonal) y las paredes no tenían espesor (ahora llevan tapa arriba y el
   parapeto corrido hacia adentro).
-- [ ] **La fuente tira agua** — pendiente. La fuente de la rotonda tira agua hacia arriba, un metro más o menos, con
-  `ParticleEmitter`.
+- [ ] **La fuente tira agua** — hecho (HASH_FUENTE). Un chorro de gotas que sube de 0,8 a 1,15 m sobre el pico y cae en la taza de
+  arriba, con gravedad de verdad (45 gotas por segundo, sin importar los fps). Partículas de GPU (`ParticleEmitter.emitGpu`, capa
+  `agua`) que tira una entidad `Chorro` por fuente. El editor dice de dónde sale y adónde cae (`chorro` en `objetos.js`,
+  `META.fuentes`), así sirve para cualquier dibujo de fuente. Las de las plazas también tiran.
+- [ ] **Partículas de GPU entre las entidades** — motor. Con `sortWithEntities: true` la capa del agua no dibujaba nada (ni lo que
+  queda por encima de la fuente); sin eso, sí (bundle fa59073a, Chromium sin placa). Hoy el agua va encima de las entidades: el
+  chorro está a más de 3 m y lo que pasa por delante no llega a taparlo, pero un árbol delante de la fuente de una plaza no
+  taparía las gotas. Pedirlo en WeedJS con una escena chica que lo muestre.
 
 ## Piso
 
@@ -136,6 +142,10 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   caminos de repuesto: fuera las casas en franjas (knob `skew`, `w.franjas`, hojas `casas*`), los flowfields en `.json`
   (knob `ffBinario`, `META.ffExt`) y el número de `formato`. Las lámparas de los faroles de Gemini (`LAMPARAS`) ya se fueron
   (fffa219). Los tres barrios ya están en lo nuevo (caras con skew, `.bin`).
+  - Las franjas: charlar antes de sacarlas (el dueño, 12/11). Lo que hacían (una persona pegada a una pared se ordena bien)
+    hoy lo hacen las caras: cada pared que llega al piso va en columnas donde el pie cambia 8 px como mucho (`PIE_MAX`), cada
+    una con su `sortOffsetY` en su base. Sacar las franjas es sacar el camino viejo (casa horneada por rumbo y cortada en
+    franjas colgadas de la `Casa`), que ningún barrio usa.
 
 ## Una sola escena: la del demo de WeedJS
 

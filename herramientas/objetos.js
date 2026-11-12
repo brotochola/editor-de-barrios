@@ -97,8 +97,9 @@ lista('SILLON', 'z_', ['makeshift_furnitureset_1_22', 'makeshift_furnitureset_33
 lista('BANCO', 'z_', ['makeshift_furnitureset_258_322']);
 lista('COLCHON', 'z_', ['shelter_furniture_32x32_420_242', 'shelter_furniture_32x32_456_100']);
 lista('TENDEDERO', 'z_', ['messy_exterior_32x32_161_75', 'messy_exterior_32x32_97_75', 'decor_27_354']);
-// la fuente de la rotonda (Parque Chas): más grande que los demás dibujos (e: la escala a la que se muestra), para que llene la isla
-lista('FUENTE', 'z_', ['fuente_01_0_0'], { e: .9 });
+// la fuente de la rotonda (Parque Chas): más grande que los demás dibujos (e: la escala a la que se muestra), para que llene la isla.
+// chorro: de dónde sale el agua (x, y del pico) y adónde cae (y del agua de la taza de arriba), en px del dibujo; el juego tira gotas
+lista('FUENTE', 'z_', ['fuente_01_0_0'], { e: .9, chorro: [32, 1, 10] });
 lista('TAMBOR', 'z_', ['postapoc_workshop_70_161', 'postapoc_workshop_71_194', 'shelter_furniture_32x32_71_449', 'shelter_furniture_32x32_71_481', ...['102_0', '198_0', '294_0', '6_0'].map(s => gp('oilbarrel_' + s))]);
 // el farol de hierro: apagado de día, prendido de noche (el juego cambia el cuadro a la hora de su luz). luz: dónde está la lámpara (px del dibujo)
 FR.u_farol_hierro = { ...arch('faroles_02_0_0'), luz: [[9, 20]], on: 'u_farol_hierro_on' };

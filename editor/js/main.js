@@ -17,7 +17,7 @@
       const hojas = {}; for (const o of Object.values(OBJETOS.frames)) hojas[o.hoja] ||= loadImg(OBJETOS.hojas + o.hoja + ".png");
       for (const k in hojas) hojas[k] = await hojas[k];
       for (const [n, o] of Object.entries(OBJETOS.frames)) { const e = o.e || OBJETOS.escala, img = hojas[o.hoja];
-        const hd = { img, x: o.x, y: o.y, w: o.w, h: o.h, ox: o.ox, oy: o.oy, e, zip: true, hoja: o.hoja, cuadro: o.cuadro, mece: o.mece, tierra: o.tierra, luz: o.luz, on: o.on, grafiti: o.grafiti };
+        const hd = { img, x: o.x, y: o.y, w: o.w, h: o.h, ox: o.ox, oy: o.oy, e, zip: true, hoja: o.hoja, cuadro: o.cuadro, mece: o.mece, tierra: o.tierra, luz: o.luz, on: o.on, chorro: o.chorro, grafiti: o.grafiti };
         if (o.grafiti) { ASSETS.frames[n] = { x: 0, y: 0, w: 0, h: 0, ox: 0, oy: 0, hd }; continue; }
         const w = Math.ceil(o.w * e), hh = Math.ceil(o.h * e); if (x + w > 2048) { x = 0; y += rowH + 2; rowH = 0; }
         g.drawImage(img, o.x, o.y, o.w, o.h, x, y, o.w * e, o.h * e);

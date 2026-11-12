@@ -112,7 +112,9 @@ nombres de ciudades europeas (Berlín, Ginebra, La Haya, Londres, Cádiz…), y 
 - **Casas:** bajas, de los años 30 a 60: casas de una y dos plantas y PH, algún chalet y casi sin comercio adentro (los locales van
   sobre las avenidas). Un 28 % de las casas tiene techo de tejas (`estilo.tejas`); las tejas son un material compartido del horneado
   con skew, como los techos planos y la chapa.
-- **La esquina de seis:** una rotonda con una fuente en el medio (la de `arte/objetos`). Los autos le dan la vuelta en sentido antihorario y cada uno elige por qué calle sale.
+- **La esquina de seis:** una rotonda con una fuente en el medio (la de `arte/objetos`), que tira un chorro de un metro: gotas que
+  caen en la taza de arriba, partículas de GPU que tira una entidad `Chorro` (el editor dice de dónde sale y adónde cae cada dibujo de
+  fuente: `chorro` en `herramientas/objetos.js`, `META.fuentes`). Los autos le dan la vuelta en sentido antihorario y cada uno elige por qué calle sale.
 - **Las seis esquinas de la fuente, copiadas a mano** de la foto 360° desde la fuente (Hernán Apaza, 2018) y de las fotos de Google
   Maps (`ESQUINAS` en `osm_real.py`, `Houses.chas`): cada una con la planta de la esquina (la ochava frente a la fuente) y su edificio.
   Victorica y Gándara: la Pizzería Keops (roja, tres plantas, cartel amarillo con las pirámides); Gándara y Ávalos al este: ladrillo

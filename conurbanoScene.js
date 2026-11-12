@@ -20,7 +20,8 @@ const META = BARRIOS[DIR] || BARRIOS[Object.keys(BARRIOS)[0]];
 const BARRIO = new URL('./' + DIR + '/', import.meta.url).href;
 
 const { Scene, GameObject, Component, SharedResource, RigidBody, Collider, CollisionListener, SpriteRenderer, VolumeShadowCaster, Transform,
-  Camera, Keyboard, Mouse, NavGrid, Layer, LAYER_KIND, BLEND_MODES, SpriteSheetRegistry, LightEmitter, LightOccluder, ShadowCaster, Sun, enums, rng, dot2 } = WEED;
+  Camera, Keyboard, Mouse, NavGrid, Layer, LAYER_KIND, BLEND_MODES, SpriteSheetRegistry, LightEmitter, LightOccluder, ShadowCaster, Sun, enums, rng, dot2,
+  ParticleEmitter, PARTICLE_EASE } = WEED;
 // todas las luces del barrio: blanco amarillento de ciudad (~3000 K)
 const LUZ = 0xffdcaa;
 // la luz de la noche (lighting.sun.night): una luna azulada que WeedJS suma a la luz de la escena cuando el sol baja de 0,4
@@ -242,6 +243,33 @@ export class Prop extends GameObject {
     luzHora(this);
     // el farol con cuadro prendido: el vidrio se ve encendido mientras su luz está prendida
     if (this._fOn) { const on = LuzHora.on[this.index] === 1 ? 1 : 0; if (on !== this._prendido) { this._prendido = on; const P = on ? this._fOn : this._fOff; this.setSprite(P.h, P.c, 0); } }
+  }
+}
+
+// el chorro de una fuente (META.fuentes: de dónde sale y adónde cae): gotas que suben un metro sobre el pico y caen en la taza de
+// arriba. Son partículas de GPU (nadie las lee: no chocan ni tocan el piso), en la capa agua
+const KZ_AGUA = META.CZ * META.SF, G_AGUA = 9.8 * KZ_AGUA / 3600;   // px de altura por metro; la gravedad, en px por cuadro²
+const VZ_AGUA = [-Math.sqrt(2 * G_AGUA * 1.15 * KZ_AGUA), -Math.sqrt(2 * G_AGUA * .8 * KZ_AGUA)];   // sube de 0,8 a 1,15 m
+const GOTAS_SEG = 45, TANDA_MS = 100;   // gotas por segundo, sin importar los fps; una tanda cada 100 ms, repartida en ese rato
+export class Chorro extends GameObject {
+  static isStatic = true;
+  static components = [];
+  onSpawned(c = {}) {
+    this._ms = 0;   // ms desde la última tanda (entero)
+    // cuánto vive una gota: lo que tarda en volver a la altura del agua de la taza (z(t) = z0 + vz·t + g·t²/2)
+    const baja = (c.z - c.t) * KZ_AGUA, vida = (vz) => (-vz + Math.sqrt(vz * vz + 2 * G_AGUA * baja)) / G_AGUA * 1000 / 60;
+    // un solo objeto de configuración por fuente: tirar una tanda no crea basura
+    this._tanda = {
+      layer: 'agua', heighted: true, count: 0, x: { min: this.x - 1, max: this.x + 1 }, y: this.y, z: -c.z * KZ_AGUA,
+      vx: { min: -.12, max: .12 }, vy: { min: -.06, max: .06 }, vz: { min: VZ_AGUA[0], max: VZ_AGUA[1] }, gravity: G_AGUA,
+      delay: { min: 0, max: 0 }, lifespan: { min: vida(VZ_AGUA[1]), max: vida(VZ_AGUA[0]) }, texture: '_whiteCircle',
+      scale: { from: .32, to: .26 }, alpha: { from: .95, to: .55, ease: PARTICLE_EASE.QUAD_IN }, tint: { from: 0xeef9ff, to: 0xa6daf0 },
+    };
+  }
+  tick(dtRatio, dt) {
+    this._ms = (this._ms + Math.round(dt)) | 0; if (this._ms < TANDA_MS) return;
+    const T = this._tanda; T.count = Math.round(this._ms * GOTAS_SEG / 1000); T.delay.max = this._ms; this._ms = 0;
+    ParticleEmitter.emitGpu(T);
   }
 }
 
@@ -709,6 +737,9 @@ export class ConurbanoScene extends Scene {
       // intensidad 0,143 a 1 con 0,857
       sombras: { zIndex: 1.6, ySorting: false, maxItems: Math.max(3000, META.nProps + META.nArboles), alphaBySun: { from: .143, to: .857 } },
       cables: { zIndex: 3.5, ySorting: false, maxItems: Math.max(4000, META.nCables + 500) },
+      // el agua de las fuentes (Chorro): partículas de GPU, encima de las entidades (el chorro está a más de 3 m: lo que pasa por
+      // delante no llega a taparlo); sólo los hilos de lógica las tiran. Con sortWithEntities no se dibujaban (BACKLOG, motor)
+      agua: { kind: LAYER_KIND.GPU_PARTICLES, zIndex: 3.4, maxParticles: 4096, gpuRings: { main: 0, logic: 1, particle: 0 }, pixelSnap: true },
       // aditivas de verdad (WeedJS compone las capas de sprites con shader.containerBlend, no con blendMode)
       brillos: { zIndex: 5.5, blendMode: BLEND_MODES.ADD, shader: { containerBlend: BLEND_MODES.ADD }, ySorting: false, maxItems: 1000 },
       // brillos de las lámparas de los faroles (los de los faros van con las entidades)
@@ -725,7 +756,7 @@ export class ConurbanoScene extends Scene {
     [Transito, { grid: { type: Uint16Array, length: Math.max(1, TR.W * TR.H) }, cruces: { type: Float32Array, length: Math.max(6, TR.n * 6) } }],
     [Semaforos, { ids: { type: Int32Array, length: Math.max(4, (TR.nSem || 0) * 4) } }],
   ];
-  static entities = [[Casa, META.nCasas + 8], [Arbol, META.nArboles + 8], [Prop, META.nProps + 64], [Persona, GENTE_MAX], [AutoIA, Math.max(8, META.nAutos)], [AutoEstacionado, Math.max(8, META.nAutos)], [Chatarra, 64], [AutoJugador, 1]];
+  static entities = [[Casa, META.nCasas + 8], [Arbol, META.nArboles + 8], [Prop, META.nProps + 64], [Persona, GENTE_MAX], [AutoIA, Math.max(8, META.nAutos)], [AutoEstacionado, Math.max(8, META.nAutos)], [Chatarra, 64], [AutoJugador, 1], [Chorro, 8]];
 
   // los faroles cuya lámpara queda detrás de una casa: la lámpara (a la altura del farol) cae dentro del
   // dibujo de la casa (la envolvente de su planta y de sus puntos de sombra subidos a su altura) y el pie del farol está más
@@ -808,6 +839,7 @@ export class ConurbanoScene extends Scene {
       if (p.r > 0) {
         let sk = -1; if (p.f === 'u_semaforo' && p.cr >= 0 && this._sem.length < (TR.nSem || 0)) { sk = this._sem.length; this._sem.push({ cid: p.cr, eje: p.ej, sk, f: -1 }); }
         Prop.spawn({ x: p.x, y: p.y, f: p.f, r: p.r, fl: p.fl, sk, tp: tapadas.has(p) ? 1 : 0 });
+        const F = META.fuentes[p.f]; if (F) Chorro.spawn({ x: p.x + (p.fl ? -F.dx : F.dx), y: p.y, z: F.z, t: F.t });
       }
       else {
         const P = META.props[p.f], a = P.a, e = P.e || 1, mece = !!P.m;   // plantas que se mecen (skew: la base queda fija)

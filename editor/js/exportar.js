@@ -273,7 +273,8 @@ const Exportar = (() => {
     // escala si no es 1 y si se mece. El ancla va en el centro de la base: el juego pone ahí el collider (un círculo de radio cr·13,5 px)
     // y ordena por ahí; lo que choca tiene de fondo por lo menos su collider (el centro de la base queda cr·SYN·SF px de juego por encima
     // del borde de abajo). Un farol: dónde están sus lámparas (fracción del cuadro), a qué altura (m) y su cuadro prendido
-    const propsMeta = {}, lamparas = {}; let semAlto = 0;
+    // Una fuente: de dónde sale el chorro (dx, px de mundo desde el ancla) y a qué altura (z, m) está el pico y el agua de la taza (t, m)
+    const propsMeta = {}, lamparas = {}, fuentes = {}; let semAlto = 0;
     { const usados = new Set(); for (const p of props) { usados.add(p.f); if (p.sh) usados.add(p.sh); } ["sh_person", "sh_car_h", "sh_tree"].forEach(n => F[n] && usados.add(n));
       for (const n of [...usados]) { const f = F[n].hd; if (f && f.on && F[f.on]) usados.add(f.on); }
       const crDe = {}; propsB.forEach((e, i) => { if (e.cr > 0) { const f = props[i].f; crDe[f] = Math.max(crDe[f] || 0, e.cr); } });
@@ -282,6 +283,7 @@ const Exportar = (() => {
         const oy = crDe[n] ? Math.min(f.oy, f.h - 1 - crDe[n] * SYN * SF / f.e) : f.oy;
         propsMeta[n] = { h: f.hoja, c: f.cuadro, a: [r4(f.ox / f.w), r4(oy / f.h)], ...(f.e !== 1 ? { e: f.e } : {}), ...(f.mece ? { m: 1 } : {}) };
         if (f.luz) lamparas[n] = { l: f.luz.map(([lx, ly]) => [r4(lx / f.w), r4(ly / f.h)]), z: r2((oy - f.luz[0][1]) * f.e / (CZ * SF)), ...(f.on ? { on: f.on } : {}) };
+        if (f.chorro) { const [cx, cy, ty] = f.chorro; fuentes[n] = { dx: r2((cx - f.ox) * f.e), z: r2((oy - cy) * f.e / (CZ * SF)), t: r2((oy - ty) * f.e / (CZ * SF)) }; }
         if (n === "u_semaforo") semAlto = r1(oy * f.e); } }
     // los grafitis de las paredes (paredes.js): ya en su tono y saturados, en su hoja (img/grafitis), que también carga el juego
     if (PAR) { const cs = PAR.cuadros().sort((a, b) => b[1].height - a[1].height || (a[0] < b[0] ? -1 : 1)); let x = 0, y = 0, rowH = 0; const pos = {};
@@ -399,7 +401,7 @@ const Exportar = (() => {
     const meta = { formato: 1, escalaCasas: Math.round(1 / DET * 1e5) / 1e5, editor: "editor de barrios · Conurbano", fecha: new Date().toISOString(), seed: B.SEED, knobs: { ...C },
       MW, MH, MG: W.MG || 0, WW, WH, SF, K, SYN, CZ, GC, CW, CH: CHh, WG: WGc, HG: HGc, PW: PWc, PH: PHc, NS, CELL, PXM: 13.5, pisoPartes: offs,
       hojasCasas: hojas.length, peatones: targets.length, ...(C.ffBinario ? { ffExt: FF_EXT } : {}), nCasas: casas.length, nSombraPts, nFranjas, nPiezas, skew: SKEW ? 1 : 0, hojasCaras, nTiles, nArboles: arboles.length,
-      nPiezasArboles: arboles.reduce((a, t) => a + arbolTipos[t.t].piezas.length, 0), nProps: props.length, nAutos: autos.length, nCables: cables.length, nLineas: lineas.length, props: propsMeta, lamparas, nGrafitis: PAR ? PAR.n : 0,
+      nPiezasArboles: arboles.reduce((a, t) => a + arbolTipos[t.t].piezas.length, 0), nProps: props.length, nAutos: autos.length, nCables: cables.length, nLineas: lineas.length, props: propsMeta, lamparas, fuentes, nGrafitis: PAR ? PAR.n : 0,
       ...(W.inicio ? { inicio: PW(W.inicio[0], W.inicio[1]).map(v => Math.round(v)), lugar: W.real } : {}),
       // rotondas: centro en px de pantalla (x, y) y en m (mx, my), radios de la isla y de la calzada (m) y las salidas: rumbo de cada
       // calle hacia afuera (m) y el corrimiento de su carril de salida (m, a la derecha)
