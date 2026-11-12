@@ -152,7 +152,7 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 
 - [ ] **Un solo formato** — en curso. El editor exporta y la escena lee un único formato, sin compatibilidad hacia atrás ni
   caminos de repuesto. Hecho: los flowfields siempre en `.bin` (fuera el knob `ffBinario`, `META.ffExt` y el repuesto `.json`) y
-  fuera el número de `formato` (HASH_FF); las lámparas de los faroles de Gemini (`LAMPARAS`) (fffa219). Falta: las casas en
+  fuera el número de `formato` (0f39cb4); las lámparas de los faroles de Gemini (`LAMPARAS`) (fffa219). Falta: las casas en
   franjas (knob `skew`, `w.franjas`, hojas `casas*`), después de charlarlo.
   - Las franjas: charlar antes de sacarlas (el dueño, 12/11). Lo que hacían (una persona pegada a una pared se ordena bien)
     hoy lo hacen las caras: cada pared que llega al piso va en columnas donde el pie cambia 8 px como mucho (`PIE_MAX`), cada
