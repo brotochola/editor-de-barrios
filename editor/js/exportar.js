@@ -180,7 +180,7 @@ const Exportar = (() => {
       // textura 0, que es _empty, transparente, y no se veían)
       for (const id in H.variantes) variantes[id] = H.variantes[id].map(t => { const n = t[0] === "_white" ? "_white" : nombreDe[t[0]];
         if (!n) throw new Error("pieza de cara sin cuadro: " + t[0]); return [n, ...t.slice(1)]; });
-      console.log("caras:", H.nDisenos, "diseños,", H.nTexturas, "texturas,", H.piezas.length, "piezas en", hojasCaras, "hojas,", Object.keys(variantes).length, "variantes");
+      console.log("caras:", H.nDisenos, "diseños,", H.nTexturas, "texturas,", H.piezas.length, "piezas en", hojasCaras, "hojas,", Object.keys(variantes).length, "variantes", JSON.stringify(H.st));
       // ---------- 2'. instancias: el origen de la casa (de ahí cuelgan las piezas), el pie (la entidad), colisionador y sombra
       for (const o of B.objs) {
         const V = H.pies[o.e.id], [ox, oy] = PW(o.x0, o.y0), [fx, fy] = PW(o.x0 + V.foot[0], o.y0 + V.foot[1]);

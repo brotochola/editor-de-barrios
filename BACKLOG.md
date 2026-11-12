@@ -131,10 +131,21 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 - [ ] **Plazas sin juegos ni bancos de Gemini** — pendiente. Con los objetos de Gemini se fueron los juegos (hamacas, tobogán,
   subibaja, calesita), el monumento, la glorieta, el bebedero, el ping-pong, el ajedrez y las manchas del piso; los packs de
   `arte/objetos` no traen nada de eso. Se podrían armar en 3D en el editor, como los postes (`Houses.poste`), u otro pack.
-- [ ] **Atlas de las caras con mucho repetido** — pendiente. Cada pared es una textura propia aunque sea casi la misma (ladrillo,
-  revoque, con su ruido, sus manchas y sus ventanas pintadas), y cada techo guarda su material en su propia medida. Reusar
-  pedazos: paredes con una baldosa de material compartida (como los techos) y ventanas, puertas y carteles como piezas aparte,
-  también compartidas; techos con una sola baldosa por material, repetida.
+- [ ] **Atlas de las caras con mucho repetido** — hecho (HASH_CARAS). Las paredes de material (revoque, ladrillo, ladrillo hueco,
+  salpicré, hormigón, piedra) salen de una baldosa compartida que se repite; el revoque, gris, teñido del color de cada pared. Al
+  hornear: el fondo en recortes de la baldosa (con las manchas horneadas), y lo dibujado encima (ventanas, puertas, carteles,
+  zócalos) en recuadros con sólo eso, compartidos; una pieza igual a otra va una sola vez.
+
+  | | Atlas de caras | PNG | Piezas de casas |
+  |---|---|---|---|
+  | Parque Chas | 12,9 → 7,8 Mpx | 20,7 → 7,0 MB | 232 → 353 mil |
+  | Carabobo | 9,6 → 6,2 Mpx | 15,4 → 6,2 MB | 236 → 341 mil |
+  | Inventado | 10,1 → 6,6 Mpx | 15,5 → 6,1 MB | 55 → 77 mil |
+
+  El costo: un 40-50 % más de piezas (lo dibujado va aparte, y el borde de los costados). Pendiente si hace falta: medir qué le
+  cuestan al juego esas piezas de más (memoria, carga, cuadro) en un aparato de verdad; los techos todavía guardan un recorte por
+  medida (de medio metro en medio metro). Una decoración que repita su textura (tiling, como los sprites) haría innecesarios los
+  recortes: sería un pedido a WeedJS.
 
 ## Formato
 

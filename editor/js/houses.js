@@ -106,7 +106,7 @@ const Houses = (() => {
   // encima se dibuja en el juego con esa baldosa, compartida entre todas las casas (t.mat, t.limpia).
   let KIT = false; const MATS = new Map();
   const TEJAS = [[182, 84, 54], [170, 96, 64], [150, 72, 50]];   // colores de teja francesa
-  function setKit(v) { KIT = !!v; }
+  function setKit(v) { KIT = !!v; Tex.kit = KIT ? { fondo: fondoKit, capa: capaKit } : null; }
   const hashD = (d) => { let a = 0x811c9dc5; for (let i = 0; i < d.length; i++) a = Math.imul(a ^ (d[i] | 0), 16777619); return a >>> 0; };
   function baldosa(key, tw, th, make) { key += "@" + R3.DET; let m = MATS.get(key); if (!m) { m = { key, tw, th, tex: make(tw, th) }; MATS.set(key, m); } return m; }
   // una textura W × H hecha con la baldosa repetida: lo que se ve en el editor; la cara limpia la arma el exportador
@@ -116,6 +116,72 @@ const Houses = (() => {
       t.d[i] = b.d[j]; t.d[i + 1] = b.d[j + 1]; t.d[i + 2] = b.d[j + 2]; t.d[i + 3] = b.d[j + 3]; }
     t.mat = m; t.limpia = hashD(t.d); return t;
   }
+  // paredes de material compartido (modo kit): el revoque, el ladrillo, el ladrillo hueco, el salpicré, el hormigón y la piedra de una
+  // pared salen de una baldosa que se repite desde la esquina de arriba a la izquierda de la textura, la misma para todas las paredes
+  // (la de revoque, salpicré y hormigón, en gris: por el color de cada pared). Las manchas que corren y la humedad no se pintan: se
+  // anotan (t.capas). caras.js arma la pared con recortes de la baldosa, las manchas y lo dibujado encima (ventanas, puertas, carteles,
+  // zócalos) como piezas compartidas. Lo chico (de menos de 1 m × 0,5 m) se pinta como siempre
+  const MUROS = new Map();
+  // una baldosa: { key, w, h (texeles), d (RGB por texel: el factor de cada canal si es gris, si no el color), gris, prom, max }
+  function muroDe(tipo, a, b) {
+    const gris = tipo === "stucco" || tipo === "salpicre" || tipo === "concrete", DET = R3.DET;
+    const key = tipo + (tipo === "brick" ? ":" + a.map(Math.round).join(",") : tipo === "concrete" ? ":" + Math.round(b * 4) / 4 : "") + "@" + DET;
+    let m = MUROS.get(key); if (m) return m;
+    let sem = 0x51ed27; for (let i = 0; i < key.length; i++) sem = Math.imul(sem ^ key.charCodeAt(i), 16777619);
+    const r = rng(sem >>> 0), W0 = px(6), H0 = px(3.6), V = R3.vnoiseCiclico;
+    let w = W0, h = H0, d;
+    const cada = (f) => { d = new Float32Array(w * h * 3); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const c = f(x, y, y * w + x), o = (y * w + x) * 3; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; } };
+    if (tipo === "stucco") {   // Tex.stucco sin el degradé de arriba abajo ni las chorreaduras (ésas van aparte: runoff)
+      const n1 = V(w, h, 14, r), n2 = V(w, h, 3, r), hue = V(w, h, 22, r);
+      cada((x, y, k) => { const t = Math.min(1, Math.max(0, (hue[k] - .35) * 1.6)) * .6, f = 1 + 0.035 * (n1[k] - .5) + 0.06 * (n2[k] - .5) + 0.05 * (r() - .5);
+        return [f * (1 + .05 * t), f * (1 - .02 * t), f * (1 - .1 * t)]; });
+    } else if (tipo === "salpicre") cada(() => { const v = r(), f = v < .12 ? .82 : v > .9 ? 1.1 : .96 + .06 * r(); return [f, f, f]; });
+    else if (tipo === "concrete") { const n = V(w, h, 5, r), g = V(w, h, 8, r), wear = Math.round(b * 4) / 4;
+      cada((x, y, k) => { const f = (1 + 0.08 * (n[k] - .5) + 0.06 * (r() - .5)) * (1 - Math.min(.14, Math.max(0, (g[k] - .5) * .4 * wear))); return [f, f, f]; }); }
+    else if (tipo === "brick") { const course = Math.max(3, Math.round(3 * DET)), blen = Math.max(8, Math.round(8 * DET)), mortar = [198, 186, 164];
+      w = blen * Math.max(1, Math.round(W0 / blen)); h = 2 * course * Math.max(1, Math.round(H0 / (2 * course))); const nb = w / blen;
+      cada((x, y) => { const row = (y / course) | 0, off = (row % 2) * (blen >> 1), mm = (y % course) === course - 1 || ((x + off) % blen) === 0;
+        if (mm) return mul(mortar, 0.9 + 0.12 * r());
+        const bid = row * 7919 + ((((x + off) / blen) | 0) % nb) * 104729, v = (Math.sin(bid * 0.001234) * 43758.5453) % 1, vv = v < 0 ? v + 1 : v;
+        return mul(a, (0.8 + 0.34 * vv) * ((y % course) === 0 ? 1.08 : 1) * (0.97 + 0.06 * r())); }); }
+    else if (tipo === "hueco") { const CH = Math.max(5, Math.round(5 * DET)), CL = Math.max(12, Math.round(12 * DET)), hy0 = Math.round(CH * .25), hy1 = Math.round(CH * .6), step = Math.max(3, Math.round(3 * DET));
+      w = CL * Math.max(1, Math.round(W0 / CL)); h = 2 * CH * Math.max(1, Math.round(H0 / (2 * CH))); const nb = w / CL;
+      cada((x, y) => { const row = (y / CH) | 0, off = (row % 2) * (CL >> 1), ly = y % CH, lx = (x + off) % CL;
+        if ((ly === CH - 1 || lx === 0) && r() < 0.92) return mul([168, 162, 150], 0.85 + 0.25 * r());
+        const bid = row * 7919 + ((((x + off) / CL) | 0) % nb) * 104729, v0 = (Math.sin(bid * 0.00731) * 9341.53) % 1, v = v0 < 0 ? v0 + 1 : v0;
+        let c = mul([214, 124, 82], 0.82 + 0.28 * v);
+        if (ly >= hy0 && ly <= hy1 && lx % step === step - 1 && lx > 1 && lx < CL - 1) c = mul(c, 0.52);
+        if (ly === 0) c = mul(c, 1.08);
+        if (ly === 0 && r() < 0.12) c = [176, 170, 158];
+        return c; }); }
+    else {   // piedra Mar del Plata (Tex.piedra), con las lajas en una grilla que da la vuelta
+      const S = Math.max(4, Math.round(6 * DET)), SV = S * .8, gw = Math.max(2, Math.round(W0 / S)), gh = Math.max(2, Math.round(H0 / SV));
+      w = gw * S; h = Math.round(gh * SV); const tonos = [[204, 178, 132], [184, 156, 112], [214, 196, 158], [168, 140, 100], [196, 170, 140], [150, 134, 112]], pts = [];
+      for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) pts.push([(i - .5 + r()) * S, (j - .5 + r() * .9) * SV, r.pick(tonos), .9 + .2 * r()]);
+      cada((x, y) => { const gi = Math.floor(x / S), gj = Math.floor(y / SV); let d1 = 1e9, d2 = 1e9, best = null;
+        for (let j = gj - 1; j <= gj + 2; j++) for (let i = gi - 1; i <= gi + 2; i++) { const ii = ((i % gw) + gw) % gw, jj = ((j % gh) + gh) % gh, q = pts[jj * gw + ii];
+          const px0 = q[0] + Math.floor(i / gw) * w, py0 = q[1] + Math.floor(j / gh) * h, dd = (px0 - x) ** 2 + (py0 - y) ** 2;
+          if (dd < d1) { d2 = d1; d1 = dd; best = q; } else if (dd < d2) d2 = dd; }
+        const edge = Math.sqrt(d2) - Math.sqrt(d1); let c = mul(best[2], best[3] * (.94 + .1 * r()));
+        if (edge < 1.1) c = mul(c, .5); else if (edge < 2.1) c = mul(c, .82);
+        return c; }); }
+    let p0 = 0, p1 = 0, p2 = 0, mx = 0; for (let i = 0; i < d.length; i += 3) { p0 += d[i]; p1 += d[i + 1]; p2 += d[i + 2]; mx = Math.max(mx, d[i], d[i + 1], d[i + 2]); }
+    const n = d.length / 3; m = { key, w, h, d, gris, prom: [p0 / n, p1 / n, p2 / n], max: mx }; MUROS.set(key, m); return m;
+  }
+  function fondoKit(t, tipo, a, b, y0, y1) {
+    y0 = Math.max(0, y0 | 0); y1 = Math.min(t.h, y1 | 0);
+    if (!KIT || t.w < px(1) || y1 - y0 < px(.5)) return false;
+    const m = muroDe(tipo, a, b), col = m.gris ? a : null;
+    for (let y = y0; y < y1; y++) { const fila = (y % m.h) * m.w;
+      for (let x = 0; x < t.w; x++) { const j = (fila + x % m.w) * 3, i = (y * t.w + x) * 4;
+        if (col) { t.d[i] = col[0] * m.d[j]; t.d[i + 1] = col[1] * m.d[j + 1]; t.d[i + 2] = col[2] * m.d[j + 2]; }
+        else { t.d[i] = m.d[j]; t.d[i + 1] = m.d[j + 1]; t.d[i + 2] = m.d[j + 2]; }
+        t.d[i + 3] = 255; } }
+    (t.fondo || (t.fondo = [])).push({ m, col: col ? col.slice() : null, y0, y1 });
+    return true;
+  }
+  // las manchas de una pared de material compartido: se anotan (caras.js las pone encima como piezas compartidas)
+  function capaKit(t, tipo, a, b) { if (!KIT || !t.fondo) return false; (t.capas || (t.capas = [])).push([tipo, a, b, 0]); return true; }
   const acc = (sc, a) => { (sc.acc || (sc.acc = [])).push(a); };
   // un accesorio solo, en el origen, para dibujarlo como sprite (caras.js)
   function accesorio(a, phi) { const sc = new Scene(); sc.setXform(phi); const k = KIT; KIT = false;

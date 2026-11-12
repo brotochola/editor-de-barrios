@@ -43,7 +43,7 @@ function sinFecha(nombre, b) {
   // cambian arboles.png y props.png (miles de píxeles de borde, casi todos por poco)
   const b = await playwright().chromium.launch({ headless: !hay('con-ventana'), args: ['--mute-audio', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
   const ctx = await b.newContext({ viewport: { width: 1280, height: 760 } }), p = await ctx.newPage();
-  const errores = []; p.on('pageerror', e => errores.push(String(e))); p.on('console', m => { if (m.type() === 'error') errores.push(m.text()); });
+  const errores = []; p.on('pageerror', e => errores.push(String(e))); p.on('console', m => { if (m.type() === 'error') errores.push(m.text()); else if (m.text().startsWith('caras:')) console.log(m.text()); });
   await ctx.addInitScript((k) => localStorage.setItem('editor_barrios_cfg', k), JSON.stringify(meta.knobs));
   await p.goto(`${URL0}/editor/index.html?semilla=${meta.seed}`);
   await p.waitForFunction(() => window.__ready || document.getElementById('err')?.textContent, null, { timeout: 300000 });

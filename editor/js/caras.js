@@ -7,7 +7,12 @@
 //   - las baldosas de material (techos): una por material, compartida por todas las casas, en piezas de hasta 6 m;
 //   - los accesorios (tanque, aire, antena, maceta): un sprite de R3 cada uno, compartido (los que tienen frente, por
 //     octavo de vuelta);
-//   - las caras de color liso no van: se dibujan con la textura blanca del motor (_white) teñida.
+//   - las caras de color liso no van: se dibujan con la textura blanca del motor (_white) teñida;
+//   - las paredes de material (revoque, ladrillo, ladrillo hueco, salpicré, hormigón, piedra: houses.js, modo kit) no van enteras:
+//     su fondo son recortes de una baldosa compartida (la de revoque, gris, teñida del color de la pared), con las manchas (las que
+//     corren desde arriba, la humedad y la sombra del piso) horneadas, y lo dibujado encima (ventanas, puertas, carteles, zócalos,
+//     pintadas) va en recuadros con sólo eso, compartidos entre las casas que lo repiten;
+//   - una pieza igual a otra (los mismos pixeles) va una sola vez.
 // Para cada rumbo en que se usa un diseño (una "variante"): qué se ve; para cada pieza su lugar, escala y skew (la cara
 // plana proyectada en la vista oblicua es un paralelogramo: escala + skewX + skewY la dibujan exacta), el tinte, hacia
 // dónde mira y la altura de su centro (con eso WeedJS la ilumina como una superficie: lighting.faces), el orden de pintor
@@ -98,6 +103,59 @@ const Caras = (() => {
       mask[j * nx + i] = malos <= 1 ? 1 : 0; }
     m = { nx, ny, mask }; LIBRE.set(T, m); return m;
   }
+  // ---------- paredes de material compartido (t.fondo de houses.js): lo dibujado encima de la baldosa (lo que no es lo que la baldosa
+  // puso en ese texel) en recuadros, cada uno una textura con sólo lo dibujado (saturado y por G; la humedad y la sombra del piso se
+  // hornean después). null si la textura tiene agujeros (va como antes)
+  function descomponer(T) {
+    const { w, h, d } = T, fila = new Array(h).fill(null), dib = new Uint8Array(w * h);
+    for (const R of T.fondo) for (let y = R.y0; y < R.y1; y++) fila[y] = R;
+    for (let y = 0; y < h; y++) { const R = fila[y];
+      for (let x = 0; x < w; x++) { const i = (y * w + x) * 4; if (d[i + 3] < 128) return null;
+        if (!R) { dib[y * w + x] = 1; continue; }
+        const m = R.m, j = (((y + (R.dy || 0)) % m.h) * m.w + x % m.w) * 3, c = R.col;
+        const e0 = c ? c[0] * m.d[j] : m.d[j], e1 = c ? c[1] * m.d[j + 1] : m.d[j + 1], e2 = c ? c[2] * m.d[j + 2] : m.d[j + 2];
+        if (Math.abs(d[i] - e0) > .5 || Math.abs(d[i + 1] - e1) > .5 || Math.abs(d[i + 2] - e2) > .5) dib[y * w + x] = 1; } }
+    // las celdas de CELDA texeles con algo dibujado, juntas por vecindad (8 vecinos); de cada grupo, el recuadro justo de lo dibujado;
+    // los recuadros que se pisan, juntos
+    const nx = Math.ceil(w / CELDA), ny = Math.ceil(h / CELDA), marca = new Uint8Array(nx * ny);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (dib[y * w + x]) marca[((y / CELDA) | 0) * nx + ((x / CELDA) | 0)] = 1;
+    const visto = new Uint8Array(nx * ny); let cajas = [];
+    for (let k = 0; k < nx * ny; k++) { if (!marca[k] || visto[k]) continue;
+      let i0 = 1e9, j0 = 1e9, i1 = -1, j1 = -1; const pila = [k]; visto[k] = 1;
+      while (pila.length) { const q = pila.pop(), i = q % nx, j = (q / nx) | 0; if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j;
+        for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const a = i + di, b = j + dj; if (a < 0 || b < 0 || a >= nx || b >= ny) continue;
+          const p = b * nx + a; if (marca[p] && !visto[p]) { visto[p] = 1; pila.push(p); } } }
+      let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+      for (let y = j0 * CELDA; y < Math.min(h, (j1 + 1) * CELDA); y++) for (let x = i0 * CELDA; x < Math.min(w, (i1 + 1) * CELDA); x++)
+        if (dib[y * w + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      cajas.push([x0, y0, x1 + 1, y1 + 1]); }
+    for (let junte = true; junte;) { junte = false;
+      for (let a = 0; a < cajas.length && !junte; a++) for (let b = a + 1; b < cajas.length; b++) { const A = cajas[a], B = cajas[b];
+        if (A[0] < B[2] && B[0] < A[2] && A[1] < B[3] && B[1] < A[3]) { cajas[a] = [Math.min(A[0], B[0]), Math.min(A[1], B[1]), Math.max(A[2], B[2]), Math.max(A[3], B[3])]; cajas.splice(b, 1); junte = true; break; } } }
+    const piezas = cajas.map(([x0, y0, x1, y1]) => { const bw = x1 - x0, bh = y1 - y0, o = new Uint8ClampedArray(bw * bh * 4);
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { if (!dib[y * w + x]) continue;
+        const i = (y * w + x) * 4, c = saturar(d[i], d[i + 1], d[i + 2]), k = ((y - y0) * bw + x - x0) * 4; o[k] = c[0] * G; o[k + 1] = c[1] * G; o[k + 2] = c[2] * G; o[k + 3] = 255; }
+      return { T: { w: bw, h: bh, d: o }, x0, y0, w: bw, h: bh }; });
+    return { piezas };
+  }
+  // un recorte de una baldosa de pared (wq × hq m, desde la esquina): la gris, normalizada (el color lo pone el tinte de la pieza:
+  // saturar(color)·L·max); la de color, saturada y por G, como un techo. bandas: las manchas que le tocan, [B, fila0, fila1] (las filas
+  // de la tira que caen de arriba a abajo del recorte), horneadas (oscurecer por 1 − alfa; a lo largo, la tira empieza en el recorte)
+  function recorteMuro(m, wq, hq, bandas = []) {
+    const w = Math.max(1, Math.min(m.w, Math.round(wq * R3.TD))), h = Math.max(1, Math.min(m.h, Math.round(hq * R3.TD))), d = new Uint8ClampedArray(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const j = (y * m.w + x) * 3, o = (y * w + x) * 4;
+      let f = 1; for (const [B, f0, f1] of bandas) { const br = Math.floor(f0 + (y + .5) / h * (f1 - f0)); if (br >= 0 && br < B.h) f *= 1 - B.d[(br * B.w + x % B.w) * 4 + 3] / 255; }
+      if (m.gris) { d[o] = m.d[j] / m.max * 255 * f; d[o + 1] = m.d[j + 1] / m.max * 255 * f; d[o + 2] = m.d[j + 2] / m.max * 255 * f; }
+      else { const c = saturar(m.d[j], m.d[j + 1], m.d[j + 2]); d[o] = c[0] * G * f; d[o + 1] = c[1] * G * f; d[o + 2] = c[2] * G * f; }
+      d[o + 3] = 255; }
+    return { w, h, d };
+  }
+  // las manchas de una cara de textura propia (una pared de material que no se pudo partir): pintadas en ella, como antes
+  function aplicarCapas(T) {
+    if (!T.capas || T.capasHechas) return; const k = R3.Tex.kit; R3.Tex.kit = null;
+    try { for (const [tipo, a, b] of T.capas) { if (tipo === "runoff") T.runoff(a, b); else if (tipo === "humidity") T.humidity(a); } } finally { R3.Tex.kit = k; }
+    T.capasHechas = true;
+  }
   const dentro4 = (P, x, y) => { let s = 0; for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length], c = (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]);
     if (Math.abs(c) < 1e-9) continue; if (!s) s = Math.sign(c); else if (Math.sign(c) !== s) return false; } return true; };
 
@@ -146,10 +204,16 @@ const Caras = (() => {
   // variantes: { id: [[cuadro, dx, dy, sx, sy, kx, ky, tinte, sortDy, innerZ(, nx, ny, nz, z)], …] }, pies: { id: {foot, casters} } }
   function hornear(entries, DET, progreso = () => {}) {
     const TILE = Math.round(128 * DET), disenos = new Map(), texturas = new Map(), piezas = [], variantes = {}, pies = {}, ranurasDe = {};
-    const st = { caras: 0, lisas: 0, material: 0, propias: 0, accesorios: 0 };
+    const st = { caras: 0, lisas: 0, material: 0, compartidas: 0, propias: 0, accesorios: 0, repetidas: 0 };
     // una textura deduplicada, cortada en piezas de hasta cu × cv px (TILE, o columnas más finas en una pared que corre hacia el
     // fondo: ver más abajo), más 1 px de solape: su grilla de cuadros
     const hashDe = (T) => T.hsh ?? (T.hsh = hash(T));
+    // una pieza igual a otra (los mismos pixeles, de otra textura o de otro lugar de la misma) usa su cuadro: va al atlas una vez
+    const porContenido = new Map();
+    function hashPieza(T, x0, y0, w, h) { let a = 0x811c9dc5 ^ w, b = 0x9e3779b9 ^ h;
+      for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) { const i = (y * T.w + x) * 4, v = T.d[i] | T.d[i + 1] << 8 | T.d[i + 2] << 16 | T.d[i + 3] << 24;
+        a = Math.imul(a ^ v, 16777619); b = Math.imul(b ^ (v >>> 3), 2246822519); }
+      return (a >>> 0).toString(36) + "." + (b >>> 0).toString(36) + "." + w + "x" + h; }
     function registrar(T, prefijo, cu = TILE, cv = TILE) {
       const hsh = hashDe(T) + ":" + cu + "x" + cv; let e = texturas.get(hsh); if (e) return e;
       const id = texturas.size, grid = [];
@@ -157,9 +221,34 @@ const Caras = (() => {
         const w = Math.min(T.w - x0, cu + 1), h = Math.min(T.h - y0, cv + 1);
         let algo = false; for (let y = y0; y < y0 + h && !algo; y++) for (let x = x0; x < x0 + w; x++) if (T.d[(y * T.w + x) * 4 + 3]) { algo = true; break; }
         if (!algo) continue;   // una pieza toda transparente no va (los huecos de un triángulo, de una reja)
-        const nombre = prefijo + id + "_" + (x0 / cu) + "_" + (y0 / cv); piezas.push({ nombre, T, x0, y0, w, h }); grid.push({ nombre, x0, y0, w, h }); }
+        const hp = hashPieza(T, x0, y0, w, h); let nombre = porContenido.get(hp);
+        if (!nombre) { nombre = prefijo + id + "_" + (x0 / cu) + "_" + (y0 / cv); piezas.push({ nombre, T, x0, y0, w, h }); porContenido.set(hp, nombre); } else st.repetidas++;
+        grid.push({ nombre, x0, y0, w, h }); }
       e = { id, w: T.w, h: T.h, grid }; texturas.set(hsh, e); return e;
     }
+    // las manchas de las paredes de material compartido, en tiras de BANDA_W m que se repiten a lo largo: el alfa de cuánto oscurecen
+    // (oscurecer por f es tapar con negro de alfa 1 − f). Arriba, las que corren desde el borde (Tex.runoff); abajo, la humedad
+    // (Tex.humidity) y la sombra del piso (la de textura(): 20 % al pie, nada a 0,7 m). Se hornean en los recortes del fondo y, la de
+    // abajo, también en lo dibujado
+    const BANDA_W = 4, BANDAS = new Map();
+    function banda(key, hm, alfa) { let B = BANDAS.get(key); if (B) return B;
+      const w = Math.round(BANDA_W * R3.TD), h = Math.max(1, Math.round(hm * R3.TD)), d = new Uint8ClampedArray(w * h * 4), a = alfa(w, h);
+      for (let k = 0; k < w * h; k++) d[k * 4 + 3] = Math.round(Math.min(1, Math.max(0, a[k])) * 255);
+      B = { key, w, h, d, hm: h / R3.TD }; BANDAS.set(key, B); return B; }
+    const runoffBanda = (depth, amt) => { const dq = Math.max(.1, Math.round(depth * 10) / 10), aq = Math.round(amt * 5) / 5;
+      return banda("r:" + dq + ":" + aq, 1.5 * dq, (w, h) => { const hh = dq * R3.TD, st = R3.vnoiseCiclico(w, 1, 2, R3.rng(0x2b5e + Math.round(dq * 10))), a = new Float32Array(w * h);
+        for (let x = 0; x < w; x++) { const Lx = hh * (0.3 + st[x] * 1.2); for (let y = 0; y < Math.min(h, Lx); y++) a[y * w + x] = .13 * aq * (1 - y / Lx); }
+        return a; }); };
+    const pieBanda = (hm, ao) => { const hq = hm ? Math.round(hm * 10) / 10 : 0, aoK = R3.LIGHT.ao;
+      return banda("p:" + hq + ":" + (ao ? 1 : 0), Math.max(ao ? .7 : 0, hq), (w, h) => { const hh = hq * R3.TD, prof = R3.vnoiseCiclico(w, 1, 4, R3.rng(0x4d1 + Math.round(hq * 10))), a = new Float32Array(w * h);
+        for (let x = 0; x < w; x++) { const top = h - hh * (0.5 + 0.5 * prof[x]);
+          for (let y = 0; y < h; y++) { const z = (h - y - .5) / R3.TD, fa = ao ? 1 - 0.2 * aoK * Math.max(0, 1 - z / 0.7) : 1;
+            const fh = hh && y >= Math.max(0, top | 0) ? (Math.abs(y - top) < 1 ? 0.82 : 0.87 - 0.06 * (y - top) / hh) : 1;
+            a[y * w + x] = 1 - fa * fh; } }
+        return a; }); };
+    // la pared de material de una cara (cacheada por diseño), o null
+    function compartida(F0, fi, D) { if (!F0.tex || !F0.tex.fondo || F0.tri) return null;
+      const k = "f:" + fi; let r = D.tex.get(k); if (r === undefined) { r = descomponer(F0.tex); D.tex.set(k, r); } return r; }
     // el ancho de columna (texeles a lo largo de la pared) para que el pie no cambie más de PIE_MAX px de pantalla dentro de una
     // pieza: TILE, o TILE/2, TILE/4… E: el borde horizontal de la pieza; n: sus texeles. Una textura se corta una sola vez (si no,
     // va repetida al atlas): con la columna más fina que pida cualquiera de las variantes que la usan (cortes, por su hash y eje)
@@ -211,7 +300,7 @@ const Caras = (() => {
         if (R3.dot(n3, VIEW) >= -1e-4) { if (!F0.both) continue; n3 = [-n3[0], -n3[1], -n3[2]]; }
         const F = { O: rot(c, s, F0.O), E1: rot(c, s, F0.E1), E2: rot(c, s, F0.E2), tri: F0.tri, n: n3 };
         const A = J(F.E1), B = J(F.E2); if (Math.hypot(A[0], A[1]) < .5 || Math.hypot(B[0], B[1]) < .5 || Math.abs(A[0] * B[1] - A[1] * B[0]) < 1) continue;   // de canto
-        st.caras++; const sub = [];
+        st.caras++; const sub = []; let desc = null, bordeBase = null;
         // una pared que llega al piso: sus piezas se ordenan por el pie de su columna (y llevan grafitis: ranuras)
         const zMin = Math.min(F.O[2], F.O[2] + F.E1[2], F.O[2] + F.E2[2], F.O[2] + F.E1[2] + F.E2[2]), pared = Math.abs(F.n[2]) < .1 && zMin <= .3;
         if (!F0.tex && !F0.tri) {
@@ -229,9 +318,40 @@ const Caras = (() => {
           let T = D.tex.get(mk); if (!T) { T = recorteMaterial(m, wq, hq); D.tex.set(mk, T); }
           const tn = hexDe(L.map(v => v / G * 255));
           for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) sub.push({ T, O: add(F.O, add(sc3(F.E1, i / nx), sc3(F.E2, j / ny))), E1: sc3(F.E1, 1 / nx), E2: sc3(F.E2, 1 / ny), tinte: tn, girable: true, clave: mk });
+        } else if ((desc = compartida(F0, fi, D))) {
+          // pared de material compartido: el fondo en recortes de su baldosa (capa 0), las manchas que corren desde arriba (1), lo dibujado
+          // encima (2) y la humedad con la sombra del piso (3); cada capa encima de la de abajo (ver el orden, más abajo)
+          st.compartidas++; const Tf = F0.tex, Wm = len(F.E1), Hm = len(F.E2), tnL = hexDe(L.map(v => v / G * 255)); let mayor = null;
+          // las manchas: cada tira y dónde cae (fila de la tira = fila de la cara + corrimiento)
+          const tiras = [];
+          for (const [tipo, a, b, o] of Tf.capas || []) if (tipo === "runoff") tiras.push([runoffBanda(a, b), o || 0]);
+          const hum = (Tf.capas || []).filter(c => c[0] === "humidity"), hm = hum.reduce((a, c) => Math.max(a, c[1]), 0), ho = hum.length ? hum[0][3] || 0 : 0;
+          const P = pared || hum.length ? pieBanda(hm, pared && !ho) : null; if (P) tiras.push([P, P.h - ho - Tf.h]);
+          // las que le tocan a las filas fy0..fy1 de la cara: [B, fila0, fila1] y su parte de la clave
+          const deFilas = (fy0, fy1) => { const out = [], k = []; for (const [B, c] of tiras) { const f0 = fy0 + c, f1 = fy1 + c; if (f1 <= 0 || f0 >= B.h) continue; out.push([B, f0, f1]); k.push(B.key + "@" + Math.round(f0) + "-" + Math.round(f1)); } return [out, k.join("|")]; };
+          for (const R of Tf.fondo) { const m = R.m, v0 = R.y0 / Tf.h, v1 = R.y1 / Tf.h, Hr = Hm * (v1 - v0); if (Hr <= 0) continue;
+            if (!mayor || R.y1 - R.y0 > mayor.y1 - mayor.y0) mayor = R;
+            const tw = m.w / R3.TD, th = m.h / R3.TD, nx = Math.max(1, Math.ceil(Wm / tw - .01)), ny = Math.max(1, Math.ceil(Hr / th - .01));
+            const wq = Math.max(.5, Math.min(tw, Math.round(Wm / nx * 2) / 2)), hq = Math.max(.5, Math.min(th, Math.round(Hr / ny * 2) / 2));
+            const tn = R.col ? hexDe(saturar(R.col[0], R.col[1], R.col[2]).map(v => v * L[0] * m.max)) : tnL;
+            for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const a0 = i / nx, b0 = v0 + (v1 - v0) * j / ny, b1 = v0 + (v1 - v0) * (j + 1) / ny;
+              const [bs, bk] = deFilas(b0 * Tf.h, b1 * Tf.h), mk = "m:" + m.key + ":" + wq + "x" + hq + "|" + bk;
+              let T = BANDAS.get(mk); if (!T) { T = recorteMuro(m, wq, hq, bs); BANDAS.set(mk, T); }
+              sub.push({ T, O: add(F.O, add(sc3(F.E1, a0), sc3(F.E2, b0))), E1: sc3(F.E1, 1 / nx), E2: sc3(F.E2, b1 - b0), tinte: tn, girable: true, clave: mk, capa: 0, pre: "m", fr: [a0, b0, a0 + 1 / nx, b1] }); } }
+          // lo dibujado, con la humedad y la sombra del piso horneadas (a lo largo, la tira empieza en el recuadro)
+          desc.piezas.forEach((p, k) => { let T = p.T;
+            if (P) { const c = P.h - ho - Tf.h; if (p.y0 + p.h + c > 0 && p.y0 + c < P.h) { const d = new Uint8ClampedArray(T.d);
+              for (let y = 0; y < p.h; y++) { const br = p.y0 + y + c; if (br < 0 || br >= P.h) continue;
+                for (let x = 0; x < p.w; x++) { const o = (y * p.w + x) * 4, f = 1 - P.d[(br * P.w + x % P.w) * 4 + 3] / 255; d[o] *= f; d[o + 1] *= f; d[o + 2] *= f; } }
+              T = { w: p.w, h: p.h, d }; } }
+            sub.push({ T, O: add(F.O, add(sc3(F.E1, p.x0 / Tf.w), sc3(F.E2, p.y0 / Tf.h))), E1: sc3(F.E1, p.w / Tf.w), E2: sc3(F.E2, p.h / Tf.h),
+            tinte: tnL, girable: true, clave: "d" + fi + ":" + k, capa: 2, pre: "d" }); });
+          // el contorno (más abajo): del color del material de la región más grande
+          if (mayor) { const m = mayor.m, c = mayor.col, sp = saturar(c ? c[0] * m.prom[0] : m.prom[0], c ? c[1] * m.prom[1] : m.prom[1], c ? c[2] * m.prom[2] : m.prom[2]);
+            bordeBase = [sp[0] * L[0], sp[1] * L[1], sp[2] * L[2]]; }
         } else {
           // dibujo propio: la cara entera
-          st.propias++; let T = D.tex.get(fi); if (!T) { T = textura(F0); D.tex.set(fi, T); }
+          st.propias++; let T = D.tex.get(fi); if (!T) { if (F0.tex) aplicarCapas(F0.tex); T = textura(F0); D.tex.set(fi, T); }
           sub.push({ T, O: F.O, E1: F.E1, E2: F.E2, tinte: hexDe(L.map(v => v / G * 255)), girable: !F.tri, clave: fi, principal: !F.tri });
         }
         // el contorno de las caras de color liso y de los techos de material (las de dibujo propio lo traen en su textura): una
@@ -239,13 +359,15 @@ const Caras = (() => {
         // la textura blanca del motor. Cada parte de la casa lleva el suyo, como cada hoja de un árbol: también las caras chicas
         // (tapas de tapial, postes, aleros) desde BORDE_MIN de lado
         { const lisa = !F0.tex && !F0.tri, mat = F0.tex && F0.tex.mat && hashD(F0.tex.d) === F0.tex.limpia;
-          if (((lisa && len(F0.E1) > BORDE_MIN && len(F0.E2) > BORDE_MIN) || mat) && Contorno.fuerza(R3.LIGHT.outline) > 0) {
-            let base; if (lisa) base = saturar(F0.col[0] * L[0], F0.col[1] * L[1], F0.col[2] * L[2]);
+          if (((lisa && len(F0.E1) > BORDE_MIN && len(F0.E2) > BORDE_MIN) || mat || bordeBase) && Contorno.fuerza(R3.LIGHT.outline) > 0) {
+            let base; if (bordeBase) base = bordeBase; else if (lisa) base = saturar(F0.col[0] * L[0], F0.col[1] * L[1], F0.col[2] * L[2]);
             else { const m = F0.tex.mat; if (!m.prom) { const d = m.tex.d; let r = 0, g = 0, b = 0, n = 0; for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 128) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; } m.prom = [r / n, g / n, b / n]; }
               const sp = saturar(m.prom[0], m.prom[1], m.prom[2]); base = [sp[0] * L[0], sp[1] * L[1], sp[2] * L[2]]; }
             const os = Contorno.oscuro(base[0], base[1], base[2]), tA = Contorno.fuerza(R3.LIGHT.outline), tn = hexDe(base.map((v, j) => v + (os[j] - v) * tA)), th = GROSOR / R3.TD;
             const e1 = len(F.E1), e2 = len(F.E2), i1 = sc3(F.E1, th / e1), i2 = sc3(F.E2, th / e2), lejos1 = add(F.O, F.E1), lejos2 = add(F.O, F.E2);
-            for (const [O, E1, E2] of [[F.O, F.E1, i2], [sub3(lejos2, i2), F.E1, i2], [F.O, i1, F.E2], [sub3(lejos1, i1), i1, F.E2]]) {
+            // (en una pared de material compartido, sólo los costados: las esquinas de la casa; arriba y abajo la tapan el techo y el piso,
+            // y cortados en columnas eran muchas piezas)
+            for (const [O, E1, E2] of (desc ? [] : [[F.O, F.E1, i2], [sub3(lejos2, i2), F.E1, i2]]).concat([[F.O, i1, F.E2], [sub3(lejos1, i1), i1, F.E2]])) {
               // la orientación que deja escala y skew sanos (la textura blanca es igual de cualquier lado)
               const A2 = J(E1), B2 = J(E2), la = Math.hypot(A2[0], A2[1]) || 1e-9, lb = Math.hypot(B2[0], B2[1]) || 1e-9;
               const qn = Math.min(Math.abs(A2[0]) / la, Math.abs(B2[1]) / lb), qt = Math.min(Math.abs(B2[0]) / lb, Math.abs(A2[1]) / la);
@@ -262,7 +384,9 @@ const Caras = (() => {
         const el = elementoCara(F), idx = E.length; E.push(el);
         for (const q of sub) items.push({ el: idx, q, pared, F });
         // una pared que llega al piso, lisa o con su dibujo, sin trasponer: candidata para grafitis (ranuras, más abajo)
-        if (pared) { const q0 = sub.find(q => q.principal); if (q0 && !q0.trans) cands.push({ el: idx, q: q0, F, T: q0.reg === BLANCO ? null : q0.T, caja: el.caja }); }
+        // (dónde se puede pintar: como en las demás, lo que se parece al color de la pared, sobre la textura de la pared)
+        if (pared && desc) cands.push({ el: idx, q: { O: F.O, E1: F.E1, E2: F.E2 }, F, T: F0.tex, caja: el.caja });
+        else if (pared) { const q0 = sub.find(q => q.principal); if (q0 && !q0.trans) cands.push({ el: idx, q: q0, F, T: q0.reg === BLANCO ? null : q0.T, caja: el.caja }); }
       }
       fase.push({ e, D, phi, c, s, E, items, cands });
     });
@@ -271,7 +395,7 @@ const Caras = (() => {
       if (n % 16 === 0) progreso(.3 + .7 * n / fase.length);
       for (const it of items) { const q = it.q; if (!q || q.reg) continue;
         const k = q.corte, cu = k ? cortes.get(k) : TILE;
-        q.reg = !k ? registrar(q.T, "c") : k.endsWith("u") ? registrar(q.T, "c", cu, TILE) : registrar(q.T, "c", TILE, cu); }
+        const pre = q.pre || "c"; q.reg = !k ? registrar(q.T, pre) : k.endsWith("u") ? registrar(q.T, pre, cu, TILE) : registrar(q.T, pre, TILE, cu); }
       // ---- accesorios: un sprite cada uno, parado en su punto
       for (const a of D.acc) { const P = rot(c, s, [a.x, a.y, a.z]), oct = a.tipo === "tanque" || a.tipo === "maceta" ? 0 : ((Math.round(phi / (Math.PI / 4)) % 8) + 8) % 8;
         const sp = spriteAcc(a, oct), p = J(P), k = 1 / DET, x0 = p[0] - sp.ax * k, y0 = p[1] - sp.ay * k, w = sp.reg.w * k, h = sp.reg.h * k;
@@ -314,7 +438,8 @@ const Caras = (() => {
           const cu = g.x0 + g.w / 2, cv = g.y0 + g.h / 2, P = add(q.O, add(sc3(q.E1, cu / T.w), sc3(q.E2, cv / T.h))), p = J(P);
           const q0 = add(q.O, add(sc3(q.E1, g.x0 / T.w), sc3(q.E2, g.y0 / T.h))), da = J(sc3(q.E1, g.w / T.w)), db = J(sc3(q.E2, g.h / T.h)), j0 = J(q0);
           const objetivo = buscada(vert, P, q0, sc3(q.E1, g.w / T.w), sc3(q.E2, g.h / T.h), tira, q.tri);
-          tiles.push({ rank: r, cuadro: g.nombre, p, sx: g.nombre === "_white" ? A[0] / 8 : sx, sy: g.nombre === "_white" ? B[1] / 8 : sy, kx, ky, tn: q.tinte, iz, objetivo, borde: !!q.borde, n: it.F.n, z: P[2], el: it.el, g,
+          const fr = q.fr && !q.trans ? [q.fr[0] + (q.fr[2] - q.fr[0]) * g.x0 / T.w, q.fr[1] + (q.fr[3] - q.fr[1]) * g.y0 / T.h, q.fr[0] + (q.fr[2] - q.fr[0]) * (g.x0 + g.w) / T.w, q.fr[1] + (q.fr[3] - q.fr[1]) * (g.y0 + g.h) / T.h] : null;
+          tiles.push({ rank: r, cuadro: g.nombre, p, sx: g.nombre === "_white" ? A[0] / 8 : sx, sy: g.nombre === "_white" ? B[1] / 8 : sy, kx, ky, tn: q.tinte, iz, objetivo, borde: !!q.borde, n: it.F.n, z: P[2], el: it.el, g, capa: q.capa || 0, fr, pre: q.pre,
             poli: q.tri ? [j0, [j0[0] + da[0], j0[1] + da[1]], [j0[0] + db[0], j0[1] + db[1]]] : [j0, [j0[0] + da[0], j0[1] + da[1]], [j0[0] + da[0] + db[0], j0[1] + da[1] + db[1]], [j0[0] + db[0], j0[1] + db[1]]] });
         }
       }
@@ -325,11 +450,28 @@ const Caras = (() => {
         for (let j = 0; j < i; j++) { if (tiles[j].rank === tiles[i].rank || tiles[j].clave <= k || separadas(cajas[i], cajas[j])) continue;
           const I = recortar(tiles[i].poli, tiles[j].poli); if (I.length >= 3 && Math.abs(area(I)) >= .5) k = tiles[j].clave; }
         tiles[i].clave = k; }
-      for (const t of tiles) if (t.borde) t.clave += .02;   // el borde, encima de su cara (misma y de orden y mismo innerZ)
+      // dentro de una cara: lo dibujado encima del fondo que tiene debajo, y el borde encima de todo lo de su cara (y de orden apenas
+      // más: .05 px por capa, que el redondeo a centésimos de la exportación no se coma; mismo innerZ). "Debajo": lo que se pisa de
+      // verdad, no por el pasito de 1 px entre columnas (en una pared que corre hacia el fondo, la columna de al lado está hasta
+      // PIE_MAX px más adelante: subir hasta ella dejaba a la gente parada al pie detrás de una puerta)
+      { const nivel = (t) => t.borde ? 9 : t.capa || 0, porEl = new Map();
+        tiles.forEach((t, i) => { if (t.el == null) return; let l = porEl.get(t.el); if (!l) porEl.set(t.el, l = []); l.push(i); });
+        for (const l of porEl.values()) { l.sort((a, b) => nivel(tiles[a]) - nivel(tiles[b]));
+          for (const i of l) { const t = tiles[i], ni = nivel(t); if (!ni) continue; let k = t.clave;
+            for (const j of l) { const u = tiles[j]; if (nivel(u) >= ni) break; if (u.clave <= k || separadas(cajas[i], cajas[j])) continue;
+              // lo que se pisan de verdad (el polígono, no el recuadro: en una pared que corre hacia el fondo los recuadros de las columnas
+              // se pisan con varias vecinas); también el pasito de 1 px con que una columna se mete en la de al lado, si no esa rayita de
+              // la pared quedaba encima de un cartel. Así lo dibujado sube a lo sumo hasta la columna de al lado (PIE_MAX)
+              const I = recortar(t.poli, u.poli); if (I.length >= 3 && Math.abs(area(I)) >= .5) k = u.clave; }
+            if (ni === 2 && k - t.objetivo > PIE_MAX + .5) st.dibujoSubido = (st.dibujoSubido || 0) + 1;
+            if (ni === 2) st.dibujoPiezas = (st.dibujoPiezas || 0) + 1;
+            t.clave = k + (t.borde ? .02 : .05 * ni); } } }
       ranurasDe[e.id] = ranuras(cands, tiles, cajas, rank, nE);
       const r2 = (v) => Math.round(v * 100) / 100, r4 = (v) => Math.round(v * 1e4) / 1e4;
       // las piezas de caras llevan además hacia dónde mira su cara (la normal, ya girada como la casa) y la altura de su centro (m):
       // el juego se las da a WeedJS (Decoration.spawn: faceNormalX, faceNormalY, faceNormalZ, faceHeight)
+      // piezas en el mundo, por clase (cuántas casas usan esta variante: e.n)
+      for (const t of tiles) { const k = "p_" + (t.borde ? "borde" : t.cuadro === "_white" ? "liso" : t.pre === "m" ? "fondo" : t.pre === "d" ? "dibujo" : t.pre === "b" ? "manchas" : "propia"); st[k] = (st[k] || 0) + (e.n || 1); }
       variantes[e.id] = tiles.map(t => { const v = [t.cuadro, r2(t.p[0]), r2(t.p[1]), r4(t.sx), r4(t.sy), r4(t.kx), r4(t.ky), t.tn, r2(t.clave - t.p[1]), t.iz];
         if (t.n) v.push(r2(t.n[0]), r2(t.n[1]), r2(t.n[2]), r2(t.z)); return v; });
       // el pie de la casa (de donde cuelgan el colisionador y la sombra): el punto más al frente de las cajas apoyadas
@@ -365,8 +507,8 @@ const Caras = (() => {
         for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const m = j * nx + i; if (!mask[m]) continue;
           const u = (i + .5) * CELDA, v = (j + .5) * CELDA; if (dentro4(t.poli, O[0] + a[0] * u + b[0] * v, O[1] + a[1] * u + b[1] * v)) { mask[m] = 0; hay--; } } }
       if (!hay) continue;
-      const pz = []; for (const t of tiles) { if (t.el !== c.el || t.borde) continue;
-        pz.push(t.uv ? [t.uv[0] * Tw, t.uv[1] * Th, t.uv[2] * Tw, t.uv[3] * Th, t.clave] : t.cuadro === "_white" ? [0, 0, Tw, Th, t.clave] : [t.g.x0, t.g.y0, t.g.x0 + t.g.w, t.g.y0 + t.g.h, t.clave]); }
+      const pz = []; for (const t of tiles) { if (t.el !== c.el || t.borde || t.capa) continue;
+        pz.push(t.fr ? [t.fr[0] * Tw, t.fr[1] * Th, t.fr[2] * Tw, t.fr[3] * Th, t.clave] : t.uv ? [t.uv[0] * Tw, t.uv[1] * Th, t.uv[2] * Tw, t.uv[3] * Th, t.clave] : t.cuadro === "_white" ? [0, 0, Tw, Th, t.clave] : [t.g.x0, t.g.y0, t.g.x0 + t.g.w, t.g.y0 + t.g.h, t.clave]); }
       out.push({ O, a, b, Tw, Th, nx, ny, mask, pz, iz, n: c.F.n.map(v => Math.round(v * 100) / 100), O3: q.O, E1: q.E1, E2: q.E2, L: len(q.E1) });
     }
     return out;

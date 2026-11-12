@@ -38,6 +38,16 @@ const R3 = (() => {
   const add = (c, d) => [clamp(c[0] + d), clamp(c[1] + d), clamp(c[2] + d)];
   const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
+  // el mismo ruido, pero que se repite cada w × h (para una baldosa sin costura): la grilla da la vuelta
+  function vnoiseCiclico(w, h, scale, r) {
+    const gx = Math.max(1, Math.round(w / scale)), gy = Math.max(1, Math.round(h / scale)), g = new Float32Array(gx * gy), out = new Float32Array(w * h);
+    for (let i = 0; i < g.length; i++) g[i] = r();
+    for (let y = 0; y < h; y++) { const fy = y / h * gy, iy = Math.floor(fy); let ty = fy - iy; ty = ty * ty * (3 - 2 * ty); const a0 = (iy % gy) * gx, a1 = ((iy + 1) % gy) * gx;
+      for (let x = 0; x < w; x++) { const fx = x / w * gx, ix = Math.floor(fx); let tx = fx - ix; tx = tx * tx * (3 - 2 * tx); const b0 = ix % gx, b1 = (ix + 1) % gx;
+        out[y * w + x] = (g[a0 + b0] * (1 - tx) + g[a0 + b1] * tx) * (1 - ty) + (g[a1 + b0] * (1 - tx) + g[a1 + b1] * tx) * ty; } }
+    return out;
+  }
+
   // ---------- texturas pintadas (18 px/m)
   const px = (m) => Math.round(m * TD);
   class Tex {
@@ -66,9 +76,16 @@ const R3 = (() => {
           if (tint) { const l = (.3 * im.d[k] + .59 * im.d[k + 1] + .11 * im.d[k + 2]) / im.L; this.d[o] = Math.min(255, tint[0] * l); this.d[o + 1] = Math.min(255, tint[1] * l); this.d[o + 2] = Math.min(255, tint[2] * l); }
           else { this.d[o] = im.d[k]; this.d[o + 1] = im.d[k + 1]; this.d[o + 2] = im.d[k + 2]; } this.d[o + 3] = 255; } }
       return true; }
-    crop(y0, y1) { y0 = Math.max(0, y0 | 0); y1 = Math.min(this.h, y1 | 0); const t = Tex.fromPx(this.w, Math.max(1, y1 - y0), 1); t.d.set(this.d.subarray(y0 * this.w * 4, y1 * this.w * 4)); t.r = this.r; return t; }
+    // las filas y0..y1. Una pared de material compartido (Tex.kit) lleva su fondo (dy: la fila de la baldosa donde empieza) y sus
+    // manchas: las que corren desde arriba, si el recorte llega a ellas (o: cuántas filas de la tira quedan arriba del recorte); la
+    // humedad, igual desde abajo
+    crop(y0, y1) { y0 = Math.max(0, y0 | 0); y1 = Math.min(this.h, y1 | 0); const t = Tex.fromPx(this.w, Math.max(1, y1 - y0), 1); t.d.set(this.d.subarray(y0 * this.w * 4, y1 * this.w * 4)); t.r = this.r;
+      if (this.fondo) { const f = []; for (const R of this.fondo) { const a = Math.max(R.y0, y0), b = Math.min(R.y1, y1); if (b > a) f.push({ ...R, y0: a - y0, y1: b - y0, dy: (R.dy || 0) + y0 }); }
+        if (f.length) { t.fondo = f; if (this.capas) t.capas = this.capas.map(([k, a, b, o]) => [k, a, b, (o || 0) + (k === "runoff" ? y0 : this.h - y1)]); } }
+      return t; }
     // ---- materiales
     stucco(col, wear = 1, y0 = 0, y1 = this.h) {
+      if (Tex.kit && Tex.kit.fondo(this, "stucco", col, wear, y0, y1)) return;
       const w = this.w, h = y1 - y0; if (h <= 0) return;
       const n1 = vnoise(w, h, 14, this.r), n2 = vnoise(w, h, 3, this.r), hue = vnoise(w, h, 22, this.r), st = vnoise(w, 1, 3, this.r);
       const alt = [col[0] * 1.05, col[1] * 0.98, col[2] * 0.9];
@@ -86,6 +103,7 @@ const R3 = (() => {
       }
     }
     brick(col = [174, 92, 62], y0 = 0, y1 = this.h, course = Math.max(3, Math.round(3 * DET)), blen = Math.max(8, Math.round(8 * DET)), mortar = [198, 186, 164]) {
+      if (Tex.kit && Tex.kit.fondo(this, "brick", col, mortar, y0, y1)) return;
       for (let y = y0; y < y1; y++) { const row = (y / course) | 0, off = (row % 2) * (blen >> 1);
         for (let x = 0; x < this.w; x++) {
           const i = (y * this.w + x) * 4, mm = (y % course) === course - 1 || ((x + off) % blen) === 0;
@@ -98,6 +116,7 @@ const R3 = (() => {
     }
     // piedra Mar del Plata: lajas irregulares (celdas de Voronoi sobre una grilla con ruido) con junta oscura hundida
     piedra(y0 = 0, y1 = this.h, tonos = [[204, 178, 132], [184, 156, 112], [214, 196, 158], [168, 140, 100], [196, 170, 140], [150, 134, 112]]) {
+      if (Tex.kit && Tex.kit.fondo(this, "piedra", null, null, y0, y1)) return;
       const S = Math.max(4, Math.round(6 * DET)), gw = Math.ceil(this.w / S) + 2, gh = Math.ceil((y1 - y0) / S) + 2, pts = [];
       for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) pts.push([(i - .5 + this.r()) * S * (1 + .25 * ((j % 2) - .5)), (j - .5 + this.r() * .9) * S * .8, this.r.pick(tonos), .9 + .2 * this.r()]);
       for (let y = y0; y < y1; y++) { const ly = y - y0, gj = Math.floor(ly / (S * .8));
@@ -111,10 +130,12 @@ const R3 = (() => {
     }
     // salpicré: revoque grueso salpicado (granulado fino con puntos claros y oscuros)
     salpicre(col, y0 = 0, y1 = this.h) {
+      if (Tex.kit && Tex.kit.fondo(this, "salpicre", col, null, y0, y1)) return;
       for (let y = y0; y < y1; y++) for (let x = 0; x < this.w; x++) { const k = (y * this.w + x) * 4, v = this.r(), f = v < .12 ? .82 : v > .9 ? 1.1 : .96 + .06 * this.r();
         this.d[k] = col[0] * f; this.d[k + 1] = col[1] * f; this.d[k + 2] = col[2] * f; this.d[k + 3] = 255; }
     }
     hueco(y0 = 0, y1 = this.h) {      // ladrillo hueco: bloques con agujeros, juntas desprolijas
+      if (Tex.kit && Tex.kit.fondo(this, "hueco", null, null, y0, y1)) return;
       const CH = Math.max(5, Math.round(5 * DET)), CL = Math.max(12, Math.round(12 * DET)), hy0 = Math.round(CH * .25), hy1 = Math.round(CH * .6), step = Math.max(3, Math.round(3 * DET));
       for (let y = y0; y < y1; y++) { const row = (y / CH) | 0, off = (row % 2) * (CL >> 1), ly = y % CH;
         for (let x = 0; x < this.w; x++) {
@@ -130,17 +151,20 @@ const R3 = (() => {
         } }
     }
     concrete(col = [170, 168, 162], wear = 1) {
+      if (Tex.kit && Tex.kit.fondo(this, "concrete", col, wear, 0, this.h)) return;
       const n = vnoise(this.w, this.h, 5, this.r), g = vnoise(this.w, this.h, 8, this.r);
       for (let k = 0; k < this.w * this.h; k++) { const f = (1 + 0.08 * (n[k] - .5) + 0.06 * (this.r() - .5)) * (1 - Math.min(.14, Math.max(0, (g[k] - .5) * .4 * wear)));
         this.d[k * 4] = col[0] * f; this.d[k * 4 + 1] = col[1] * f; this.d[k * 4 + 2] = col[2] * f; this.d[k * 4 + 3] = 255; }
     }
     humidity(hm = 0.7) {
+      if (Tex.kit && Tex.kit.capa(this, "humidity", hm, 0)) return;
       const hh = px(hm), prof = vnoise(this.w, 1, 4, this.r);
       for (let x = 0; x < this.w; x++) { const top = this.h - hh * (0.5 + 0.5 * prof[x]);
         for (let y = Math.max(0, top | 0); y < this.h; y++) { const i = (y * this.w + x) * 4; if (this.d[i + 3] < 1) continue;
           const f = Math.abs(y - top) < 1 ? 0.82 : 0.87 - 0.06 * (y - top) / hh; this.d[i] *= f; this.d[i + 1] *= f; this.d[i + 2] *= f * 0.98; } }
     }
     runoff(depth = 0.6, amt = 1) {   // manchas que bajan desde el borde de arriba
+      if (Tex.kit && Tex.kit.capa(this, "runoff", depth, amt)) return;
       const hh = px(depth), st = vnoise(this.w, 1, 2, this.r);
       for (let x = 0; x < this.w; x++) { const L = hh * (0.3 + st[x] * 1.2);
         for (let y = 0; y < Math.min(this.h, L); y++) { const i = (y * this.w + x) * 4, f = 1 - 0.13 * amt * (1 - y / L); this.d[i] *= f; this.d[i + 1] *= f; this.d[i + 2] *= f; } }
@@ -157,6 +181,10 @@ const R3 = (() => {
         }
       }
     }
+    // la exportación por caras (houses.js, modo kit) pone acá { fondo(t, tipo, a, b, y0, y1), capa(t, tipo, a, b) }: el material de una
+    // pared sale de una baldosa compartida y las manchas se anotan en vez de pintarse (caras.js las dibuja como piezas compartidas).
+    // Devuelven false si no corresponde (una textura chica): entonces se pinta como siempre
+    static kit = null;
     toImageData() { const a = new Uint8ClampedArray(this.w * this.h * 4); for (let i = 0; i < a.length; i++) a[i] = this.d[i]; return new ImageData(a, this.w, this.h); }
   }
 
@@ -341,5 +369,5 @@ const R3 = (() => {
         const X = x + (gx + bx) * k + a, Y = y0 + (gy + dy) * k + b; if (shadow) t.p(X + k, Y + k, shadow); t.p(X, Y, c); } });
       x += (bold ? 7 : 6) * k; }
   }
-  return { SF, K, CZ, SYN, DECALS, setDetalle, get DET() { return DET; }, get TD() { return TD; }, proj, norm, dot, cross, LIGHT, SUNC, SKY, BOUNCE, hull, rng, vnoise, mul, add, mix, clamp, px, Tex, Scene, text, textW, setLight, get SUN() { return SUN; } };
+  return { SF, K, CZ, SYN, DECALS, setDetalle, get DET() { return DET; }, get TD() { return TD; }, proj, norm, dot, cross, LIGHT, SUNC, SKY, BOUNCE, hull, rng, vnoise, vnoiseCiclico, mul, add, mix, clamp, px, Tex, Scene, text, textW, setLight, get SUN() { return SUN; } };
 })();
