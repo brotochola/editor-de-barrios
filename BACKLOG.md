@@ -129,8 +129,10 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   detrás de una casa va sin brillo). Probado: en la capa de entidades la lámpara queda opaca y sin halo. Hace falta que
   WeedJS dibuje un brillo en el orden de las entidades sin que la luz lo oscurezca (por ejemplo, la pasada aditiva de los
   brillos con prueba de profundidad contra las entidades, o un búfer emisivo que se suma después de la luz).
-- [ ] **Luces direccionales** — charlar, motor. Un parámetro en `LightEmitter`: el ángulo del cono (360° por defecto, así las
-  luces de siempre siguen siendo puntuales), que gira con la entidad. Para los faros de los autos.
+- [ ] **Luces direccionales** — hecho (820d911; motor: WeedJS DX-SPOT, en el bundle 39c1edf0; el dueño, 13/11: «ahora tenemos conos
+  de iluminación, que son ideales para las luces de los autos»). Los faros son un cono desde el frente de la huella: abre 56°, el
+  40 % de afuera de cada mitad se esfuma, y llega a 900 px (unos 65 m; antes, una luz redonda de 265 px). El cono se mide sobre
+  el piso aplastado y gira con el auto; el espejo del dibujo (flipX) no lo da vuelta.
 - [ ] **Resolución de la luz para pixel art** — charlar. ¿Tiene sentido `lighting.resolution: .5` en un juego pixel art?
 
 ## Cables
@@ -173,7 +175,7 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   (`hornear_atlas.js` y las carpetas `atlas/` de los barrios, fuera). El editor sólo arma lo del barrio: caras, árboles, piso y
   la hoja de grafitis de las paredes (`img/grafitis`). `META.props` dice la hoja, el cuadro, el ancla, la escala y si se mece de
   cada objeto (antes, `META.anclas` y `META.escalas` y una hoja `img/props` por barrio).
-- [ ] **Hasta un millón de decoraciones** — hecho (motor: WeedJS 39c1edf0, rama `deco/1m`; el dueño, 13/11). WeedJS
+- [ ] **Hasta un millón de decoraciones** — hecho (d2f610e; motor: WeedJS 39c1edf0, rama `deco/1m`; el dueño, 13/11). WeedJS
   numeraba las decoraciones con 19 bits: más de 524 287 no cargaba, y Parque Chas ya pedía 514 mil. Ahora acepta hasta
   1 048 575. Ese bundle trae también la API nueva de luces (sin compatibilidad): `radius` en vez de `lightIntensity`
   (radio = 10·√intensidad), `color`, `glow` (el alfa del brillo: intensidad · hasGlowSprite / 25 000), `glowOffsetY` (hacia
