@@ -1,5 +1,5 @@
 // ===================== caras.js — casas por caras planas con skew (WeedJS ≥ DX-DECOSKEW, PR #7) =====================
-// Cada diseño del catálogo (casa, edificio, casilla, esquina, tapial, paredón, poste) se arma una sola vez en R3, sin
+// Cada diseño del catálogo (casa, edificio, casilla, esquina, tapial, medianera, poste) se arma una sola vez en R3, sin
 // rumbo y en modo kit (Houses.setKit): sus caras quedan en coordenadas de la casa y sus detalles chicos como accesorios.
 // Lo que va al atlas, sin rumbo y sin repetir:
 //   - las caras con dibujo propio (fachadas, medianeras, carteles…): planas, con su material, la oclusión del piso, la

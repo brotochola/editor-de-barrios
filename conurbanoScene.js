@@ -613,7 +613,21 @@ export class AutoJugador extends Auto {
     if (Keyboard.d || Keyboard.arrowright) turn += 1; if (Keyboard.a || Keyboard.arrowleft) turn -= 1;
     if (fwd || turn) this.applyForces(fwd, turn);
     if (Keyboard[' ']) { const i = this.index; RigidBody.vx[i] *= .9; RigidBody.vy[i] *= .9; }
+    this.alBorde();
     Camera.followEntity(this.index, 0, .12, dtRatio);
+  }
+  // el borde del área jugable no se ve (sin paredón: el dueño, 13/11, «no permitimos que salgan, mágicamente»): si el auto lo cruza,
+  // vuelve a él y pierde la velocidad hacia afuera. En metros del mundo el área es un rectángulo (META.MG de margen); en px de pantalla,
+  // los bordes este y oeste van inclinados (x + K·y)
+  alBorde() {
+    const M = META, mg = M.MG; if (!(mg > 0)) return;
+    const wy = M.MH - this.y / (M.SF * M.SYN), wx = this.x / M.SF - M.K * wy;
+    const cx = Math.max(mg, Math.min(M.MW - mg, wx)), cy = Math.max(mg, Math.min(M.MH - mg, wy));
+    if (cx === wx && cy === wy) return;
+    const i = this.index; this.x = M.SF * (cx + M.K * cy); this.y = (M.MH - cy) * M.SF * M.SYN;
+    if (cx !== wx) { const s = cx > wx ? 1 : -1, k = M.K / M.SYN, n = Math.hypot(1, k), nx = s / n, ny = s * k / n, vn = RigidBody.vx[i] * nx + RigidBody.vy[i] * ny;
+      if (vn < 0) { RigidBody.vx[i] -= vn * nx; RigidBody.vy[i] -= vn * ny; } }   // (hacia adentro: más x del mundo)
+    if (cy !== wy) { const s = cy > wy ? -1 : 1; if (RigidBody.vy[i] * s < 0) RigidBody.vy[i] = 0; }   // (más y del mundo es más arriba en pantalla)
   }
 }
 
@@ -697,7 +711,7 @@ export class ConurbanoScene extends Scene {
     physics: { gravity: { x: 0, y: 0 }, sleeping: true, subStepCount: 0, commandRingCapacity: 65536, numberOfPhysicsWorkers: HC >= 8 ? 4 : 2 },
     particle: { maxParticles: 500, decals: false },
     // piezas de casas y árboles, props (y sus sombras), cables y líneas de canchas
-    decoration: { maxDecorations: META.nPiezas + (META.nTiles || 0) + META.nPiezasArboles + 2 * META.nProps + META.nArboles + META.nCables + META.nGrafitis + (META.nLineas || 0) + 8 * ((META.transito && META.transito.n) || 0) + 3000, maxAttachedDecorationsPerEntity: 255 },
+    decoration: { maxDecorations: META.nPiezas + (META.nTiles || 0) + META.nPiezasArboles + META.nDecoProps + META.nArboles + META.nCables + META.nGrafitis + (META.nLineas || 0) + 8 * ((META.transito && META.transito.n) || 0) + 3000, maxAttachedDecorationsPerEntity: 255 },
     renderer: { backend: 'webgl', ySort: true },
     // las casas son decoraciones: que no se desvanezcan al alejar
     preRender: { startFadingDecorationsAtZoom: .2, hideDecorationsAtZoom: .1, cullingRatio: .3 },
@@ -963,7 +977,7 @@ export class ConurbanoScene extends Scene {
   get driving() { return Estado.manejando.load(0) === 1; }
   zoomBy(f) { this.zoomT = Math.max(.25, Math.min(4, this.zoomT * f)); }
   // La vista entera adentro del mapa, que en pantalla es un paralelogramo (cada px hacia arriba corre K/SYN px a la derecha):
-  // así la cámara nunca muestra el borde del mundo. El área jugable está más adentro, detrás del paredón (META.MG m de margen).
+  // así la cámara nunca muestra el borde del mundo. El área jugable está más adentro (META.MG m de margen), con un borde que no se ve.
   limitarVista() {
     const vb = Camera.getViewportBounds(_vista), z = Camera.zoom || 1, cw = vb.width * z, ch = vb.height * z;   // el lienzo, en px de pantalla
     if (!(cw > 0 && ch > 0)) return;

@@ -8,7 +8,7 @@
 //   - firmas: de 2 a 4 letras sueltas, juntas, de un color (el tinte del juego sobre la letra blanca);
 //   - carteles pegados: de 1 a 4, distintos y en cualquier orden;
 //   - enredaderas en su espaldera: paradas en el piso contra la pared, quietas (una por pared, a lo sumo).
-// Cuántos: según el lugar (grafitis: más en lo pobre, en tapiales y paredones; enredaderas: más en lo de más plata) y los knobs
+// Cuántos: según el lugar (grafitis: más en lo pobre y en tapiales; enredaderas: más en lo de más plata) y los knobs
 // «grafitis» y «plantas». Todo sale de la posición de la casa (no del sorteo del barrio), así el resto no cambia.
 const Paredes = (() => {
   const TONOS = 6, LEJOS_MISMO = 45, LEJOS_IGUAL = 160, CELDA = 40, TIRA = 8;   // TIRA: el ancho de las tiras (ver pieza)
@@ -108,7 +108,7 @@ const Paredes = (() => {
     function poner(ranuras, x, y, tipo, riqueza) {
       if (!ranuras || !ranuras.length || (K <= 0 && KE <= 0) || tipo === "poste") return null;
       const rng = R3.rng((Math.imul(Math.round(x * 10), 0x27d4eb2d) ^ Math.imul(Math.round(y * 10), 0x165667b1) ^ 0x5eed6a11) >>> 0);
-      const largo = tipo === "paredon" || tipo === "tapial", p = Math.min(1, K * (largo ? .85 : riqueza < .35 ? .75 : riqueza < .6 ? .55 : .3)), out = [];
+      const largo = tipo === "tapial", p = Math.min(1, K * (largo ? .85 : riqueza < .35 ? .75 : riqueza < .6 ? .55 : .3)), out = [];
       const pe = Math.min(1, KE * (riqueza < .3 ? .06 : riqueza < .6 ? .14 : .2));
       for (const s of ranuras) {
         const max = largo ? Math.max(1, Math.floor(s.L / 5)) : s.L > 8 ? 2 : 1; let libre = null;

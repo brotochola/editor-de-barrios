@@ -288,6 +288,10 @@ const Exportar = (() => {
         if (f.luz) lamparas[n] = { l: f.luz.map(([lx, ly]) => [r4(lx / f.w), r4(ly / f.h)]), z: r2((oy - f.luz[0][1]) * f.e / (CZ * SF)), ...(f.on ? { on: f.on } : {}) };
         if (f.chorro) { const [cx, cy, ty] = f.chorro; fuentes[n] = { dx: r2((cx - f.ox) * f.e), z: r2((oy - cy) * f.e / (CZ * SF)), t: r2((oy - ty) * f.e / (CZ * SF)) }; }
         if (n === "u_semaforo") semAlto = r1(oy * f.e); } }
+    // cuántas decoraciones usan los props en el juego (la escena reserva eso: con 2 por prop sobraban 24 mil en Parque Chas, y el tope de
+    // WeedJS es 524 287): el dibujo y su sombra los que no chocan; los que chocan son entidades, y un farol cuelga 2 por lámpara (centro
+    // y halo) y un semáforo, 4 luces
+    const nDecoProps = props.reduce((n, p) => n + (p.r > 0 ? (lamparas[p.f] ? 2 * lamparas[p.f].l.length : p.f === "u_semaforo" ? 4 : 0) : 1 + (p.sh ? 1 : 0)), 0);
     // los grafitis de las paredes (paredes.js): ya en su tono y saturados, en su hoja (img/grafitis), que también carga el juego
     if (PAR) { const cs = PAR.cuadros().sort((a, b) => b[1].height - a[1].height || (a[0] < b[0] ? -1 : 1)); let x = 0, y = 0, rowH = 0; const pos = {};
       for (const [n, c] of cs) { if (x + c.width > 2048) { x = 0; y += rowH + 2; rowH = 0; } pos[n] = [x, y]; x += c.width + 2; rowH = Math.max(rowH, c.height); }
@@ -335,7 +339,7 @@ const Exportar = (() => {
     for (const q of W.rotondas || []) { const xa = Math.max(0, Math.floor(q[0] - q[3])), xb = Math.min(GW - 1, Math.ceil(q[0] + q[3])), ya = Math.max(0, Math.floor(q[1] - q[3])), yb = Math.min(GH - 1, Math.ceil(q[1] + q[3]));
       for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) { const dx = x + .5 - q[0], dy = y + .5 - q[1], d2 = dx * dx + dy * dy; if (d2 >= q[3] * q[3]) continue;
         const i = y * GW + x; cost[i] = d2 < q[2] * q[2] ? 0 : COST.calle; vereda[i] = 0; } }
-    // afuera del paredón no camina nadie (ni aparece: el juego pone a la gente donde "veredas" tiene dirección)
+    // afuera del área jugable no camina nadie (ni aparece: el juego pone a la gente donde "veredas" tiene dirección)
     for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (!W.dentro(x + .5, y + .5)) { cost[y * GW + x] = 0; vereda[y * GW + x] = 0; }
     const fg = FlowGrid(GW, GH, cost, COST.calle), nDest = Math.max(3, Math.min(10, Math.round(C.destinos || 6)));
     const targets = fg.pickTargets(nDest, R3.rng(B.SEED ^ 0x2545F491), (c) => c === COST.vereda);
@@ -354,7 +358,7 @@ const Exportar = (() => {
       W.classifyInto(x, y, cl); if (cl.k !== 1) return null; const s = cl.s;
       if (s.mat === "pasillo" || s.type === "pasaje" || (s.type === "ave" && Math.abs(cl.ds) < s.med + .2)) return null;   // los pasajes (angostos, de tierra en la villa) no son para el tránsito
       const fwd = cl.ds < 0 ? 1 : -1, lane = laneOff(s), off = cl.ds - (-fwd * lane), pull = Math.max(-.6, Math.min(.6, -off * .35));
-      // calle cortada por el paredón: los últimos 14 m antes de las vallas, el carril que va hacia afuera dobla al de vuelta (giro en U)
+      // calle que sale del área jugable: los últimos 14 m antes del borde, el carril que va hacia afuera dobla al de vuelta (giro en U)
       { let corta = false; for (let d = 3; d <= 14; d += 2.75) if (!W.dentro(x + s.dir[0] * fwd * d, y + s.dir[1] * fwd * d)) { corta = true; break; }
         if (corta) { const g = cl.ds < 0 ? 1 : -1; return toScr(s.n[0] * g + s.dir[0] * fwd * .25, s.n[1] * g + s.dir[1] * fwd * .25); } }
       return toScr(s.dir[0] * fwd + s.n[0] * pull, s.dir[1] * fwd + s.n[1] * pull); }));
@@ -403,7 +407,7 @@ const Exportar = (() => {
     const meta = { escalaCasas: Math.round(1 / DET * 1e5) / 1e5, editor: "editor de barrios · Conurbano", fecha: new Date().toISOString(), seed: B.SEED, knobs: { ...C },
       MW, MH, MG: W.MG || 0, WW, WH, SF, K, SYN, CZ, GC, CW, CH: CHh, WG: WGc, HG: HGc, PW: PWc, PH: PHc, NS, CELL, PXM: 13.5, pisoPartes: offs,
       hojasCasas: hojas.length, peatones: targets.length, nCasas: casas.length, nSombraPts, nFranjas, nPiezas, skew: SKEW ? 1 : 0, hojasCaras, nTiles, nArboles: arboles.length,
-      nPiezasArboles: arboles.reduce((a, t) => a + arbolTipos[t.t].piezas.length, 0), nProps: props.length, nAutos: autos.length, nCables: cables.length, nLineas: lineas.length, props: propsMeta, lamparas, fuentes, nGrafitis: PAR ? PAR.n : 0,
+      nPiezasArboles: arboles.reduce((a, t) => a + arbolTipos[t.t].piezas.length, 0), nProps: props.length, nDecoProps, nAutos: autos.length, nCables: cables.length, nLineas: lineas.length, props: propsMeta, lamparas, fuentes, nGrafitis: PAR ? PAR.n : 0,
       ...(W.inicio ? { inicio: PW(W.inicio[0], W.inicio[1]).map(v => Math.round(v)), lugar: W.real } : {}),
       // rotondas: centro en px de pantalla (x, y) y en m (mx, my), radios de la isla y de la calzada (m) y las salidas: rumbo de cada
       // calle hacia afuera (m) y el corrimiento de su carril de salida (m, a la derecha)

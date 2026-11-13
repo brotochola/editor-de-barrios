@@ -77,7 +77,7 @@ const Barrio = (() => {
       const rol = name, ob = OBJ && OBJ.roles[name] ? elegir(name, h) : null;
       if (ob) name = ob.f;
       if (!F0[name]) return null;
-      if (rol.startsWith("yy_") && !W.dentro(x, y)) return null;   // afuera del paredón, sin yuyos (son la mayoría de los props)
+      if (rol.startsWith("yy_") && !W.dentro(x, y)) return null;   // afuera del área jugable, sin yuyos (son la mayoría de los props)
       // en la calzada sólo lo que va en la calle (vallas, conos, volquetes, contenedores); lo demás que caiga ahí (una maceta de un
       // lote de esquina, un hidrante corrido) no se pone
       if (!EN_CALLE.test(rol)) { const ck = W.classify(x, y); if (ck && ck.k === "road") return null; }
@@ -95,7 +95,7 @@ const Barrio = (() => {
     function calTronco(a, s) { const h = Math.abs(Math.imul(Math.round(a.x * 7), 0x27d4eb2d) ^ Math.imul(Math.round(a.y * 7), 0x165667b1)) % 1000 / 1000;
       if (h < (s.w < .5 ? .55 : .3)) a.t += "_c"; return true; }
     function arbol(x, y, flip, tipo) { const t = tipo || Arboles.pick(r, W.wealthAt(x, y), W.estilo && W.estilo.arboles); if (duro(x, y) || !claim(x, y, .4)) return null; const a = { t, x, y, flip: !!flip, cr: .28 }; arboles.push(a); return a; }
-    const person = (x, y, stay) => { if (conGente && W.dentro(x, y)) people.push({ x, y, stay: !!stay }); };   // afuera del paredón no hay gente
+    const person = (x, y, stay) => { if (conGente && W.dentro(x, y)) people.push({ x, y, stay: !!stay }); };   // afuera del área jugable no hay gente
     const at = (s, t, off) => [s.a[0] + s.dir[0] * t + s.n[0] * off, s.a[1] + s.dir[1] * t + s.n[1] * off];
 
     // ---- plazas: árboles en el borde y sueltos, faroles y bancos sobre los senderos, monumento o fuente en el medio,
@@ -180,26 +180,10 @@ const Barrio = (() => {
       for (let k = 0, n = Math.min(12, Math.round(A / 45)) * C.gente; k < n; k++) { const q = at2(rx.uni(-hA * .85, hA * .85), rx.uni(-hB * .85, hB * .85)); person(q[0], q[1], false); }
     }
 
-    // ---- paredón: cierra el área jugable (afuera el mundo sigue, sin gente ni autos andando ni yuyos). Primero se reserva su
-    // línea, así nada se pone encima, y los lotes que lo cruzan quedan vacíos
-    const MG = W.MG, PX0 = MG, PY0 = MG, PX1 = W.MW - MG, PY1 = W.MH - MG;
-    const lados = MG > 0 ? [[PX0, PY0, PX1, PY0], [PX0, PY1, PX1, PY1], [PX0, PY0, PX0, PY1], [PX1, PY0, PX1, PY1]] : [];
-    for (const [ax, ay, bx, by] of lados) { const L = Math.hypot(bx - ax, by - ay); for (let t = 0; t <= L; t += .4) claim(ax + (bx - ax) * t / L, ay + (by - ay) * t / L, .5); }
-    const cruzaParedon = (lot) => { if (!MG || !lot.q) return false; let ins = 0; for (const p of lot.q) if (W.dentro(p[0], p[1])) ins++; return ins > 0 && ins < lot.q.length; };
-    // El paredón va sólo sobre tierra: donde cruza una calle o una vereda, la calle está cortada con vallas (como un corte de
-    // calle por obra), que también tienen colisionador. Tramos de hasta 12 m (o lo que quede entre dos calles).
-    { const SEG = 12, T = .36, PASO = .5;
-      for (const [ax, ay, bx, by] of lados) { const L = Math.hypot(bx - ax, by - ay), ux = (bx - ax) / L, uy = (by - ay) / L, phi = Math.atan2(uy, ux), phiQ = qa(phi), nx = -uy, ny = ux;
-        const runs = []; let cur = null;
-        for (let t = 0; t <= L; t += PASO) { const tierra = !W.classify(ax + ux * t, ay + uy * t);
-          if (!cur || cur.tierra !== tierra) { if (cur) cur.t1 = t; cur = { tierra, t0: t, t1: L }; runs.push(cur); } }
-        let k = 0;
-        for (const rn of runs) {
-          if (rn.tierra) { for (let t = rn.t0; t < rn.t1 - .3; t += SEG, k++) { const w = Math.min(SEG, rn.t1 - t); if (w < .8) continue; const sx = ax + ux * t, sy = ay + uy * t;
-              addObj("tapial", { t: "paredon", W: Math.round(w * 2) / 2, a: aIdx(phi), s: k % 4 }, null, sx, sy, phiQ, null,
-                [[sx, sy], [sx + ux * w, sy + uy * w], [sx + ux * w + nx * T, sy + uy * w + ny * T], [sx + nx * T, sy + ny * T]]); } }
-          else if (F.u_valla) for (let t = rn.t0 + .35; t < rn.t1 - .2; t += .75) put("u_valla", ax + ux * t, ay + uy * t, { noClaim: true });
-        } } }
+    // ---- el borde del área jugable: sin paredón (el dueño, 13/11: «quitá los paredones de alrededor, y simplemente no permitimos que
+    // salgan, mágicamente»). Afuera el mundo sigue igual (casas, veredas, calles), sin gente ni autos andando ni yuyos: la gente no
+    // camina afuera (su flowfield no tiene costo ahí), los autos dan la vuelta antes del borde (el de las calles) y el tuyo no lo cruza
+    // (conurbanoScene.js: AutoJugador). Los lotes que cruzan el borde se arman como los demás
 
     // ---- las esquinas de la fuente (Parque Chas): el edificio copiado a mano, con la planta del lote; el café saca sus mesas
     function esquinaChas(lot) {
@@ -232,7 +216,6 @@ const Barrio = (() => {
     // ---- casas y tapiales
     for (const lot of W.lots) {
       if (lot.kind === "sendero") continue;
-      if (cruzaParedon(lot)) continue;
       if (lot.kind === "esquina") { esquinaLote(lot); continue; }
       if (lot.kind === "esquinaChas") { esquinaChas(lot); continue; }
       if (lot.kind === "plaza") { if (lot.plaza.real) plazaReal(lot); else plaza(lot); continue; }
@@ -667,7 +650,7 @@ const Barrio = (() => {
     // un baldío, lo que queda entre lotes); la del fondo, salvo que la ponga el lote de atrás (también detrás de la casa del fondo); y
     // donde la casa deja un pasillo a un costado, la medianera arranca en el frente y un pedazo de pared lo cierra sobre la vereda. De a
     // metro (los pedazos del frente, de a medio). Tapia, ladrillo o alambrado, de la semilla del lote; en lo rico, casi siempre tapia
-    { const patio = (l) => l && !cruzaParedon(l) && (PATIOS.has(l.kind) || (l.kind === "edificio" && l.ld < 14) || (l.kind === "petit" && l.ld < 11));
+    { const patio = (l) => l && (PATIOS.has(l.kind) || (l.kind === "edificio" && l.ld < 14) || (l.kind === "petit" && l.ld < 11));
       const ancho = (o) => { const w = o.e.spec.W, u0 = o.place.u0 + (o.place.uw - w) / 2; return [u0, u0 + w]; };
       // hasta dónde se puede ir por P(t) sin pisar una calle o una vereda (un lote de esquina de las calles reales puede meterse en la
       // calle de al lado, y su medianera la cruzaba)
@@ -701,7 +684,6 @@ const Barrio = (() => {
     if (spec.t === "casa") return Houses.build({ kind: spec.k, W: spec.W, D: spec.D, p: spec.p, seed: 1000 + spec.v * 7919 + spec.wb * 104729 + spec.a * 31 + Math.round(spec.W * 10) * 17 + (spec.co ?? 0) * 613 + (spec.tj ?? 0) * 389 + (spec.ct ? spec.ct.length * 977 + spec.ct.charCodeAt(spec.ct.length - 1) * 131 : 0), wealth: [.25, .7][spec.wb], co: spec.co, al: spec.al, tj: spec.tj, ct: spec.ct, rb: spec.rb }, phi);
     if (spec.t === "chas") return Houses.chas(spec, phi);
     if (spec.t === "esquina") return Houses.esquina({ W: spec.W, D: spec.D, c: spec.c, p: spec.p, rub: spec.rub, seed: 9000 + spec.rub * 7919 + spec.p * 104729 + spec.a * 31, wealth: .5 }, phi);
-    if (spec.t === "paredon") return Houses.paredon(spec.W, 700 + spec.s, phi);
     if (spec.t === "tapial") return Houses.tapial(spec.W, 500 + spec.s, spec.tk, phi);
     if (spec.t === "medianera") return Houses.medianera(spec.W, 600 + spec.s, spec.tk, phi, !!spec.ve);
     return Houses.poste(7, phi, !!spec.l);

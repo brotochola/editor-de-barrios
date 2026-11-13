@@ -13,7 +13,7 @@ const World = (() => {
   const PAIRS = []; for (let i = 0; i < 48; i++) { const j = angIdx(ANG[i] + Math.PI / 2); if (angDist(ANG[j], ANG[i] + Math.PI / 2) < 1.6 * Math.PI / 180) PAIRS.push([ANG[i], ANG[j]]); }
 
   function generate(seed) {
-    // el mundo es el área jugable (mapW × mapH) más el margen de cada lado: ciudad del otro lado del paredón que la cierra.
+    // el mundo es el área jugable (mapW × mapH) más el margen de cada lado: ciudad alrededor, del otro lado de un borde que no se ve.
     // Con "barrio real" el mapa sale de OpenStreetMap (REAL, de herramientas/osm_real.py): calles, villa, plazas y canchas
     // de verdad, con su propio tamaño
     const C = CFG.v, RS = typeof REALES !== "undefined" ? REALES : {}, RM = C.real ? (RS[["", "carabobo", "parquechas"][C.real | 0]] || RS.carabobo || null) : null;

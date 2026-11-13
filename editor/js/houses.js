@@ -102,7 +102,7 @@ const Houses = (() => {
     t.shade(x0, y0, x1, y0 + 2, .6);
   }
   // pintadas: graffiti.js (relevamiento de las paredes porteñas: aerosol, de pintor, poesía, firmas, bombas). CTX dice dónde:
-  // lo pone cada constructor (casa pobre, villa, paredón) antes de pintar
+  // lo pone cada constructor (casa pobre, villa) antes de pintar
   let CTX = {};
   // ---------- modo kit (caras.js: casas por caras con skew). Los detalles chicos (tanque, aire, antena, maceta) no se
   // arman con cajas: se anotan en sc.acc y el exportador los dibuja como un sprite compartido cada uno (como el tanque
@@ -785,18 +785,6 @@ const Houses = (() => {
       sc.box(tx, ty, zr, tx + .9, ty + .9, zr + 1.0, { front: [40, 40, 44], back: [40, 40, 44], left: [30, 30, 34], right: [30, 30, 34], top: [62, 62, 66] }); }
     return { sc, storeys, depth: D, shop: name, height: Htot };
   }
-  // paredón del borde del área jugable: revoque gastado de 3 m con pilares cada 4 m, pintadas y alambre de púas arriba
-  // (como los paredones de las vías). Local: a lo largo de x, el espesor hacia +y.
-  function paredon(W, seed, phi = 0) {
-    const sc = new Scene(); sc.setXform(phi); const r = rng(seed), H = 3; CTX = { paredon: true };
-    const t = new Tex(W, H, seed); t.stucco(r.pick([[176, 170, 158], [196, 186, 166], [168, 160, 150], [190, 176, 150]]), 1.6); t.runoff(.9, 1.6); t.peel(3); t.humidity(.9);
-    for (let x0 = 4 + r.int(0, 30); x0 < t.w - 50;) { const x1 = Math.min(t.w - 4, x0 + r.int(60, 100)); if (r() < .8) pintada(t, x0 + 8, x1 - 8, px(r.uni(.6, 1.5)), r); x0 = x1 + r.int(25, 60); }   // sin pisarse (la letra con borde es más ancha de lo que calcula pintada)
-    sc.box(0, 0, 0, W, .3, H, { front: t, back: t, top: [150, 146, 138], right: [128, 124, 118], left: [138, 134, 128] });
-    for (let xp = 0; xp < W - .1; xp += 4) sc.box(xp, -.06, 0, xp + .4, .36, H + .1, { front: [182, 176, 164], back: [182, 176, 164], top: [204, 198, 186], right: [140, 136, 128], left: [150, 146, 138] });
-    for (let xp = .2; xp < W; xp += 2) sc.box(xp, .12, H, xp + .05, .17, H + .5, { front: [70, 66, 62], back: [70, 66, 62], right: [56, 52, 50], left: [60, 56, 52], top: [80, 76, 72], cast: false });
-    for (const z of [H + .2, H + .34, H + .47]) sc.box(0, .13, z, W, .16, z + .03, { front: [96, 92, 88], back: [96, 92, 88], top: [120, 116, 110], cast: false });
-    return { sc };
-  }
   // poste de madera (cruceta perpendicular a la calle) — local: calle a lo largo de x
   function poste(seed, phi, luz) {
     const sc = new Scene(); sc.setXform(phi);
@@ -938,5 +926,5 @@ const Houses = (() => {
     sc.box(0, 0, 0, W, .15, H, { front: t, back: t, top: [204, 200, 190] });
     return { sc };
   }
-  return { build, tapial, paredon, esquina, poste, medianera, WALLS, ESQ, CO, setKit, accesorio, chas };
+  return { build, tapial, esquina, poste, medianera, WALLS, ESQ, CO, setKit, accesorio, chas };
 })();
