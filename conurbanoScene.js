@@ -21,7 +21,7 @@ const BARRIO = new URL('./' + DIR + '/', import.meta.url).href;
 
 const { Scene, GameObject, Component, SharedResource, RigidBody, Collider, CollisionListener, SpriteRenderer, VolumeShadowCaster, Transform,
   Camera, Keyboard, Mouse, NavGrid, Layer, LAYER_KIND, BLEND_MODES, SpriteSheetRegistry, LightEmitter, LightOccluder, ShadowCaster, Sun, enums, rng, dot2,
-  ParticleEmitter, PARTICLE_EASE } = WEED;
+  ParticleEmitter, PARTICLE_EASE, DecorationComponent } = WEED;
 // todas las luces del barrio: blanco amarillento de ciudad (~3000 K)
 const LUZ = 0xffdcaa;
 // la luz de la noche (lighting.sun.night): una luna azulada que WeedJS suma a la luz de la escena cuando el sol baja de 0,4
@@ -35,6 +35,13 @@ const R_FAROL = 10 * Math.sqrt(1800 * 2.2), R_POSTE = 10 * Math.sqrt(1500 * 2.2)
 // ancho de la huella), medidos sobre el piso. Llegan a unos 65 m (900 px; la mitad de la luz a 90 px, 6,7 m, y un quinto a 13 m);
 // cada uno abre 44° y se esfuma en la mitad de afuera de cada lado, a 0,7 de brillo (donde se juntan, adelante, suman)
 const R_FARO = 900, CONO_FARO = 44 * Math.PI / 180, BORDE_FARO = .5, BRILLO_FARO = .7, FARO_LADO = .62;
+// la baliza del patrullero (el dueño, 13/11: «luz roja y azul en su techo, apuntando hacia los costados, intercaladamente azul y
+// rojo de cada lado»): un cono a cada costado, desde el costado de la huella hacia afuera, que cambia de rojo a azul cada SIRENA_T
+// segundos (cuando un lado es rojo, el otro es azul), y en el techo una lamparita de cada lado del mismo color. Las lamparitas
+// titilan siempre; los conos alumbran sólo de noche (de día la luz se sumaría a la del sol y borraría las sombras). Sin sombras
+// (castShadows 0: más barato). Abren 120°, llegan a 420 px (la mitad de la luz a 42 px, 3 m), a 1,5 de brillo (con 1, de color
+// sobre el asfalto oscuro, casi no se veían) y salen de la altura del techo
+const BRILLO_SIRENA = 1.5, R_SIRENA = 420, CONO_SIRENA = 120 * Math.PI / 180, BORDE_SIRENA = .6, SIRENA_T = .3, ROJO_SIRENA = 0xff2a2a, AZUL_SIRENA = 0x2f5bff;
 // el brillo en la lámpara (LightEmitter.glow, su alfa): el de antes, intensidad · 0,55 / 25 000 (0,5 en los postes)
 const BRILLO_FAROL = R_FAROL * R_FAROL / 100 * .55 / 25000, BRILLO_POSTE = R_POSTE * R_POSTE / 100 * .5 / 25000;
 const { ShapeType } = enums;
@@ -100,7 +107,11 @@ export class AutoComp extends Component {
     hl: Float32Array, hw: Float32Array,   // medio largo y medio ancho del colisionador (px): la IA y la gente miran el tamaño de cada vehículo
     ha: Float32Array, hb: Float32Array,   // medio largo y medio ancho de la huella en el piso, en px del dibujo (18 px/m, piso aplastado a AUTO_S)
     faros: Uint8Array,                    // 1: lleva faros (su luz, en la esquina izquierda del frente, y la del Faro de la derecha)
-    faro: Int32Array,                     // el Faro de la derecha: su índice + 1 (0: no tiene)
+    faro: Int32Array,                     // el faro derecho (una LuzAuto): su índice + 1 (0: no tiene)
+    // la baliza del patrullero: sus dos LuzAuto (izquierda, derecha) y sus dos lamparitas (decoraciones pegadas), índice + 1;
+    // techo: a cuántos px de pantalla sobre el piso va la baliza; fase: segundos que corre su titileo (no todos a la vez)
+    // (punI, punD: el punto de color de cada lamparita, sobre la lámpara pintada del dibujo: se ve también de día)
+    sirI: Int32Array, sirD: Int32Array, lamI: Int32Array, lamD: Int32Array, punI: Int32Array, punD: Int32Array, techo: Float32Array, fase: Float32Array,
     // estado de la IA: en componentes (no en campos del objeto), porque una entidad puede pasar de un worker de lógica a otro
     sx: Float32Array, sy: Float32Array, sr: Float32Array, lx: Float32Array, ly: Float32Array, stuck: Float32Array, libre: Float32Array, parado: Float32Array,
     pf: Float32Array,      // qué tan cerca de la máxima maneja (0,8 a 0,97: nadie se pasa)
@@ -413,18 +424,24 @@ const _huella = [0, 0];
 const _apoyo = new Map();
 function apoyoDe(sheet) { let t = _apoyo.get(sheet); if (t === undefined) { t = APOYO[sheet.slice(5)] || null; _apoyo.set(sheet, t); } return t; }
 // los faros: dos conos (R_FARO) desde las esquinas del frente de la huella. WeedJS da una luz por entidad: la de la izquierda es
-// la del propio auto (LightEmitter.offsetX/offsetY giran con él, y el cono apunta adonde mira: direction 0); la de la derecha, un
-// Faro, una entidad con sólo su luz que el auto pone en su esquina y apunta en cada tick (y prende y apaga con la suya). El dibujo
+// la del propio auto (LightEmitter.offsetX/offsetY giran con él, y el cono apunta adonde mira: direction 0); la de la derecha, una
+// LuzAuto, una entidad con sólo su luz que el auto pone en su esquina y apunta en cada tick (y prende y apaga con la suya). El dibujo
 // del auto se espeja con flipX, pero eso es del dibujo: la luz no lo sigue (followFlip 0, el de siempre). Sin brillos
 const LUZ_FARO = 0xfff0d0;
 function conoFaro(L) {
   L.color = LUZ_FARO; L.glow = 0; L.radius = R_FARO; L.brightness = BRILLO_FARO; L.shadowRange = SOMBRA_FARO;
   L.coneAngle = CONO_FARO; L.coneSoftness = BORDE_FARO; L.direction = 0;
 }
-// (con ?raycast=1 el Faro, sin colisionador ni dibujo, no está en la grilla espacial: su luz no busca las casas que la tapan)
-export class Faro extends GameObject {
+function conoSirena(L, techo) {
+  L.color = ROJO_SIRENA; L.glow = 0; L.radius = R_SIRENA; L.brightness = BRILLO_SIRENA; L.elevation = techo; L.castShadows = 0;
+  L.coneAngle = CONO_SIRENA; L.coneSoftness = BORDE_SIRENA; L.direction = 0;
+}
+// una luz pegada a un auto: el faro derecho, o un lado de la baliza del patrullero (c.sirena, con c.techo). Sólo su luz: el auto la
+// pone en su lugar, la apunta (no gira: su direction es la de la luz en el mundo) y la prende en cada tick (Auto._luces)
+// (con ?raycast=1, sin colisionador ni dibujo, no está en la grilla espacial: su luz no busca las casas que la tapan)
+export class LuzAuto extends GameObject {
   static components = [LightEmitter];
-  onSpawned() { conoFaro(this.lightEmitter); this.lightEmitter.active = 0; }
+  onSpawned(c = {}) { if (c.sirena) conoSirena(this.lightEmitter, c.techo || 0); else conoFaro(this.lightEmitter); this.lightEmitter.active = 0; }
 }
 // los cables por su estilo (mundo.json cables[i][4], del editor): [grosor en px de mundo, tinte, alfa]. 0 de luz (los de la cruceta),
 // 1 de teléfono y tele (más gruesos), 2 bajada a una casa, 3 rienda al piso (acero galvanizado)
@@ -458,22 +475,59 @@ export class Auto extends GameObject {
     A.faro = 0;
     if (c.faros) {   // _frame corre las luces a las esquinas del frente de la huella cuando el auto gira
       conoFaro(L); L.offsetX = A.hl; L.offsetY = -A.hw * FARO_LADO; L.active = 1;
-      const f = Faro.spawn({ x: this.x, y: this.y }); if (f) A.faro = f.index + 1;
+      const f = LuzAuto.spawn({ x: this.x, y: this.y }); if (f) A.faro = f.index + 1;
       // (el auto lee sus vecinos: con raycast su luz busca las casas que la tapan sólo dentro de su visualRange, que llega
       // hasta el alcance de sus sombras, desde el frente)
       if (RAYCAST) this.collider.visualRange = SOMBRA_FARO + A.hl;
       luzNace(this, 0, 0, 0);   // los faros se prenden a su hora
     } else { L.radius = 0; L.offsetX = 0; L.offsetY = 0; L.active = 0; this.luzHora.base = 0; }
-    this._frame(); this._faro();
+    // el patrullero (circulando o estacionado): su baliza
+    A.sirI = A.sirD = A.lamI = A.lamD = A.punI = A.punD = 0;
+    if (String(c.hoja || '').startsWith('policia')) {
+      A.techo = sh; A.fase = rng() * 10;
+      const a = LuzAuto.spawn({ x: this.x, y: this.y, sirena: 1, techo: sh }); if (a) A.sirI = a.index + 1;
+      const b = LuzAuto.spawn({ x: this.x, y: this.y, sirena: 1, techo: sh }); if (b) A.sirD = b.index + 1;
+      // las lamparitas: un punto de color sobre cada lámpara pintada del dibujo (con el auto: se ve de día y lo tapa lo que tapa al
+      // auto) y su halo en la capa 'brillos' (aditiva, arriba de las entidades: no se ordena con las casas; de día casi no se ve)
+      const op = { tint: ROJO_SIRENA, alpha: 1, anchorX: .5, anchorY: .5 };
+      A.punI = this.addDecoration('_whiteCircle', 0, -sh, .36, .36, 2, op) + 1; A.punD = this.addDecoration('_whiteCircle', 0, -sh, .36, .36, 2, { ...op, tint: AZUL_SIRENA }) + 1;
+      A.lamI = this.addDecoration('_lightGradient', 0, -sh, .3, .3, 1, { ...op, layer: 'brillos' }) + 1; A.lamD = this.addDecoration('_lightGradient', 0, -sh, .3, .3, 1, { ...op, tint: AZUL_SIRENA, layer: 'brillos' }) + 1;
+      // el estacionado no tiene faros: sus horas de noche, como las de una luz fija
+      if (!c.faros) { horasLuz(c.x || this.x, c.y || this.y, _hl); this.luzHora.prende = _hl[0]; this.luzHora.apaga = _hl[1]; }
+    }
+    this._frame(); this._luces();
   }
-  onDespawned() { const A = this.autoComp; A.active = 0; if (A.faro) { Faro.despawn(A.faro - 1); A.faro = 0; } }
-  // el Faro de la derecha: en la esquina derecha del frente (la de la luz propia, espejada de costado), apuntando adonde mira el
-  // auto (el Faro no gira: su direction es el rumbo), prendido y apagado con la luz propia
-  _faro() {
-    const i = this.index, f = AutoComp.faro[i] - 1; if (f < 0) return;
-    const c = Transform.rotC ? Transform.rotC[i] : 1, s = Transform.rotS ? Transform.rotS[i] : 0, ox = LightEmitter.offsetX[i], oy = -LightEmitter.offsetY[i];
-    const go = GameObject.get(f); if (go) { go.x = this.x + c * ox - s * oy; go.y = this.y + s * ox + c * oy; }
-    LightEmitter.dirC[f] = c; LightEmitter.dirS[f] = s; LightEmitter.radius[f] = LightEmitter.radius[i]; LightEmitter.active[f] = LightEmitter.active[i];
+  onDespawned() {
+    const A = this.autoComp; A.active = 0;
+    for (const k of ['faro', 'sirI', 'sirD']) if (A[k]) { LuzAuto.despawn(A[k] - 1); A[k] = 0; }
+    A.lamI = A.lamD = 0;
+  }
+  // las luces pegadas al auto (LuzAuto), en su lugar y apuntadas en cada tick. El faro derecho: en la esquina derecha del frente
+  // (la de la luz propia, espejada de costado), hacia adelante, prendido y apagado con la luz propia. La baliza: un cono a cada
+  // costado, desde el costado de la huella hacia afuera, de noche; los colores cambian cada SIRENA_T s, un lado rojo y el otro azul
+  _luces() {
+    const i = this.index, A = AutoComp, c = Transform.rotC ? Transform.rotC[i] : 1, s = Transform.rotS ? Transform.rotS[i] : 0;
+    const f = A.faro[i] - 1;
+    if (f >= 0) {
+      const ox = LightEmitter.offsetX[i], oy = -LightEmitter.offsetY[i], go = GameObject.get(f);
+      if (go) { go.x = this.x + c * ox - s * oy; go.y = this.y + s * ox + c * oy; }
+      LightEmitter.dirC[f] = c; LightEmitter.dirS[f] = s; LightEmitter.radius[f] = LightEmitter.radius[i]; LightEmitter.active[f] = LightEmitter.active[i];
+    }
+    if (!A.lamI[i] && !A.sirI[i]) return;
+    // (en pantalla, con y hacia abajo, la derecha del rumbo (c, s) es (−s, c))
+    const rojoIzq = (Math.floor((performance.now() / 1000 + A.fase[i]) / SIRENA_T) & 1) === 0, w = A.hw[i], h = Sun.hour;
+    const noche = h >= LuzHora.prende[i] || h < LuzHora.apaga[i] ? 1 : 0;
+    for (let k = -1; k <= 1; k += 2) {
+      const col = (k < 0) === rojoIzq ? ROJO_SIRENA : AZUL_SIRENA, e = (k < 0 ? A.sirI[i] : A.sirD[i]) - 1, d = (k < 0 ? A.lamI[i] : A.lamD[i]) - 1;
+      if (e >= 0) {
+        const go = GameObject.get(e); if (go) { go.x = this.x - s * k * w; go.y = this.y + c * k * w; }
+        LightEmitter.dirC[e] = -s * k; LightEmitter.dirS[e] = c * k; LightEmitter.color[e] = col; LightEmitter.active[e] = noche; LightEmitter.radius[e] = noche ? R_SIRENA : 0;
+      }
+      // (las columnas de las decoraciones están en DecorationComponent; Decoration es la fachada de un lugar del pool)
+      const D = DecorationComponent, lx = -s * k * w * .4, ly = c * k * w * .4 - A.techo[i];
+      if (d >= 0) { D.localX[d] = lx; D.localY[d] = ly; D.tint[d] = col; }
+      const p = (k < 0 ? A.punI[i] : A.punD[i]) - 1; if (p >= 0) { D.localX[p] = lx; D.localY[p] = ly; D.tint[p] = col; }
+    }
   }
   // agarre lateral (las ruedas no patinan de costado)
   _friction() {
@@ -511,7 +565,7 @@ export class Auto extends GameObject {
     }
   }
   tick() {
-    const i = this.index; if (!Transform.active[i]) return; this._friction(); this._frame(); luzHora(this); this._faro();
+    const i = this.index; if (!Transform.active[i]) return; this._friction(); this._frame(); luzHora(this); this._luces();
   }
 }
 export class AutoEstacionado extends Auto { }
@@ -797,7 +851,7 @@ export class ConurbanoScene extends Scene {
     [Transito, { grid: { type: Uint16Array, length: Math.max(1, TR.W * TR.H) }, cruces: { type: Float32Array, length: Math.max(6, TR.n * 6) } }],
     [Semaforos, { ids: { type: Int32Array, length: Math.max(4, (TR.nSem || 0) * 4) } }],
   ];
-  static entities = [[Casa, META.nCasas + 8], [Arbol, META.nArboles + 8], [Prop, META.nProps + 64], [Persona, GENTE_MAX], [AutoIA, META.nAutosM + 8], [AutoEstacionado, META.nAutos - META.nAutosM - META.nChatarras + 8], [Chatarra, META.nChatarras + 8], [AutoJugador, 1], [Faro, META.nAutosM + 9], [Chorro, 8]];
+  static entities = [[Casa, META.nCasas + 8], [Arbol, META.nArboles + 8], [Prop, META.nProps + 64], [Persona, GENTE_MAX], [AutoIA, META.nAutosM + 8], [AutoEstacionado, META.nAutos - META.nAutosM - META.nChatarras + 8], [Chatarra, META.nChatarras + 8], [AutoJugador, 1], [LuzAuto, META.nAutosM + 9 + 2 * META.nPoli], [Chorro, 8]];
   // (cada clase de auto, su pool justo: WeedJS no pasa de 65 535 entidades (Box2D) y Parque Chas, con 23 000 personas, llega cerca;
   // antes los que circulan y los estacionados tenían lugar para todos los autos del barrio cada uno)
 

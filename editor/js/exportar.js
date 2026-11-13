@@ -336,7 +336,8 @@ const Exportar = (() => {
       peatones: targets.length, nCasas: casas.length, nSombraPts, skew: 1, hojasCaras, nTiles, nArboles: arboles.length,
       nPiezasArboles: arboles.reduce((a, t) => a + arbolTipos[t.t].piezas.length, 0), nProps: props.length, nDecoProps, nAutos: autos.length,
       // (los que circulan y las chatarras: la escena da a cada clase de auto su pool justo; WeedJS no pasa de 65 535 entidades)
-      nAutosM: autos.filter(a => a.m && a.c !== "burnt").length, nChatarras: autos.filter(a => a.c === "burnt").length, nCables: cables.length, nLineas: lineas.length, props: propsMeta, lamparas, fuentes, nGrafitis: PAR ? PAR.n : 0,
+      // (y los patrulleros: cada uno lleva dos luces más, las de su baliza)
+      nAutosM: autos.filter(a => a.m && a.c !== "burnt").length, nChatarras: autos.filter(a => a.c === "burnt").length, nPoli: autos.filter(a => a.c === "poli").length, nCables: cables.length, nLineas: lineas.length, props: propsMeta, lamparas, fuentes, nGrafitis: PAR ? PAR.n : 0,
       ...(W.inicio ? { inicio: PW(W.inicio[0], W.inicio[1]).map(v => Math.round(v)), lugar: W.real } : {}),
       // rotondas: centro en px de pantalla (x, y) y en m (mx, my), radios de la isla y de la calzada (m) y las salidas: rumbo de cada
       // calle hacia afuera (m) y el corrimiento de su carril de salida (m, a la derecha)
