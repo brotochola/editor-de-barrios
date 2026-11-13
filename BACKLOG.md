@@ -111,9 +111,13 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   jardín, con plantas»). Cada casa: baldosas pegadas a la casa (roja, calcáreo blanco y negro, cerámico, ladrillo, vainilla gris o
   cemento, de su semilla), alineadas con ella (piso.bin trae el rumbo de cada lote: la parte «patios»), y detrás su jardín: pasto,
   tierra en lo pobre, yuyos si está abandonado; a veces todo patio. Las plantas de tierra, en el jardín; en el patio, macetas.
-- [ ] **Medianeras que se abren del lote; plantas encima de la tapa** — en curso (el dueño, 13/11). La medianera de un costado iba
-  girada al rumbo de auto más cercano (la perpendicular a la calle casi nunca es uno) y se abría del borde del lote, que sigue el
-  piso; y una planta detrás de una medianera se dibujaba encima de la pared y de su tapa (columnas de 32 px; la tapa, de una pieza).
+- [ ] **Medianeras que se abren del lote; plantas encima de la tapa** — hecho (el dueño, 13/11). Las medianeras se dibujaban
+  giradas al rumbo de auto más cercano (cada 7,5°), no al de su lote: una de 26 m de un lote a 171,1° salía a 165,8°, 2,3 m fuera
+  de su lugar y metida en la casa del fondo («esa línea que se va abriendo»). Ahora llevan su ángulo exacto (spec.ph; el diseño se
+  comparte entre ángulos y el atlas no crece) y van en el marco de su lote. Una planta de atrás ya no queda encima: columnas de
+  16 px (antes 32) y la tapa ordenada por la punta de adelante de su pared. No pasan a menos de 0,5 m de la casa de otro lote (se
+  cortan en tramos) ni dejan pasillos de menos de 90 cm junto a la casa. Las casas siguen al rumbo de auto más cercano: en un lote
+  que no está en uno de esos rumbos, la casa queda girada hasta 3,75° respecto del lote.
 
 ## Luces
 

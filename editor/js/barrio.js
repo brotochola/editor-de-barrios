@@ -5,6 +5,8 @@
 const Barrio = (() => {
   // las casas se hornean en los mismos 48 rumbos que las calles (los de los autos): así quedan paralelas a su vereda
   const aIdx = (a) => World.angIdx(a), qa = (a) => World.ANG[World.angIdx(a)], Q = Math.PI / 24;
+  // el ángulo exacto de una pared (en décimas de grado): se dibuja girada así, no con el rumbo de auto más cercano (build3D)
+  const phD = (a) => Math.round((((a * 180 / Math.PI) % 360) + 360) % 360 * 10) / 10, dePh = (ph) => ph * Math.PI / 180;
   const Wb = (w, step) => Math.max(3, Math.floor(w / step + 1e-6) * step);
   const Db = (d, deep) => deep ? (d < 6 ? 5 : d < 8 ? 7 : d < 10 ? 9 : 11) : d;
   const EN_CALLE = /^(u_valla|u_cono|c_volquete|u_contenedor|c_palomas|yy_|gd_|obra_material)/;
@@ -396,11 +398,11 @@ const Barrio = (() => {
       const sobra = (q) => { if (W.lotAt(q[0], q[1]) || !W.dentro(q[0], q[1]) || W.wealthAt(q[0], q[1]) < .3) return false; W.classifyInto(q[0], q[1], cl); return cl.k === 0; };
       const tramo = (s, side, t0, t1) => { const L = t1 - t0; if (L < 1.5) return; const n = Math.ceil(L / MAXL);
         for (let i = 0; i < n; i++) { const a0 = t0 + L * i / n, a1 = t0 + L * (i + 1) / n, Lq = Math.round((a1 - a0) * 2) / 2; if (Lq < 1) continue;
-          const phi = Math.atan2(-side * s.n[0], side * s.n[1]), phiQ = qa(phi), dq = [Math.cos(phiQ), Math.sin(phiQ)], nq = [-dq[1], dq[0]];   // x a lo largo, y hacia adentro
+          const phi = Math.atan2(-side * s.n[0], side * s.n[1]), dq = [Math.cos(phi), Math.sin(phi)], nq = [-dq[1], dq[0]];   // (al ángulo exacto de la calle)   // x a lo largo, y hacia adentro
           const c = at(s, (a0 + a1) / 2, side * (s.hw + s.sw + .05)), sx = c[0] - dq[0] * Lq / 2, sy = c[1] - dq[1] * Lq / 2;
           const rq = R3.rng((Math.imul(Math.round(c[0] * 7), 73856093) ^ Math.imul(Math.round(c[1] * 7), 19349663)) >>> 0), w = W.wealthAt(c[0], c[1]);
           const tk = pickW(rq, w < .45 ? [["tapia", 3], ["ladrillo", 3]] : [["tapia", 5], ["ladrillo", 2]]);
-          addObj("tapial", { t: "medianera", tk, W: Lq, a: aIdx(phi), s: k++ % 3, ve: 1 }, null, sx, sy, phiQ, null,
+          addObj("tapial", { t: "medianera", tk, W: Lq, a: aIdx(phi), ph: phD(phi), s: k++ % 3, ve: 1 }, null, sx, sy, phi, null,
             [[sx, sy], [sx + dq[0] * Lq, sy + dq[1] * Lq], [sx + dq[0] * Lq + nq[0] * .25, sy + dq[1] * Lq + nq[1] * .25], [sx + nq[0] * .25, sy + nq[1] * .25]]);
           for (let u = 0; u <= Lq; u += .4) claim(sx + dq[0] * u + nq[0] * .1, sy + dq[1] * u + nq[1] * .1, .25); } };
       for (const s of W.segs) { if (!(s.sw > 0)) continue;
@@ -673,23 +675,52 @@ const Barrio = (() => {
       // hasta dónde se puede ir por P(t) sin pisar una calle o una vereda (un lote de esquina de las calles reales puede meterse en la
       // calle de al lado, y su medianera la cruzaba)
       const cl2 = {}, hasta = (P, L) => { for (let t = .3; t <= L; t += .5) { const q = P(t); W.classifyInto(q[0], q[1], cl2); if (cl2.k !== 0 || !W.dentro(q[0], q[1])) return Math.max(0, t - .5); } return L; };
+      // las casas (su planta), en una grilla de 8 m: una medianera no pasa a menos de CERCA m de una (si no, pared y casa se mezclaban
+      // en franjas al ordenarse: la del fondo de un lote de otra calle corría en diagonal a 30 cm de la casa del fondo del vecino)
+      // (la planta de verdad: el colisionador de una casa cubre todo el ancho de su lote; las esquinas, su polígono. Las del mismo lote no
+      // cuentan: la medianera arranca detrás de su casa o junto a un pasillo, y frena antes de la casa del fondo. A CERCA = .5 la pared y
+      // la casa quedan a más de 20 px de pie en pantalla: ya no se mezclan)
+      const CERCA = .5, GR = 8, casasG = new Map();
+      const planta = (o) => { if (o.kind === "esquina" || o.kind === "chas") return o.collider; if (o.kind !== "house" || !o.place || !o.lot) return null;
+        const l = o.lot, sp = o.e.spec, u0 = o.place.u0 + (o.place.uw - sp.W) / 2, v0 = o.place.v0 + (sp.k === "chalet" && !o.back ? 2.6 : 0), v1 = v0 + (sp.D || 5);
+        const LPo = (u, v) => [l.o[0] + l.ux[0] * u + l.nOut[0] * v, l.o[1] + l.ux[1] * u + l.nOut[1] * v]; return [LPo(u0, v0), LPo(u0 + sp.W, v0), LPo(u0 + sp.W, v1), LPo(u0, v1)]; };
+      for (const o of objs) { const P0 = planta(o); if (!P0) continue; const P = Object.assign(P0.map(q => q.slice()), { lot: o.lot }), xs = P.map(q => q[0]), ys = P.map(q => q[1]);
+        for (let i = Math.floor((Math.min(...xs) - CERCA) / GR); i <= Math.floor((Math.max(...xs) + CERCA) / GR); i++) for (let j = Math.floor((Math.min(...ys) - CERCA) / GR); j <= Math.floor((Math.max(...ys) + CERCA) / GR); j++) {
+          const k = i * 65536 + j; let l = casasG.get(k); if (!l) casasG.set(k, l = []); l.push(P); } }
+      const dSeg = (q, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1e-9, t = Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / L2)); return Math.hypot(q[0] - a[0] - dx * t, q[1] - a[1] - dy * t); };
+      const pegada = (q, lot) => { for (const P of casasG.get(Math.floor(q[0] / GR) * 65536 + Math.floor(q[1] / GR)) || []) { if (P.lot === lot) continue; let dentro = false, d = 1e9;
+          for (let i = 0, n = P.length; i < n; i++) { const a = P[i], b = P[(i + 1) % n]; d = Math.min(d, dSeg(q, a, b)); if ((a[1] > q[1]) !== (b[1] > q[1]) && q[0] < a[0] + (q[1] - a[1]) * (b[0] - a[0]) / (b[1] - a[1])) dentro = !dentro; }
+          if (dentro || d < CERCA) return true; } return false; };
+      // los tramos libres de P(t), t de 0 a L (sin calle, adentro del área, lejos de las casas): [[t0, t1], …]
+      const tramos = (P, L, lot) => { const out = []; let t0 = null; for (let t = 0; t <= L + 1e-6; t += .25) { const q = P(Math.min(t, L)); W.classifyInto(q[0], q[1], cl2);
+          const ok = cl2.k === 0 && W.dentro(q[0], q[1]) && !pegada(q, lot); if (ok && t0 == null) t0 = t; if (t0 != null && (!ok || t + .25 > L + 1e-6)) { out.push([t0, ok ? Math.min(t, L) : t - .25]); t0 = null; } }
+        return out; };
       for (const { lot, LP, phiQ, casa, atras: oA, backV } of patiosLotes) {
         const rm = R3.rng(lot.seed ^ 0x3243f6a8); rm();
         const tk = pickW(rm, lot.w < .35 ? [["tapia", 3], ["ladrillo", 3], ["alambre", 2]] : lot.w < .65 ? [["tapia", 4], ["ladrillo", 2], ["alambre", 1]] : [["tapia", 6], ["ladrillo", 2]]);
         const sm = (lot.seed >>> 5) % 3, phiN = Math.atan2(lot.nOut[1], lot.nOut[0]), vb = lot.ld - .2, chalet = lot.kind === "chalet";
         const [hu0, hu1] = ancho(casa), hd = (chalet ? 2.6 : 0) + casa.e.spec.D, [bu, bu1] = oA ? ancho(oA) : [0, 0];
-        const pasoI = hu0 >= .3, pasoD = lot.fw - hu1 >= .3;   // ¿pasillo a ese costado de la casa?
+        // ¿pasillo a ese costado de la casa? (de 90 cm o más: con uno más angosto la medianera quedaba pegada a la pared de la casa y se
+        // mezclaban en franjas al ordenarse; ahí arranca detrás de la casa y un pedazo de pared cierra el hueco del frente)
+        const pasoI = hu0 >= .9, pasoD = lot.fw - hu1 >= .9, huecoI = hu0 >= .3, huecoD = lot.fw - hu1 >= .3;
         // a lo largo del lote (en u, de va a v1), adentro del lote (de u − .15 a u a la derecha, de u a u + .15 a la izquierda)
-        const lado = (u, va, v1, der) => { const L = Math.floor(hasta((t) => LP(der ? u - .07 : u + .07, va + t), v1 - va)); if (L < 2) return; const ux0 = der ? u : u + .15, [mx, my] = LP(ux0, va);
-          addObj("tapial", { t: "medianera", tk, W: L, a: aIdx(phiN), s: sm }, lot, mx, my, qa(phiN), null, [LP(ux0 - .15, va), LP(ux0, va), LP(ux0, va + L), LP(ux0 - .15, va + L)]); };
+        // (en el marco del lote, a lo largo de su y: girada al rumbo de auto más cercano a la perpendicular de la calle, se abría del
+        // borde del lote y del piso, que lo sigue)
+        // (en tramos: los pedazos lejos de las casas de otros lotes y de la del fondo; la casa del lote no cuenta: la medianera arranca
+        // detrás de ella o al lado de un pasillo de 90 cm o más)
+        const lado = (u, va, v1, der) => { for (const [a, b] of tramos((t) => LP(der ? u - .07 : u + .07, va + t), v1 - va, lot)) { const L = Math.floor(b - a); if (L < 2) continue;
+          const v0 = va + a, ux0 = der ? u : u + .15, [mx, my] = LP(ux0, v0);
+          addObj("tapial", { t: "medianera", tk, W: L, a: aIdx(lot.phi), ph: phD(lot.phi), s: sm, y: 1 }, lot, mx, my, lot.phi, null, [LP(ux0 - .15, v0), LP(ux0, v0), LP(ux0, v0 + L), LP(ux0 - .15, v0 + L)]); } };
         // a lo ancho (en v, de u0 a u1): el fondo, o el pedazo que cierra un pasillo sobre la vereda (ve: va en las columnas finas)
-        const ancha = (u0, u1, v, paso, ve) => { if (!ve) u1 = u0 + hasta((t) => LP(u0 + t, v + .07), u1 - u0); const L = Math.floor((u1 - u0) / paso) * paso; if (L < paso) return; const ua = u0 + (u1 - u0 - L) / 2, [mx, my] = LP(ua, v);
-          addObj("tapial", { t: "medianera", tk: tk === "alambre" ? "tapia" : tk, W: L, a: aIdx(lot.phi), s: sm, ...(ve ? { ve: 1 } : {}) }, lot, mx, my, phiQ, null, [LP(ua, v), LP(ua + L, v), LP(ua + L, v + .15), LP(ua, v + .15)]); };
+        const ancha = (u0, u1, v, paso, ve) => { for (const [a, b] of ve ? [[0, u1 - u0]] : tramos((t) => LP(u0 + t, v + .07), u1 - u0, lot)) { const L = Math.floor((b - a) / paso) * paso; if (L < paso) continue;
+          const ua = u0 + a + (b - a - L) / 2, [mx, my] = LP(ua, v);
+          addObj("tapial", { t: "medianera", tk: tk === "alambre" ? "tapia" : tk, W: L, a: aIdx(lot.phi), ph: phD(lot.phi), s: sm, ...(ve ? { ve: 1 } : {}) }, lot, mx, my, lot.phi, null, [LP(ua, v), LP(ua + L, v), LP(ua + L, v + .15), LP(ua, v + .15)]); } };
         const vf = (paso) => paso ? .15 : hd + .3;   // donde arranca la medianera de un costado
-        lado(lot.fw, vf(pasoD), oA && lot.fw - bu1 < .3 ? backV - .2 : vb, true);
+        // (hasta la casa del fondo si queda a menos de 90 cm de ese costado: si no, la pared corría pegada a ella, mezclándose)
+        lado(lot.fw, vf(pasoD), oA && lot.fw - bu1 < .9 ? backV - .2 : vb, true);
         const izq = W.lotAt(...LP(-.4, (hd + lot.ld) / 2));
-        if (!(patio(izq) && izq !== lot && Math.abs(izq.ux[0] * lot.ux[0] + izq.ux[1] * lot.ux[1]) > .98)) lado(0, vf(pasoI), oA && bu < .3 ? backV - .2 : vb, false);
-        if (!chalet) { if (pasoI) ancha(0, hu0, 0, .5, true); if (pasoD) ancha(hu1, lot.fw, 0, .5, true); }
+        if (!(patio(izq) && izq !== lot && Math.abs(izq.ux[0] * lot.ux[0] + izq.ux[1] * lot.ux[1]) > .98)) lado(0, vf(pasoI), oA && bu < .9 ? backV - .2 : vb, false);
+        if (!chalet) { if (huecoI) ancha(0, hu0, 0, .5, true); if (huecoD) ancha(hu1, lot.fw, 0, .5, true); }
         const otro = W.lotAt(...LP(lot.fw / 2, lot.ld + .5)), pb = LP(lot.fw / 2, lot.ld);
         if (!(patio(otro) && otro !== lot && otro.id < lot.id && Math.abs((pb[0] - otro.o[0]) * otro.nOut[0] + (pb[1] - otro.o[1]) * otro.nOut[1] - otro.ld) < 1.2)) ancha(0, lot.fw, vb, 1, false); } }
     // cazuelas: también en el mundo (el piso del editor las dibuja), con una grilla de 2 m para buscarlas rápido
@@ -698,12 +729,12 @@ const Barrio = (() => {
   }
   // la casa/tapial/poste 3D de una clave del catálogo (misma semilla en el visor y en la exportación)
   function build3D(spec) {
-    const phi = World.ANG[spec.a];
+    const phi = spec.ph != null ? dePh(spec.ph) : World.ANG[spec.a];
     if (spec.t === "casa") return Houses.build({ kind: spec.k, W: spec.W, D: spec.D, p: spec.p, seed: 1000 + spec.v * 7919 + spec.wb * 104729 + spec.a * 31 + Math.round(spec.W * 10) * 17 + (spec.co ?? 0) * 613 + (spec.tj ?? 0) * 389 + (spec.ct ? spec.ct.length * 977 + spec.ct.charCodeAt(spec.ct.length - 1) * 131 : 0), wealth: [.25, .7][spec.wb], co: spec.co, al: spec.al, tj: spec.tj, ct: spec.ct, rb: spec.rb, ...(spec.hr ? { d: CASAS_REALES[spec.hr] } : {}) }, phi);
     if (spec.t === "chas") return Houses.chas(spec, phi);
     if (spec.t === "esquina") return Houses.esquina({ W: spec.W, D: spec.D, c: spec.c, p: spec.p, rub: spec.rub, seed: 9000 + spec.rub * 7919 + spec.p * 104729 + spec.a * 31, wealth: .5 }, phi);
     if (spec.t === "tapial") return Houses.tapial(spec.W, 500 + spec.s, spec.tk, phi);
-    if (spec.t === "medianera") return Houses.medianera(spec.W, 600 + spec.s, spec.tk, phi, !!spec.ve);
+    if (spec.t === "medianera") return Houses.medianera(spec.W, 600 + spec.s, spec.tk, phi, !!spec.ve, !!spec.y);
     return Houses.poste(7, phi, !!spec.l);
   }
   // Qué cuadro y qué espejo usa un prop que mira hacia (sx, sy) en pantalla: el dibujo mira a la derecha; si mira a la izquierda, en espejo

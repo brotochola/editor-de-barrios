@@ -289,7 +289,7 @@ const Caras = (() => {
     function columna(E, n, pm = PIE_MAX) { const porTexel = Math.abs(J(E)[1]) / n; let c = TILE; while (c > 8 && c * porTexel > pm) c = Math.ceil(c / 2); return c; }
     // una medianera de fondo (entre patios: casi no pasa gente) se corta con más tolerancia: es larga y corre hacia el fondo, y con
     // PIE_MAX eran muchas piezas (el tope de decoraciones de WeedJS). No la que va a lo largo de la vereda (spec.ve): ahí camina gente
-    const PIE_FONDO = 32;
+    const PIE_FONDO = 16;   // (32: una planta detrás de la medianera se dibujaba encima; 8, como las casas, cuando WeedJS pase el tope de 524 287)
     const BLANCO = { w: 8, h: 8, grid: [{ nombre: "_white", x0: 0, y0: 0, w: 8, h: 8 }] };
     // medio cuadrado blanco (u + v ≤ 1): cualquier triángulo liso es su imagen con escala y skew, como una cara lisa lo es de _white.
     // Todos lo comparten, teñido de su color (antes cada triángulo iba al atlas con su textura: los techos de las esquinas con forma)
@@ -307,7 +307,7 @@ const Caras = (() => {
       const T = { w: cv.width, h: cv.height, d: new Uint8ClampedArray(d) }, reg = registrar(T, "a");
       e = { reg, ax: res.ax, ay: res.ay }; sprites.set(k, e); return e;
     }
-    const claveDiseno = (spec) => { const { a, ...resto } = spec; return JSON.stringify(resto); };
+    const claveDiseno = (spec) => { const { a, ph, ...resto } = spec; return JSON.stringify(resto); };   // (ph: el ángulo exacto de una pared)
     Houses.setKit(true);
     try {
     // primera pasada: las caras y piezas de cada variante, y el corte que pide cada textura de pared
@@ -315,9 +315,9 @@ const Caras = (() => {
     entries.forEach((e, n) => {
       if (n % 16 === 0) progreso(n / entries.length * .3);
       const kd = claveDiseno(e.spec); let D = disenos.get(kd);
-      if (!D) { const B3 = Barrio.build3D({ ...e.spec, a: 0 }), s = B3.sc;
+      if (!D) { const B3 = Barrio.build3D({ ...e.spec, a: 0, ph: undefined }), s = B3.sc;
         D = { faces: s.faces.filter(f => f.both || f.n[2] > -.5), casters: s.casters, acc: s.acc || [], tex: new Map(), puertas: B3.puertas || [], frenteY: B3.frenteY || 0 }; disenos.set(kd, D); }
-      const phi = World.ANG[e.spec.a], c = Math.cos(phi), s = Math.sin(phi), E = [], items = [], cands = [];
+      const phi = e.spec.ph != null ? e.spec.ph * Math.PI / 180 : World.ANG[e.spec.a], c = Math.cos(phi), s = Math.sin(phi), E = [], items = [], cands = [];
       // ---- caras visibles, en piezas planas: [textura (grilla), O, E1, E2 (el paralelogramo que cubre), tinte]
       for (let fi = 0; fi < D.faces.length; fi++) { const F0 = D.faces[fi]; let n3 = rot(c, s, F0.n);
         if (R3.dot(n3, VIEW) >= -1e-4) { if (!F0.both) continue; n3 = [-n3[0], -n3[1], -n3[2]]; }
@@ -477,7 +477,9 @@ const Caras = (() => {
         for (const g of T.grid) {
           const cu = g.x0 + g.w / 2, cv = g.y0 + g.h / 2, P = add(q.O, add(sc3(q.E1, cu / T.w), sc3(q.E2, cv / T.h))), p = J(P);
           const q0 = add(q.O, add(sc3(q.E1, g.x0 / T.w), sc3(q.E2, g.y0 / T.h))), da = J(sc3(q.E1, g.w / T.w)), db = J(sc3(q.E2, g.h / T.h)), j0 = J(q0);
-          const objetivo = buscada(vert, P, q0, sc3(q.E1, g.w / T.w), sc3(q.E2, g.h / T.h), tira, q.tri);
+          // (la tapa de una medianera, ordenada por la punta de adelante de su pared, no por la de atrás: si no, lo que está detrás de la
+          // pared, plantas, quedaba encima de la tapa. Una planta adelante no llega a la altura de la tapa; un árbol puede, y lo cruza)
+          const objetivo = buscada(vert, P, q0, sc3(q.E1, g.w / T.w), sc3(q.E2, g.h / T.h), tira && e.spec.t !== "medianera", q.tri);
           const fr = q.fr && !q.trans ? [q.fr[0] + (q.fr[2] - q.fr[0]) * g.x0 / T.w, q.fr[1] + (q.fr[3] - q.fr[1]) * g.y0 / T.h, q.fr[0] + (q.fr[2] - q.fr[0]) * (g.x0 + g.w) / T.w, q.fr[1] + (q.fr[3] - q.fr[1]) * (g.y0 + g.h) / T.h] : null;
           tiles.push({ rank: r, cuadro: g.nombre, p, sx: g.nombre === "_white" ? A[0] / 8 : sx, sy: g.nombre === "_white" ? B[1] / 8 : sy, kx, ky, tn: q.tinte, iz, objetivo, borde: !!q.borde, bk: q.bk, n: it.F.n, z: P[2], el: it.el, g, capa: q.capa || 0, fr, pre: q.pre,
             poli: q.tri ? [j0, [j0[0] + da[0], j0[1] + da[1]], [j0[0] + db[0], j0[1] + db[1]]] : [j0, [j0[0] + da[0], j0[1] + da[1]], [j0[0] + da[0] + db[0], j0[1] + da[1] + db[1]], [j0[0] + db[0], j0[1] + db[1]]] });
