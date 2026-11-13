@@ -401,8 +401,10 @@ const Caras = (() => {
             const os = Contorno.oscuro(base[0], base[1], base[2]), tA = Contorno.fuerza(R3.LIGHT.outline), tn = hexDe(base.map((v, j) => v + (os[j] - v) * tA)), th = GROSOR / R3.TD;
             const e1 = len(F.E1), e2 = len(F.E2), i1 = sc3(F.E1, th / e1), i2 = sc3(F.E2, th / e2), lejos1 = add(F.O, F.E1), lejos2 = add(F.O, F.E2);
             // (en una pared que llega al piso, sólo los costados: las esquinas de la casa; arriba y abajo los tapan el techo, el petil y el
-            // piso, y cortados en columnas como la pared eran muchas piezas: el tope de decoraciones de WeedJS)
-            for (const [O, E1, E2] of (desc || pared ? [] : [[F.O, F.E1, i2], [sub3(lejos2, i2), F.E1, i2]]).concat([[F.O, i1, F.E2], [sub3(lejos1, i1), i1, F.E2]])) {
+            // piso, y cortados en columnas como la pared eran muchas piezas: el tope de decoraciones de WeedJS. Una que no llega al piso, el
+            // piso de arriba o la caja del techo, los lleva todos: ahí abajo está el techo, no el piso, y va entera, sin columnas; no las bajas,
+            // la cara de adentro de un petil, que ya tiene la línea de su tapa)
+            for (const [O, E1, E2] of (pared || (desc && Math.max(Math.abs(F.E1[2]), Math.abs(F.E2[2])) < 1.4) ? [] : [[F.O, F.E1, i2], [sub3(lejos2, i2), F.E1, i2]]).concat([[F.O, i1, F.E2], [sub3(lejos1, i1), i1, F.E2]])) {
               // la orientación que deja escala y skew sanos (la textura blanca es igual de cualquier lado)
               const A2 = J(E1), B2 = J(E2), la = Math.hypot(A2[0], A2[1]) || 1e-9, lb = Math.hypot(B2[0], B2[1]) || 1e-9;
               const qn = Math.min(Math.abs(A2[0]) / la, Math.abs(B2[1]) / lb), qt = Math.min(Math.abs(B2[0]) / lb, Math.abs(A2[1]) / la);
