@@ -148,7 +148,7 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   la arma ahora `herramientas/hojas.js` (salió igual pixel por pixel). Las grillas de autos para Gemini pasaron a
   `arte/autos_gemini`. La fuente de la rotonda y de las plazas es la de `arte/objetos`.
 - [ ] **Plazas sin juegos ni bancos de Gemini** — hecho (69ffe40): hamacas, tobogán, subibaja, monumento y bebedero en 3D (Houses.juego: cajas de colores lisos,
-  sin atlas; los de caño, sin sombra), donde iban los dibujos; los bancos ya salían de arte/objetos. Después (HASH_PLAZA2): la calesita
+  sin atlas; los de caño, sin sombra), donde iban los dibujos; los bancos ya salían de arte/objetos. Después (b8f1005): la calesita
   (techo a gajos), la glorieta, la mesa de ping-pong, las de ajedrez y las barras; en las plazas reales grandes, también ajedrez,
   ping-pong y glorieta. Faltan las manchas del piso. Lo de antes: Con los objetos de Gemini se fueron los juegos (hamacas, tobogán,
   subibaja, calesita), el monumento, la glorieta, el bebedero, el ping-pong, el ajedrez y las manchas del piso; los packs de
