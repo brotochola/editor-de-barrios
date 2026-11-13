@@ -20,6 +20,8 @@ const Barrio = (() => {
   const BASURA = ["bolsas_0", "bolsas_0", "bolsas_1", "bolsas_1", "gomas", "chapas", "b_pallets", "obra_material", "k_colchon", "cajones", "cajones", "b_tacho_azul", "b_tacho_azul", "garrafa", "escombro", "escombro"];
   // y lo que crece en un baldío: arbustos y matas altas
   const MATAS = ["plm_pindo", "plm_cortadera", "plm_yuyos", "plm_yuyos", "plm_tomates", "plm_romero"];
+  // y lo que se planta en un jardín lindo
+  const LINDAS = ["plm_rosal", "plm_jazmin", "pl_hortensia", "plm_agapanto", "plm_lantana", "pl_limonero", "plm_strelitzia", "plm_plumbago", "pl_hibisco", "pl_gomero", "plm_santarita", "plm_romero"];
   // colores de autos: el juego elige el modelo y usa este color si el modelo lo tiene; "poli" = patrullero, "burnt" = chatarra
   const COLORES = [["red", 1.6], ["white", 1.6], ["black", 1.4], ["blue", 1.4], ["yellow", 1], ["poli", .4]];
   const pickW = (r, tbl) => { let t = tbl.reduce((a, b) => a + b[1], 0) * r(); for (const [n, w] of tbl) { t -= w; if (t <= 0) return n; } return tbl[0][0]; };
@@ -309,7 +311,32 @@ const Barrio = (() => {
         if (r() < .2) put("parrilla", ...ppLado()); if (lot.w > .3 && r() < .1) put("pileta", ...pp());
         // el fondo con pasto (el piso lo pinta desde los 13 m): matas, trébol, margaritas, algún hongo después de la lluvia
         if (F.yy_mata && fin > 14) for (let k = 0, n = rz.int(1, 4); k < n; k++) { const q = LP(rz.uni(.6, lot.fw - .6), rz.uni(13.5, fin));
-          put(lot.w < .3 ? rz.pick(["yy_mata_seca", "yy_pasto_largo", "yy_rastrera", "yy_vinagrillo"]) : rz.pick(["yy_cesped_margaritas", "yy_trebol_blanco", "yy_mata", "yy_manzanilla", "yy_hongos", "yy_vinagrillo"]), q[0], q[1], { rad: .2 }); } if (r() < .08 * C.gente) { const p = pp(); person(p[0], p[1], true); } }
+          put(lot.w < .3 ? rz.pick(["yy_mata_seca", "yy_pasto_largo", "yy_rastrera", "yy_vinagrillo"]) : rz.pick(["yy_cesped_margaritas", "yy_trebol_blanco", "yy_mata", "yy_manzanilla", "yy_hongos", "yy_vinagrillo"]), q[0], q[1], { rad: .2 }); } if (r() < .08 * C.gente) { const p = pp(); person(p[0], p[1], true); }
+        // el estilo del fondo (el dueño, 12/11), de su semilla (no del sorteo de lo demás): un jardín lindo (plantas lindas a lo largo de
+        // las medianeras, un árbol, sillas, ropa colgada), abandonado (yuyos crecidos, basura, escombro) o el de siempre. Más lindos en lo
+        // rico, más abandonados en lo pobre
+        const rj = R3.rng(lot.seed ^ 0x7c3aed11), pLindo = lot.w > .6 ? .5 : lot.w > .35 ? .28 : .1, pAband = lot.w < .3 ? .35 : lot.w < .55 ? .15 : .04, qe = rj();
+        const ppj = (v0) => LP(rj.uni(.8, lot.fw - .8), rj.uni(v0, fin));
+        if (qe < pLindo && fin - depthTot > 4) {
+          for (const u of [.6, lot.fw - .6]) for (let v = depthTot + 1.6; v < fin; v += rj.uni(1.1, 1.7)) { const q = LP(u, v); put(rj.pick(LINDAS), q[0], q[1], { rad: .3 }); }
+          if (rj() < .7 * C.arboles) { const q = ppj(depthTot + 4); arbol(q[0], q[1], rj() < .5, Arboles.pick(rj, lot.w, W.estilo && W.estilo.arboles)); }
+          if (F.silla) { const c = ppj(depthTot + 2); for (let k = 0, n = rj.int(2, 3); k < n; k++) put("silla", c[0] + rj.uni(-1, 1), c[1] + rj.uni(-.6, .6), { rad: .25, flip: rj() < .5 }); }
+          if (F.b_tendedero && rj() < .6) put("b_tendedero", ...ppj(depthTot + 2));
+          if (F.yy_cesped_margaritas) for (let k = 0, n = rj.int(2, 5); k < n; k++) put(rj.pick(["yy_cesped_margaritas", "yy_trebol_blanco", "yy_manzanilla"]), ...ppj(depthTot + 1.5), { rad: .2 });
+        } else if (qe < pLindo + pAband && fin - depthTot > 3) {
+          const area = lot.fw * (fin - depthTot);
+          for (let k = 0, n = Math.round(area / 5 * rj.uni(.7, 1.2)); k < n; k++) put(rj.pick(["yy_seco_alto", "yy_seco_alto_b", "yy_mostacilla", "yy_avena", "yy_cardo", "yy_ortiga", "yy_cola_zorro", "yy_pasto_seco", "yy_hinojo", "yy_sorgo"]), ...ppj(depthTot + 1.2), { rad: .25 });
+          for (let m = 0, nM = rj.int(1, 2); m < nM; m++) { const c = ppj(depthTot + 2); for (let k = 0, n = rj.int(3, 6); k < n; k++) put(rj.pick(BASURA), c[0] + rj.uni(-1.3, 1.3), c[1] + rj.uni(-.9, .9), { rad: .15 }); }
+          for (let k = 0, n = rj.int(1, 3); k < n; k++) put(rj.pick(MATAS), ...ppj(depthTot + 2), { rad: .3 });
+        } }
+      // la medianera del fondo: entre este patio y el del lote de al lado (a su derecha), desde la casa hasta el fondo (o la casa del
+      // fondo); una por límite, de su semilla. Tapia, ladrillo o alambrado; en lo rico, casi siempre tapia
+      { const rm = R3.rng(lot.seed ^ 0x3243f6a8), v0 = depthTot + .3, v1 = (backV || lot.ld) - .2, L = Math.floor((v1 - v0) / 2) * 2;
+        if (lot.kind !== "villa" && L >= 2 && rm() < .85) {
+          const tk = pickW(rm, lot.w < .35 ? [["tapia", 3], ["ladrillo", 3], ["alambre", 2]] : lot.w < .65 ? [["tapia", 4], ["ladrillo", 2], ["alambre", 1]] : [["tapia", 6], ["ladrillo", 2]]);
+          const phi2 = Math.atan2(lot.nOut[1], lot.nOut[0]), [mx, my] = LP(lot.fw, v0);
+          addObj("tapial", { t: "medianera", tk, W: L, a: aIdx(phi2), s: (lot.seed >>> 5) % 3 }, lot, mx, my, qa(phi2), null, [LP(lot.fw - .12, v0), LP(lot.fw + .05, v0), LP(lot.fw + .05, v0 + L), LP(lot.fw - .12, v0 + L)]);
+          occRect(lot.fw - .5, lot.fw, v0, v0 + L); } }
       const s = lot.seg, side = lot.side, mid = (lot.o[0] - s.a[0]) * s.dir[0] + (lot.o[1] - s.a[1]) * s.dir[1] + (side === 1 ? lot.fw / 2 : -lot.fw / 2);
       if (s.sw > 1) {
         const near = (dd) => at(s, mid + r.uni(-lot.fw / 3, lot.fw / 3), side * (s.hw + s.sw - dd));
@@ -609,6 +636,7 @@ const Barrio = (() => {
     if (spec.t === "esquina") return Houses.esquina({ W: spec.W, D: spec.D, c: spec.c, p: spec.p, rub: spec.rub, seed: 9000 + spec.rub * 7919 + spec.p * 104729 + spec.a * 31, wealth: .5 }, phi);
     if (spec.t === "paredon") return Houses.paredon(spec.W, 700 + spec.s, phi);
     if (spec.t === "tapial") return Houses.tapial(spec.W, 500 + spec.s, spec.tk, phi);
+    if (spec.t === "medianera") return Houses.medianera(spec.W, 600 + spec.s, spec.tk, phi);
     return Houses.poste(7, phi, !!spec.l);
   }
   // Qué cuadro y qué espejo usa un prop que mira hacia (sx, sy) en pantalla: el dibujo mira a la derecha; si mira a la izquierda, en espejo
