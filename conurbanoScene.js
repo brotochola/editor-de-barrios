@@ -125,9 +125,9 @@ function luzHora(go) {
   for (let q = 0, n = Math.min(L.ag[i], go.getAttachedDecorationCount()); q < n; q++) { const d = go.getAttachedDecoration(q); if (d) d.alpha = on ? (q & 1 ? L.a1[i] : L.a0[i]) : 0; }
 }
 
-// ---------- casas, tapiales y postes (sprites horneados con R3)
-// La entidad sólo lleva el colisionador y la luz de la ventana. El dibujo va en franjas verticales (Decoration), cada una
-// con su y de orden en la base de la pared de esa columna: así el ySort sabe qué tapa a qué aunque la casa esté girada.
+// ---------- casas, tapiales y postes (por caras planas: caras.js)
+// La entidad sólo lleva el colisionador, la sombra y la luz; el dibujo son las piezas de sus caras, decoraciones del mundo (ver
+// la carga de mundo.json).
 export class Casa extends GameObject {
   static isStatic = true;
   static tickInterval = LUZ_TICK;
@@ -148,15 +148,6 @@ export class Casa extends GameObject {
       if (!this.collider.makePolygon(flat)) { this.collider.shapeType = ShapeType.Circle; this.collider.radius = 6; }
     } else { this.collider.shapeType = ShapeType.Circle; this.collider.radius = c.r || 3; }
     this.collider.visualRange = 260;
-    // las piezas del dibujo cuelgan de la casa (WeedJS ≥ ff32c939): cada franja vertical del sprite se ordena en la base de su
-    // pared (sortOffsetY = base de la franja − y de la casa) y cada pieza se recorta por su propio centro
-    if (c.fr) {
-      const e = c.e || 1;
-      for (let k = 0; k < c.fr.length; k++) {
-        const [fx, fy, p] = c.fr[k];
-        for (let j = 0; j < p.length; j++) this.addDecoration(c.t + k + '_' + j, fx + p[j][0], fy + p[j][1], e, e, j, { anchorX: .5, anchorY: .5, sortOffsetY: fy });
-      }
-    }
     // las casas no alumbran; los postes de madera con lámpara (calles de tierra y villas) sí
     const L = this.lightEmitter, on = c.k === 'poste' && !!c.l;
     L.lightColor = LUZ; L.height = 0; L.glowHeightOffset = 7 * META.CZ * META.SF; L.hasGlowSprite = on ? .5 : 0;
@@ -688,7 +679,6 @@ function elegirModelos(autos, props) {
 
 // ---------- escena
 const SHEETS = {};
-for (let i = 0; i < META.hojasCasas; i++) SHEETS['casas' + i] = { json: BARRIO + 'img/casas' + i + '.json', png: BARRIO + 'img/casas' + i + '.png' };
 for (let i = 0; i < (META.hojasCaras || 0); i++) SHEETS['caras' + i] = { json: BARRIO + 'img/caras' + i + '.json', png: BARRIO + 'img/caras' + i + '.png' };
 // los objetos: las hojas de img/objetos (herramientas/hojas.js), enteras, comunes a todos los barrios; los grafitis de las paredes, la del barrio
 for (const h of HOJAS) SHEETS[h] = { json: 'img/objetos/' + h + '.json', png: 'img/objetos/' + h + '.png' };
@@ -711,7 +701,7 @@ export class ConurbanoScene extends Scene {
     physics: { gravity: { x: 0, y: 0 }, sleeping: true, subStepCount: 0, commandRingCapacity: 65536, numberOfPhysicsWorkers: HC >= 8 ? 4 : 2 },
     particle: { maxParticles: 500, decals: false },
     // piezas de casas y árboles, props (y sus sombras), cables y líneas de canchas
-    decoration: { maxDecorations: META.nPiezas + (META.nTiles || 0) + META.nPiezasArboles + META.nDecoProps + META.nArboles + META.nCables + META.nGrafitis + (META.nLineas || 0) + 8 * ((META.transito && META.transito.n) || 0) + 3000, maxAttachedDecorationsPerEntity: 255 },
+    decoration: { maxDecorations: META.nTiles + META.nPiezasArboles + META.nDecoProps + META.nArboles + META.nCables + META.nGrafitis + (META.nLineas || 0) + 8 * ((META.transito && META.transito.n) || 0) + 3000, maxAttachedDecorationsPerEntity: 255 },
     renderer: { backend: 'webgl', ySort: true },
     // las casas son decoraciones: que no se desvanezcan al alejar
     preRender: { startFadingDecorationsAtZoom: .2, hideDecorationsAtZoom: .1, cullingRatio: .3 },
@@ -814,7 +804,7 @@ export class ConurbanoScene extends Scene {
       (w.cruces || []).forEach((c, k) => { for (let q = 0; q < 6; q++) Transito.cruces[k * 6 + q] = c[q]; });
     }
     this._sem = [];   // los semáforos: cruce, calle y número (sus luces, en Semaforos.ids)
-    if (META.skew) {
+    {
       // casas por caras (WeedJS DX-DECOSKEW): la entidad lleva el colisionador; el dibujo son piezas de caras planas, decoraciones
       // del mundo (no colgadas: la casa no se mueve, así no pasan por el paso de las colgadas cada cuadro), cada una con su
       // escala, skew, tinte de luz, y orden (sortOffsetY: la base de su columna; innerZ: el orden de pintor dentro de la casa).
@@ -845,8 +835,6 @@ export class ConurbanoScene extends Scene {
           cfg.alpha = 1;
         }
       }
-    } else for (const h of w.casas) {
-      Casa.spawn({ x: h.x, y: h.y, col: h.col, r: h.r, k: h.k, l: h.l, sp: h.sp, fr: w.franjas[h.a], t: 'casas' + h.o + '_' + h.a + '_', e: META.escalaCasas || 1 });
     }
     const tapadas = this._lamparasTapadas(w); this.lamparasTapadas = tapadas.size;
     for (const p of w.props) {

@@ -205,14 +205,13 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 
 ## Formato
 
-- [ ] **Un solo formato** — en curso. El editor exporta y la escena lee un único formato, sin compatibilidad hacia atrás ni
-  caminos de repuesto. Hecho: los flowfields siempre en `.bin` (fuera el knob `ffBinario`, `META.ffExt` y el repuesto `.json`) y
-  fuera el número de `formato` (0f39cb4); las lámparas de los faroles de Gemini (`LAMPARAS`) (fffa219). Falta: las casas en
-  franjas (knob `skew`, `w.franjas`, hojas `casas*`), después de charlarlo.
-  - Las franjas: charlar antes de sacarlas (el dueño, 12/11). Lo que hacían (una persona pegada a una pared se ordena bien)
-    hoy lo hacen las caras: cada pared que llega al piso va en columnas donde el pie cambia 8 px como mucho (`PIE_MAX`), cada
-    una con su `sortOffsetY` en su base. Sacar las franjas es sacar el camino viejo (casa horneada por rumbo y cortada en
-    franjas colgadas de la `Casa`), que ningún barrio usa.
+- [ ] **Un solo formato** — hecho. El editor exporta y la escena lee un único formato, sin compatibilidad hacia atrás ni
+  caminos de repuesto. Los flowfields siempre en `.bin` (fuera el knob `ffBinario`, `META.ffExt` y el repuesto `.json`) y
+  fuera el número de `formato` (0f39cb4); las lámparas de los faroles de Gemini (`LAMPARAS`) (fffa219); y las casas en franjas
+  (el dueño, 13/11: «el camino de la exportación anterior podés borrarlo»): fuera el knob `skew`, `w.franjas`, las hojas
+  `casas*`, `META.nFranjas`, `nPiezas`, `hojasCasas` y `escalaCasas`, y la rama de la escena que colgaba franjas de la `Casa`.
+  Lo que hacían (una persona pegada a una pared se ordena bien) lo hacen las caras: cada pared que llega al piso va en columnas
+  donde el pie cambia 8 px como mucho (`PIE_MAX`). `META.skew` queda en 1: el demo de WeedJS lo mira.
 
 ## Una sola escena: la del demo de WeedJS
 
