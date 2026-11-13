@@ -943,8 +943,17 @@ const Houses = (() => {
   function juego(k, seed, phi = 0) {
     const sc = new Scene(); sc.setXform(phi); const r = rng(seed);
     // (los de caño, sin sombra: la de una casa es el volumen que envuelve todas sus cajas, y para un marco de hamacas era un bloque lleno)
-    const maciza = k === "monumento" || k === "bebedero", caja = (x0, y0, z0, x1, y1, z1, c, sombra = maciza) => sc.box(x0, y0, z0, x1, y1, z1, { front: c, back: mul(c, .8), right: mul(c, .7), left: mul(c, .85), top: mul(c, 1.12), cast: sombra });
+    const maciza = k === "monumento" || k === "bebedero" || k === "glorieta" || k === "calesita" || k === "ajedrez", caja = (x0, y0, z0, x1, y1, z1, c, sombra = maciza) => sc.box(x0, y0, z0, x1, y1, z1, { front: c, back: mul(c, .8), right: mul(c, .7), left: mul(c, .85), top: mul(c, 1.12), cast: sombra });
     const PINTURA = [[196, 48, 40], [44, 92, 168], [232, 180, 40], [40, 138, 80]], pc = r.pick(PINTURA), negro = [44, 44, 48], gris = [150, 150, 154];
+    // un prisma de n lados (centro cx, cy; radio rr; de z0 a z1): los lados y la tapa en triángulos, todo mirando para afuera; un cono
+    // (techo) con cada triángulo de un color (col(i))
+    const borde = (cx, cy, rr, n, z) => Array.from({ length: n }, (_, i) => [cx + rr * Math.cos(i / n * 2 * Math.PI), cy + rr * Math.sin(i / n * 2 * Math.PI), z]);
+    const prisma = (cx, cy, rr, z0, z1, n, ctapa, clado) => { const P = borde(cx, cy, rr, n, z1);
+      for (let i = 0; i < n; i++) { const a = P[i], b = P[(i + 1) % n];
+        sc.quad(a, [b[0] - a[0], b[1] - a[1], 0], [0, 0, z0 - z1], typeof clado === "function" ? clado(i) : clado);
+        sc.quad([cx, cy, z1], [b[0] - cx, b[1] - cy, 0], [a[0] - cx, a[1] - cy, 0], ctapa, { tri: true }); } };
+    const cono = (cx, cy, rr, z0, alto, n, col) => { const P = borde(cx, cy, rr, n, z0), A = [cx, cy, z0 + alto];
+      for (let i = 0; i < n; i++) { const a = P[i], b = P[(i + 1) % n]; sc.quad(a, [A[0] - a[0], A[1] - a[1], A[2] - a[2]], [b[0] - a[0], b[1] - a[1], 0], col(i), { tri: true }); } };
     if (k === "hamacas") {   // dos postes por lado, el travesaño y dos asientos colgando de sus cadenas
       for (const x of [-1.3, 1.25]) for (const y of [-.55, .5]) caja(x, y, 0, x + .07, y + .07, 2.2, pc);
       caja(-1.3, -.03, 2.15, 1.32, .06, 2.27, pc);
@@ -960,6 +969,27 @@ const Houses = (() => {
       caja(-.12, -.15, 0, .12, .15, .45, gris);
       const t = .14; sc.quad([-1.7, -.12, .25 + t], [0, .24, 0], [3.4, 0, .5], pc); sc.quad([-1.7, -.12, .25 + t], [3.4, 0, .5], [0, 0, -.06], mul(pc, .75));
       for (const x of [-1.45, 1.35]) caja(x, -.02, .25 + t + (x + 1.7) / 3.4 * .5, x + .05, .03, .55 + t + (x + 1.7) / 3.4 * .5, negro, false);
+    } else if (k === "calesita") {   // la plataforma redonda, el poste del medio, los caballitos en sus caños y el techo a gajos
+      prisma(0, 0, 2.1, 0, .3, 12, [176, 140, 96], [196, 48, 40]); caja(-.12, -.12, .3, .12, .12, 2.6, [232, 220, 180]);
+      const cab = [[236, 236, 230], [232, 180, 40], [196, 48, 40], [44, 92, 168]];
+      for (let i = 0; i < 6; i++) { const a = i / 6 * 2 * Math.PI, x = 1.5 * Math.cos(a), y = 1.5 * Math.sin(a);
+        caja(x - .02, y - .02, .3, x + .02, y + .02, 2.55, [214, 190, 120], false); caja(x - .28, y - .09, .75 + (i % 2) * .15, x + .28, y + .09, 1.05 + (i % 2) * .15, cab[i % 4], false); }
+      prisma(0, 0, 2.25, 2.5, 2.6, 12, [236, 230, 214], [196, 48, 40]); cono(0, 0, 2.25, 2.6, 1.1, 12, (i) => i % 2 ? [236, 230, 214] : [196, 48, 40]);
+    } else if (k === "glorieta") {   // el piso hexagonal, seis postes blancos y el techo en pirámide
+      prisma(0, 0, 2.2, 0, .25, 6, [196, 186, 170], [170, 160, 146]);
+      for (const [x, y] of borde(0, 0, 1.95, 6, 0)) caja(x - .07, y - .07, .25, x + .07, y + .07, 2.6, [236, 232, 222]);
+      cono(0, 0, 2.35, 2.6, 1.2, 6, (i) => i % 2 ? [150, 70, 50] : [170, 82, 58]);
+    } else if (k === "pingpong") {   // la mesa verde con su línea blanca, las patas y la red
+      for (const x of [-1.2, 1.15]) for (const y of [-.65, .6]) caja(x, y, 0, x + .05, y + .05, .72, negro, false);
+      caja(-1.37, -.76, .72, 1.37, .76, .78, [40, 110, 80]); caja(-1.37, -.01, .78, 1.37, .01, .79, [236, 236, 230], false);
+      caja(-.02, -.85, .78, .02, .85, .94, [236, 236, 230], false);
+    } else if (k === "ajedrez") {   // la mesa redonda de piedra (el tablero pintado arriba) y dos banquitos
+      prisma(0, 0, .12, 0, .7, 8, [176, 170, 160], [150, 146, 138]); prisma(0, 0, .5, .7, .78, 8, [214, 208, 196], [170, 164, 154]);
+      caja(-.22, -.22, .78, .22, .22, .785, [44, 44, 48], false);
+      for (const x of [-.85, .85]) prisma(x, 0, .2, 0, .45, 8, [196, 190, 178], [160, 154, 144]);
+    } else if (k === "aparato") {   // barras de gimnasia: dos postes y dos barras
+      for (const x of [-.9, .85]) caja(x, -.04, 0, x + .07, .04, 2.1, [40, 138, 80]);
+      for (const z of [1.2, 2.0]) caja(-.9, -.025, z, .92, .025, z + .05, gris, false);
     } else if (k === "monumento") {   // pedestal escalonado de piedra con un busto de bronce
       const piedra = [196, 190, 176], bronce = [96, 78, 50];
       caja(-.9, -.9, 0, .9, .9, .25, mul(piedra, .9)); caja(-.6, -.6, .25, .6, .6, 1.75, piedra); caja(-.7, -.7, 1.75, .7, .7, 1.9, mul(piedra, 1.05));
