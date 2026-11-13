@@ -133,6 +133,12 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   de iluminación, que son ideales para las luces de los autos»). Los faros son un cono desde el frente de la huella: abre 56°, el
   40 % de afuera de cada mitad se esfuma, y llega a 900 px (unos 65 m; antes, una luz redonda de 265 px). El cono se mide sobre
   el piso aplastado y gira con el auto; el espejo del dibujo (flipX) no lo da vuelta.
+- [ ] **Dos faros por auto** — hecho (7e52c99; el dueño, 13/11: «un solo cono queda raro e irreal»). Un cono en cada esquina del
+  frente de la huella: abren 44°, la mitad de afuera de cada lado se esfuma, a 0,7 de brillo (adelante, donde se juntan, suman).
+  WeedJS da una luz por entidad: la izquierda es la del auto y la derecha un `Faro`, una entidad con sólo su luz que el auto pone
+  en su esquina y apunta en cada tick, y prende y apaga con la suya. Con `?raycast=1` el `Faro` no está en la grilla espacial
+  (no tiene colisionador ni dibujo): su luz no busca las casas que la tapan. Si WeedJS diera más de una luz por entidad, el `Faro`
+  sobraría.
 - [ ] **Resolución de la luz para pixel art** — charlar. ¿Tiene sentido `lighting.resolution: .5` en un juego pixel art?
 
 ## Cables
