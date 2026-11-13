@@ -77,6 +77,15 @@ const Barrio = (() => {
       if (ob && ob.top) props.push({ f: ob.top, x, y, flip: !!(mezcla(h, 6) & 1), cr: 0, sh: null, face: null, o: ob.tierra - 2, rol });
       return e;
     }
+    // los juegos y el monumento de plaza que no tienen dibujo van en 3D (Houses.juego): poner() pone el dibujo si lo hay y si no, el
+    // juego, mirando como los senderos de su plaza (phi)
+    const JUEGO3D = { pz_hamacas: "hamacas", pz_tobogan: "tobogan", pz_subibaja: "subibaja", pz_monumento: "monumento", pz_bebedero: "bebedero" };
+    const RJ = { hamacas: [1.4, .7], tobogan: [1.7, .4], subibaja: [1.8, .25], monumento: [.95, .95], bebedero: [.2, .2] };
+    function poner(n, x, y, opt = {}, phi = 0) {
+      if (F0[n] || !JUEGO3D[n]) return put(n, x, y, opt);
+      const k = JUEGO3D[n], [hx, hy] = RJ[k], c = Math.cos(phi), s = Math.sin(phi), P = (u, v) => [x + c * u - s * v, y + s * u + c * v];
+      return addObj("juego", { t: "juego", k, a: aIdx(phi), s: k === "hamacas" || k === "tobogan" || k === "subibaja" ? Math.abs(Math.round(x * 7 + y * 3)) % 4 : 0 }, null, x, y, qa(phi), null, [P(-hx, -hy), P(hx, -hy), P(hx, hy), P(-hx, hy)]);
+    }
     // árbol: un tipo procedural según la riqueza del lugar (lleva el mismo sorteo que antes, así el resto no cambia)
     // tronco pintado a la cal (blanco hasta 1,2 m): en buena parte de los árboles de vereda, más en los barrios. Sale de la
     // posición, no del sorteo, así el resto del barrio no cambia. Devuelve true siempre (va dentro de la condición de arriba)
@@ -93,7 +102,8 @@ const Barrio = (() => {
       const pasto = (q) => { const l = W.lotAt(q[0], q[1]); return l && l.kind === "plaza"; }, sendero = (q) => { const l = W.lotAt(q[0], q[1]); return l && l.kind === "sendero"; };
       const hA = P.bA / 2 - 8.5, hB = P.bB / 2 - 8.5, rx2 = rx;
       // centro
-      put(F.pz_monumento && rx2() < .55 ? "pz_monumento" : F.pz_fuente ? "pz_fuente" : "u_farol_doble", P.c[0], P.c[1], { noClaim: true, face: [0, -1] });   // el prócer mira al sur
+      const phiP = Math.atan2(P.u[1], P.u[0]);
+      poner(rx2() < .55 ? "pz_monumento" : F.pz_fuente ? "pz_fuente" : "u_farol_doble", P.c[0], P.c[1], { noClaim: true, face: [0, -1] }, phiP);   // el prócer mira al sur
       // árboles en el borde, cada 9 a 12 m, fuera de los senderos
       for (const [ax, len, fixed] of [[0, hA, hB], [0, hA, -hB], [1, hB, hA], [1, hB, -hA]])
         for (let t = -len + rx2.uni(1, 4); t < len; t += rx2.uni(9, 12)) { const q = ax ? at2(fixed, t) : at2(t, fixed); if (pasto(q)) {
@@ -111,8 +121,8 @@ const Barrio = (() => {
       // cuartos: juegos, aparatos y mesas, canteros con flores
       const cuartos = [[1, 1], [-1, 1], [1, -1], [-1, -1]].sort(() => rx2() - .5);
       const enCuarto = (cu, k, rad) => { for (let tries = 0; tries < 12; tries++) { const q = at2(cu[0] * rx2.uni(hA * .3, hA * .8), cu[1] * rx2.uni(hB * .3, hB * .8)); if (pasto(q) && claim(q[0], q[1], rad)) return q; } return null; };
-      for (const n of ["pz_hamacas", "pz_tobogan", "pz_subibaja", "pz_calesita"]) { if (!F[n]) continue; const q = enCuarto(cuartos[0], n, n === "pz_calesita" ? 2.5 : 1.6); if (q) put(n, q[0], q[1], { noClaim: true }); }
-      for (const n of ["pz_aparato", "pz_aparato", "pz_pingpong", "pz_ajedrez", "pz_bebedero"]) { if (!F[n]) continue; const q = enCuarto(cuartos[1], n, 1.4); if (q) put(n, q[0], q[1], { noClaim: true }); }
+      for (const n of ["pz_hamacas", "pz_tobogan", "pz_subibaja", "pz_calesita"]) { if (!F[n] && !JUEGO3D[n]) continue; const q = enCuarto(cuartos[0], n, n === "pz_calesita" ? 2.5 : 2); if (q) poner(n, q[0], q[1], { noClaim: true }, phiP); }
+      for (const n of ["pz_aparato", "pz_aparato", "pz_pingpong", "pz_ajedrez", "pz_bebedero"]) { if (!F[n] && !JUEGO3D[n]) continue; const q = enCuarto(cuartos[1], n, 1.4); if (q) poner(n, q[0], q[1], { noClaim: true }, phiP); }
       for (let k = 0; k < 6; k++) { const n = rx2.pick(["pz_cantero", "plm_agapanto", "plm_lantana", "pl_boj", "plm_rosal", "plm_yuyos"]); if (!F[n]) continue; const q = enCuarto(cuartos[2 + (k & 1)], n, .9); if (q) put(n, q[0], q[1], { noClaim: true }); }
       // el pasto de la plaza: matas, trébol con flores, margaritas, manzanilla, hongos
       if (F.yy_mata) for (let k = 0, n = Math.round(P.bA * P.bB / 60); k < n; k++) { const q = at2(rz.uni(-hA + 1, hA - 1), rz.uni(-hB + 1, hB - 1));
@@ -141,10 +151,11 @@ const Barrio = (() => {
         for (const d of [1.7, 2.1]) { const qq = [q[0] + o[0] * d, q[1] + o[1] * d]; if (!pasto(qq)) continue;
           const nm = rx() < .35 ? (F.u_farola_orn ? "u_farola_orn" : "u_farola") : rx() < .8 ? (F.pz_banco && rx() < .5 ? "pz_banco" : "u_banco") : "u_cesto";
           put(nm, qq[0], qq[1], nm.includes("banco") ? { face: [-o[0], -o[1]] } : {}); break; } }
-      if (A > 3500 && pasto(P.c) && F.pz_monumento) put(rx() < .5 ? "pz_monumento" : F.pz_fuente ? "pz_fuente" : "pz_monumento", P.c[0], P.c[1], { face: [0, -1] });
+      const phiR = Math.atan2(P.u[1], P.u[0]);
+      if (A > 3500 && pasto(P.c)) poner(rx() < .5 ? "pz_monumento" : F.pz_fuente ? "pz_fuente" : "pz_monumento", P.c[0], P.c[1], { face: [0, -1] }, phiR);
       // juegos
-      if (P.juegos || (A > 2500 && rx() < .5)) for (const n of ["pz_hamacas", "pz_tobogan", "pz_subibaja", "pz_calesita", "pz_aparato"]) { if (!F[n] || rx() < .3) continue;
-        for (let tries = 0; tries < 14; tries++) { const q = at2(rx.uni(-hA * .7, hA * .7), rx.uni(-hB * .7, hB * .7)); if (pasto(q) && claim(q[0], q[1], n === "pz_calesita" ? 2.5 : 1.6)) { put(n, q[0], q[1], { noClaim: true }); break; } } }
+      if (P.juegos || (A > 2500 && rx() < .5)) for (const n of ["pz_hamacas", "pz_tobogan", "pz_subibaja", "pz_calesita", "pz_aparato"]) { if ((!F[n] && !JUEGO3D[n]) || rx() < .3) continue;
+        for (let tries = 0; tries < 14; tries++) { const q = at2(rx.uni(-hA * .7, hA * .7), rx.uni(-hB * .7, hB * .7)); if (pasto(q) && claim(q[0], q[1], n === "pz_calesita" ? 2.5 : 2)) { poner(n, q[0], q[1], { noClaim: true }, phiR); break; } } }
       // pasto, bichos y gente
       if (F.yy_mata) for (let k = 0, n = Math.round(A / 55); k < n; k++) { const q = at2(rz.uni(-hA, hA), rz.uni(-hB, hB));
         if (pasto(q)) put(rz.pick(["yy_cesped_margaritas", "yy_trebol_blanco", "yy_mata", "yy_manzanilla", "yy_trebol_blanco", "yy_hongos", "yy_vinagrillo", "yy_gramilla", "yy_llanten"]), q[0], q[1], { rad: .2 }); }
@@ -637,6 +648,7 @@ const Barrio = (() => {
     if (spec.t === "paredon") return Houses.paredon(spec.W, 700 + spec.s, phi);
     if (spec.t === "tapial") return Houses.tapial(spec.W, 500 + spec.s, spec.tk, phi);
     if (spec.t === "medianera") return Houses.medianera(spec.W, 600 + spec.s, spec.tk, phi);
+    if (spec.t === "juego") return Houses.juego(spec.k, 800 + spec.s, phi);
     return Houses.poste(7, phi, !!spec.l);
   }
   // Qué cuadro y qué espejo usa un prop que mira hacia (sx, sy) en pantalla: el dibujo mira a la derecha; si mira a la izquierda, en espejo

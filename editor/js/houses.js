@@ -938,5 +938,37 @@ const Houses = (() => {
     sc.box(0, 0, 0, W, .15, H, { front: t, back: t, top: [204, 200, 190] });
     return { sc };
   }
-  return { build, tapial, paredon, esquina, poste, medianera, WALLS, ESQ, CO, setKit, accesorio, chas };
+  // ---------- juegos y monumento de plaza, en 3D (los dibujos de Gemini se borraron y los packs no traen): cajas de colores lisos,
+  // centrados en el origen, a lo largo de x
+  function juego(k, seed, phi = 0) {
+    const sc = new Scene(); sc.setXform(phi); const r = rng(seed);
+    // (los de caño, sin sombra: la de una casa es el volumen que envuelve todas sus cajas, y para un marco de hamacas era un bloque lleno)
+    const maciza = k === "monumento" || k === "bebedero", caja = (x0, y0, z0, x1, y1, z1, c, sombra = maciza) => sc.box(x0, y0, z0, x1, y1, z1, { front: c, back: mul(c, .8), right: mul(c, .7), left: mul(c, .85), top: mul(c, 1.12), cast: sombra });
+    const PINTURA = [[196, 48, 40], [44, 92, 168], [232, 180, 40], [40, 138, 80]], pc = r.pick(PINTURA), negro = [44, 44, 48], gris = [150, 150, 154];
+    if (k === "hamacas") {   // dos postes por lado, el travesaño y dos asientos colgando de sus cadenas
+      for (const x of [-1.3, 1.25]) for (const y of [-.55, .5]) caja(x, y, 0, x + .07, y + .07, 2.2, pc);
+      caja(-1.3, -.03, 2.15, 1.32, .06, 2.27, pc);
+      for (const x of [-.6, .4]) { caja(x, -.12, .42, x + .44, .12, .47, negro); for (const dx of [0, .39]) caja(x + dx, -.025, .47, x + dx + .05, .025, 2.15, [86, 86, 92], false); }
+    } else if (k === "tobogan") {   // escalera, plataforma y la rampa con barandas
+      for (const y of [-.28, .23]) caja(-1.6, y, 0, -1.54, y + .05, 1.7, gris);
+      for (let z = .3; z < 1.6; z += .3) caja(-1.6, -.28, z, -1.54, .28, z + .04, gris, false);
+      caja(-1.54, -.32, 1.5, -.95, .32, 1.58, pc);
+      const sl = r.pick([[232, 180, 40], [196, 48, 40], [44, 150, 190]]);
+      sc.quad([-.95, -.25, 1.55], [0, .5, 0], [2.2, 0, -1.35], mul(sl, 1.1));   // (E1, E2 así: la normal para arriba) sc.quad([-.95, -.25, 1.55], [2.2, 0, -1.35], [0, 0, .12], mul(sl, .8)); sc.quad([-.95, .25, 1.67], [2.2, 0, -1.35], [0, 0, -.12], mul(sl, .7));
+      for (const y of [-.32, .27]) caja(-1.0, y, 0, -.94, y + .05, 1.5, gris);
+    } else if (k === "subibaja") {   // el pie y la tabla inclinada, con sus manijas
+      caja(-.12, -.15, 0, .12, .15, .45, gris);
+      const t = .14; sc.quad([-1.7, -.12, .25 + t], [0, .24, 0], [3.4, 0, .5], pc); sc.quad([-1.7, -.12, .25 + t], [3.4, 0, .5], [0, 0, -.06], mul(pc, .75));
+      for (const x of [-1.45, 1.35]) caja(x, -.02, .25 + t + (x + 1.7) / 3.4 * .5, x + .05, .03, .55 + t + (x + 1.7) / 3.4 * .5, negro, false);
+    } else if (k === "monumento") {   // pedestal escalonado de piedra con un busto de bronce
+      const piedra = [196, 190, 176], bronce = [96, 78, 50];
+      caja(-.9, -.9, 0, .9, .9, .25, mul(piedra, .9)); caja(-.6, -.6, .25, .6, .6, 1.75, piedra); caja(-.7, -.7, 1.75, .7, .7, 1.9, mul(piedra, 1.05));
+      caja(-.3, -.22, 1.9, .3, .22, 2.35, bronce); caja(-.15, -.14, 2.35, .15, .14, 2.7, mul(bronce, 1.1));
+      sc.quad([-.35, -.61, 1.35], [.7, 0, 0], [0, 0, -.35], [150, 130, 70]);   // la placa
+    } else {   // bebedero: un pilar con la canilla
+      caja(-.15, -.15, 0, .15, .15, .9, [176, 172, 164]); caja(-.04, -.25, .78, .04, -.15, .84, gris, false);
+    }
+    return { sc };
+  }
+  return { build, tapial, paredon, esquina, poste, medianera, juego, WALLS, ESQ, CO, setKit, accesorio, chas };
 })();
