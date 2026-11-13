@@ -233,7 +233,7 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 
 - [ ] **Reexportar el barrio inventado y Carabobo** — hecho (fffa219): los tres barrios, reexportados juntos.
 - [x] **Rama `objetos-zip`** — mergeada a main el 12/11 (sin subir a GitHub).
-- [ ] **Varsovia y Bucarelli, tal cual** — hecho (el dueño, 12/11 y 13/11). Los 20 lotes de la cuadra, del catastro, y cada casa
+- [ ] **Varsovia y Bucarelli, tal cual** — hecho (45e9bf8; el dueño, 12/11 y 13/11). Los 20 lotes de la cuadra, del catastro, y cada casa
   de la foto más nueva de su fachada (`editor/recursos/cuadras_reales.js`, `Houses.build` con `spec.d`); las dos esquinas de
   Bucarelli, estilos propios de `Houses.chas` (2901 con paños de ladrillo, 1634 lila con la esquina redonda); los árboles del censo
   corridos con los lotes. Diferencias que quedan: las calles del editor son más anchas (los frentes, achicados un 7 % para que
