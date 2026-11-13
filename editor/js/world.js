@@ -587,7 +587,12 @@ const World = (() => {
           for (const [k, p] of peso) if (p > best) { best = p; kind = k; }
           sg.veredaLado[side] = kind; } } }
     const lotAt = (x, y) => { const gx = (x * LR) | 0, gy = (y * LR) | 0; if (gx < 0 || gy < 0 || gx >= LW || gy >= LH) return null; const i = lotGrid[gy * LW + gx]; return i >= 0 ? lots[i] : null; };
-    return { MW, MH, MG, dentro, segs, lots, districts, inters, classify, classifyInto, lotAt, wealthAt, near, raw, plazas, villaAt, zona, real: RM ? RM.nombre : null, carpeta: RM ? (RM.carpeta || "carabobo") : "barrio", estilo: (RM && RM.estilo) || {}, inicio: RM ? RM.inicio : null,
+    // el piso de un lote en (x, y), como lo pinta el exportador: el del patio (baldosa, cemento…) en los primeros 13 m desde el frente
+    // (la casa y su patio); más al fondo, pasto (tierra en lo pobre) si el barrio tiene pasto (en la Capital el fondo también es patio)
+    const pisoLote = (lot, x, y) => { const v = lot.nOut ? (x - lot.o[0]) * lot.nOut[0] + (y - lot.o[1]) * lot.nOut[1] : 0;
+      return lot.patio !== "yuyo" && lot.kind !== "plaza" && lot.kind !== "sendero" && lot.kind !== "cancha" && v > 13 && PASTO >= .5 ? (lot.w < .3 ? "tierra" : "pasto") : lot.patio; };
+    const pisoEn = (x, y) => { const l = lotAt(x, y); return l ? pisoLote(l, x, y) : null; };
+    return { MW, MH, MG, dentro, segs, lots, districts, inters, classify, classifyInto, lotAt, pisoLote, pisoEn, wealthAt, near, raw, plazas, villaAt, zona, real: RM ? RM.nombre : null, carpeta: RM ? (RM.carpeta || "carabobo") : "barrio", estilo: (RM && RM.estilo) || {}, inicio: RM ? RM.inicio : null,
       arbolesReales: RM && RM.arboles ? { especies: RM.especies, lista: RM.arboles } : null, rotondas: ROTONDAS, pasto: PASTO };
   }
 

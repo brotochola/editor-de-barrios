@@ -380,12 +380,8 @@ const Exportar = (() => {
         if (cl.k === 2) { const sgn = cl.ds >= 0 ? 1 : -1, s = cl.s; let kind = s.veredaLado && s.veredaLado[sgn], dmg = false;
           if (!kind) { kind = s.w < .3 ? "tierra" : "vain"; dmg = s.w < .45; } else if (kind === "vain_d") { kind = "vain"; dmg = true; }
           cellB[o + 2] = (VER[kind] || 2) | (dmg ? 16 : 0); }
-        // patio: el piso del lote (baldosa, cemento…) sólo en los primeros 13 m desde el frente (la casa y su patio); más al fondo,
-        // pasto (tierra en los barrios pobres), como el fondo de las manzanas de Buenos Aires
-        const lot = W.lotAt(x, y); if (lot) { const v = lot.nOut ? (x - lot.o[0]) * lot.nOut[0] + (y - lot.o[1]) * lot.nOut[1] : 0;
-          // (en la Capital el fondo también es patio: baldosa o cemento, no pasto)
-          const pat = lot.patio !== "yuyo" && lot.kind !== "plaza" && lot.kind !== "sendero" && lot.kind !== "cancha" && v > 13 && W.pasto >= .5 ? (lot.w < .3 ? "tierra" : "pasto") : lot.patio;
-          cellB[o + 3] = (PAT[pat] || 5) | (lot.w < .4 ? 16 : 0); }
+        // patio: el piso del lote (World.pisoLote: el del patio en los primeros 13 m, más al fondo pasto o tierra si el barrio tiene)
+        const lot = W.lotAt(x, y); if (lot) cellB[o + 3] = (PAT[W.pisoLote(lot, x, y)] || 5) | (lot.w < .4 ? 16 : 0);
         // en la Capital lo que queda entre lotes también es patio de cemento, no pasto (y no a parches: se veía un damero)
         else if (W.pasto < .5 && cl.k === 0 && W.dentro(x, y) && W.wealthAt(x, y) >= .3) cellB[o + 3] = PAT.cem;
       } }

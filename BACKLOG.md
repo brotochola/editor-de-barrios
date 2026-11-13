@@ -87,6 +87,8 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 - [ ] **Calles parejas** — hecho (f00925d). Un solo material por calle (asfalto, asfalto roto, adoquín, tierra), el
   que más largo tenía entre sus cuadras. Una calle son las cuadras del mismo nombre; sin nombre, las que siguen derecho en
   la esquina.
+- [ ] **Plantas y árboles saliendo de la baldosa** — en curso (el dueño, 13/11: «no tiene sentido! salvo que estén en macetas»).
+  En los patios de cemento o baldosa salían árboles, plantas y yuyos del piso.
 
 ## Luces
 
@@ -147,12 +149,11 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   `variantes.html`). Quedan las piezas de fachada (`arte/fachadas`, con las hojas originales en `arte/fachadas/gemini`); su hoja
   la arma ahora `herramientas/hojas.js` (salió igual pixel por pixel). Las grillas de autos para Gemini pasaron a
   `arte/autos_gemini`. La fuente de la rotonda y de las plazas es la de `arte/objetos`.
-- [ ] **Plazas sin juegos ni bancos de Gemini** — hecho (69ffe40): hamacas, tobogán, subibaja, monumento y bebedero en 3D (Houses.juego: cajas de colores lisos,
-  sin atlas; los de caño, sin sombra), donde iban los dibujos; los bancos ya salían de arte/objetos. Después (b8f1005): la calesita
-  (techo a gajos), la glorieta, la mesa de ping-pong, las de ajedrez y las barras; en las plazas reales grandes, también ajedrez,
-  ping-pong y glorieta. Faltan las manchas del piso. Lo de antes: Con los objetos de Gemini se fueron los juegos (hamacas, tobogán,
+- [ ] **Plazas sin juegos ni bancos de Gemini** — falta el dibujo. Con los objetos de Gemini se fueron los juegos (hamacas, tobogán,
   subibaja, calesita), el monumento, la glorieta, el bebedero, el ping-pong, el ajedrez y las manchas del piso; los packs de
-  `arte/objetos` no traen nada de eso. Se podrían armar en 3D en el editor, como los postes (`Houses.poste`), u otro pack.
+  `arte/objetos` no traen nada de eso (los bancos y la fuente sí). Hoy las plazas los saltean. Armados en 3D con cajas de colores
+  (69ffe40, b8f1005) quedaban horribles al lado de la fuente: se sacaron (el dueño, 13/11). Van cuando haya un dibujo (otro pack
+  o del dueño); no se arman en 3D sin que se pida.
 - [ ] **Atlas de las caras con mucho repetido** — hecho (c1d764e). Las paredes de material (revoque, ladrillo, ladrillo hueco,
   salpicré, hormigón, piedra) salen de una baldosa compartida que se repite; el revoque, gris, teñido del color de cada pared. Al
   hornear: el fondo en recortes de la baldosa (con las manchas horneadas), y lo dibujado encima (ventanas, puertas, carteles,

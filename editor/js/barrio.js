@@ -59,9 +59,17 @@ const Barrio = (() => {
       const m = p.m[mezcla(h, 3) % p.m.length], tl = OBJ.pools[p.p[mezcla(h, 4) % p.p.length]];
       return { f: m, top: tl[mezcla(h, 5) % tl.length], tierra: OBJ.frames[m].tierra };
     }
+    // nada crece de la baldosa ni del cemento (el dueño, 13/11): en un piso duro una planta de tierra (plm_) va en maceta, como en los
+    // patios porteños (lindas en lo rico, baldes y gomas en lo pobre), y un yuyo o un árbol no va (los de grieta y cordón sí)
+    const DURO = new Set(["cem", "roja"]), duro = (x, y) => DURO.has(W.pisoEn(x, y)), GRIETA = /^yy_(grieta|musgo|cordon|brotes)$/;
+    const MACETA = [["pl_balde", "pl_cubierta", "pl_botellas", "pl_balde"], ["pl_malvon", "pl_potus", "pl_sansevieria", "pl_aloe", "pl_cactus"],
+      ["pl_hortensia", "pl_limonero", "pl_lavanda", "pl_azalea", "pl_clivia", "pl_helecho", "pl_ficus", "pl_boj"]];
     function put(name, x, y, opt = {}) {
       const h = Math.abs(Math.imul(Math.round(x * 10), 73856093) ^ Math.imul(Math.round(y * 10), 19349663));
       if (QUITAR.has(name)) return null;
+      if ((name.startsWith("plm_") || (name.startsWith("yy_") && !GRIETA.test(name))) && duro(x, y)) {
+        if (name.startsWith("yy_")) return null;
+        const w = W.wealthAt(x, y), L = MACETA[w < .3 ? 0 : w < .55 ? 1 : 2]; name = L[mezcla(h, 7) % L.length]; }
       const rol = name, ob = OBJ && OBJ.roles[name] ? elegir(name, h) : null;
       if (ob) name = ob.f;
       if (!F0[name]) return null;
@@ -77,23 +85,12 @@ const Barrio = (() => {
       if (ob && ob.top) props.push({ f: ob.top, x, y, flip: !!(mezcla(h, 6) & 1), cr: 0, sh: null, face: null, o: ob.tierra - 2, rol });
       return e;
     }
-    // los juegos y el monumento de plaza que no tienen dibujo van en 3D (Houses.juego): poner() pone el dibujo si lo hay y si no, el
-    // juego, mirando como los senderos de su plaza (phi)
-    const JUEGO3D = { pz_hamacas: "hamacas", pz_tobogan: "tobogan", pz_subibaja: "subibaja", pz_monumento: "monumento", pz_bebedero: "bebedero",
-      pz_calesita: "calesita", pz_glorieta: "glorieta", pz_pingpong: "pingpong", pz_ajedrez: "ajedrez", pz_aparato: "aparato" };
-    const RJ = { hamacas: [1.4, .7], tobogan: [1.7, .4], subibaja: [1.8, .25], monumento: [.95, .95], bebedero: [.2, .2], calesita: [2.2, 2.2], glorieta: [2.3, 2.3],
-      pingpong: [1.4, .8], ajedrez: [1.05, .5], aparato: [1, .1] };
-    function poner(n, x, y, opt = {}, phi = 0) {
-      if (F0[n] || !JUEGO3D[n]) return put(n, x, y, opt);
-      const k = JUEGO3D[n], [hx, hy] = RJ[k], c = Math.cos(phi), s = Math.sin(phi), P = (u, v) => [x + c * u - s * v, y + s * u + c * v];
-      return addObj("juego", { t: "juego", k, a: aIdx(phi), s: k === "hamacas" || k === "tobogan" || k === "subibaja" ? Math.abs(Math.round(x * 7 + y * 3)) % 4 : 0 }, null, x, y, qa(phi), null, [P(-hx, -hy), P(hx, -hy), P(hx, hy), P(-hx, hy)]);
-    }
     // árbol: un tipo procedural según la riqueza del lugar (lleva el mismo sorteo que antes, así el resto no cambia)
     // tronco pintado a la cal (blanco hasta 1,2 m): en buena parte de los árboles de vereda, más en los barrios. Sale de la
     // posición, no del sorteo, así el resto del barrio no cambia. Devuelve true siempre (va dentro de la condición de arriba)
     function calTronco(a, s) { const h = Math.abs(Math.imul(Math.round(a.x * 7), 0x27d4eb2d) ^ Math.imul(Math.round(a.y * 7), 0x165667b1)) % 1000 / 1000;
       if (h < (s.w < .5 ? .55 : .3)) a.t += "_c"; return true; }
-    function arbol(x, y, flip, tipo) { const t = tipo || Arboles.pick(r, W.wealthAt(x, y), W.estilo && W.estilo.arboles); if (!claim(x, y, .4)) return null; const a = { t, x, y, flip: !!flip, cr: .28 }; arboles.push(a); return a; }
+    function arbol(x, y, flip, tipo) { const t = tipo || Arboles.pick(r, W.wealthAt(x, y), W.estilo && W.estilo.arboles); if (duro(x, y) || !claim(x, y, .4)) return null; const a = { t, x, y, flip: !!flip, cr: .28 }; arboles.push(a); return a; }
     const person = (x, y, stay) => { if (conGente && W.dentro(x, y)) people.push({ x, y, stay: !!stay }); };   // afuera del paredón no hay gente
     const at = (s, t, off) => [s.a[0] + s.dir[0] * t + s.n[0] * off, s.a[1] + s.dir[1] * t + s.n[1] * off];
 
@@ -104,8 +101,7 @@ const Barrio = (() => {
       const pasto = (q) => { const l = W.lotAt(q[0], q[1]); return l && l.kind === "plaza"; }, sendero = (q) => { const l = W.lotAt(q[0], q[1]); return l && l.kind === "sendero"; };
       const hA = P.bA / 2 - 8.5, hB = P.bB / 2 - 8.5, rx2 = rx;
       // centro
-      const phiP = Math.atan2(P.u[1], P.u[0]);
-      poner(rx2() < .55 ? "pz_monumento" : F.pz_fuente ? "pz_fuente" : "u_farol_doble", P.c[0], P.c[1], { noClaim: true, face: [0, -1] }, phiP);   // el prócer mira al sur
+      put(F.pz_monumento && rx2() < .55 ? "pz_monumento" : F.pz_fuente ? "pz_fuente" : "u_farol_doble", P.c[0], P.c[1], { noClaim: true, face: [0, -1] });   // el prócer mira al sur
       // árboles en el borde, cada 9 a 12 m, fuera de los senderos
       for (const [ax, len, fixed] of [[0, hA, hB], [0, hA, -hB], [1, hB, hA], [1, hB, -hA]])
         for (let t = -len + rx2.uni(1, 4); t < len; t += rx2.uni(9, 12)) { const q = ax ? at2(fixed, t) : at2(t, fixed); if (pasto(q)) {
@@ -123,15 +119,15 @@ const Barrio = (() => {
       // cuartos: juegos, aparatos y mesas, canteros con flores
       const cuartos = [[1, 1], [-1, 1], [1, -1], [-1, -1]].sort(() => rx2() - .5);
       const enCuarto = (cu, k, rad) => { for (let tries = 0; tries < 12; tries++) { const q = at2(cu[0] * rx2.uni(hA * .3, hA * .8), cu[1] * rx2.uni(hB * .3, hB * .8)); if (pasto(q) && claim(q[0], q[1], rad)) return q; } return null; };
-      for (const n of ["pz_hamacas", "pz_tobogan", "pz_subibaja", "pz_calesita"]) { if (!F[n] && !JUEGO3D[n]) continue; const q = enCuarto(cuartos[0], n, n === "pz_calesita" ? 2.5 : 2); if (q) poner(n, q[0], q[1], { noClaim: true }, phiP); }
-      for (const n of ["pz_aparato", "pz_aparato", "pz_pingpong", "pz_ajedrez", "pz_bebedero"]) { if (!F[n] && !JUEGO3D[n]) continue; const q = enCuarto(cuartos[1], n, 1.4); if (q) poner(n, q[0], q[1], { noClaim: true }, phiP); }
+      for (const n of ["pz_hamacas", "pz_tobogan", "pz_subibaja", "pz_calesita"]) { if (!F[n]) continue; const q = enCuarto(cuartos[0], n, n === "pz_calesita" ? 2.5 : 1.6); if (q) put(n, q[0], q[1], { noClaim: true }); }
+      for (const n of ["pz_aparato", "pz_aparato", "pz_pingpong", "pz_ajedrez", "pz_bebedero"]) { if (!F[n]) continue; const q = enCuarto(cuartos[1], n, 1.4); if (q) put(n, q[0], q[1], { noClaim: true }); }
       for (let k = 0; k < 6; k++) { const n = rx2.pick(["pz_cantero", "plm_agapanto", "plm_lantana", "pl_boj", "plm_rosal", "plm_yuyos"]); if (!F[n]) continue; const q = enCuarto(cuartos[2 + (k & 1)], n, .9); if (q) put(n, q[0], q[1], { noClaim: true }); }
       // el pasto de la plaza: matas, trébol con flores, margaritas, manzanilla, hongos
       if (F.yy_mata) for (let k = 0, n = Math.round(P.bA * P.bB / 60); k < n; k++) { const q = at2(rz.uni(-hA + 1, hA - 1), rz.uni(-hB + 1, hB - 1));
         if (pasto(q)) put(rz.pick(["yy_cesped_margaritas", "yy_trebol_blanco", "yy_mata", "yy_manzanilla", "yy_trebol_blanco", "yy_hongos", "yy_vinagrillo"]), q[0], q[1], { rad: .2 }); }
       for (const n of ["c_palomas", "c_palomas", "c_perro", "c_perro_duerme", "c_gato"]) { if (!F[n] || rx2() > .7) continue; const q = at2(rx2.uni(-hA, hA), rx2.uni(-hB, hB)); if (n !== "c_perro" && (sendero(q) || pasto(q))) put(n, q[0], q[1], { noCollide: true }); }   // sin el perro parado (el sorteo queda igual)
       if (F.c_chori && rx2() < .6) { const q = at2(rx2.pick([-1, 1]) * (hA + 4), rx2.uni(-hB * .5, hB * .5)); put("c_chori", q[0], q[1]); }
-      if (rx2() < .4) { const q = enCuarto(cuartos[2], "pz_glorieta", 3); if (q) poner("pz_glorieta", q[0], q[1], { noClaim: true }, phiP); }
+      if (F.pz_glorieta && rx2() < .4) { const q = enCuarto(cuartos[2], "pz_glorieta", 3); if (q) put("pz_glorieta", q[0], q[1], { noClaim: true }); }
       for (let k = 0; k < Math.round(P.bA * P.bB / 900) * C.gente; k++) { const q = at2(rx2.uni(-hA, hA), rx2.uni(-hB, hB)); if (sendero(q) || pasto(q)) person(q[0], q[1], rx2() < .5); }
     }
 
@@ -153,14 +149,10 @@ const Barrio = (() => {
         for (const d of [1.7, 2.1]) { const qq = [q[0] + o[0] * d, q[1] + o[1] * d]; if (!pasto(qq)) continue;
           const nm = rx() < .35 ? (F.u_farola_orn ? "u_farola_orn" : "u_farola") : rx() < .8 ? (F.pz_banco && rx() < .5 ? "pz_banco" : "u_banco") : "u_cesto";
           put(nm, qq[0], qq[1], nm.includes("banco") ? { face: [-o[0], -o[1]] } : {}); break; } }
-      const phiR = Math.atan2(P.u[1], P.u[0]);
-      if (A > 3500 && pasto(P.c)) poner(rx() < .5 ? "pz_monumento" : F.pz_fuente ? "pz_fuente" : "pz_monumento", P.c[0], P.c[1], { face: [0, -1] }, phiR);
+      if (A > 3500 && pasto(P.c) && (F.pz_monumento || F.pz_fuente)) put(F.pz_monumento && rx() < .5 ? "pz_monumento" : F.pz_fuente ? "pz_fuente" : "pz_monumento", P.c[0], P.c[1], { face: [0, -1] });
       // juegos
-      if (P.juegos || (A > 2500 && rx() < .5)) for (const n of ["pz_hamacas", "pz_tobogan", "pz_subibaja", "pz_calesita", "pz_aparato"]) { if ((!F[n] && !JUEGO3D[n]) || rx() < .3) continue;
-        for (let tries = 0; tries < 14; tries++) { const q = at2(rx.uni(-hA * .7, hA * .7), rx.uni(-hB * .7, hB * .7)); if (pasto(q) && claim(q[0], q[1], n === "pz_calesita" ? 2.5 : 2)) { poner(n, q[0], q[1], { noClaim: true }, phiR); break; } } }
-      // y en las grandes, mesas de ajedrez, ping-pong y a veces una glorieta
-      if (A > 3000) for (const n of ["pz_ajedrez", "pz_ajedrez", "pz_pingpong", "pz_glorieta"]) { if (rx() < (n === "pz_glorieta" ? .7 : .45)) continue;
-        for (let tries = 0; tries < 14; tries++) { const q = at2(rx.uni(-hA * .75, hA * .75), rx.uni(-hB * .75, hB * .75)); if (pasto(q) && claim(q[0], q[1], n === "pz_glorieta" ? 3 : 1.6)) { poner(n, q[0], q[1], { noClaim: true }, phiR); break; } } }
+      if (P.juegos || (A > 2500 && rx() < .5)) for (const n of ["pz_hamacas", "pz_tobogan", "pz_subibaja", "pz_calesita", "pz_aparato"]) { if (!F[n] || rx() < .3) continue;
+        for (let tries = 0; tries < 14; tries++) { const q = at2(rx.uni(-hA * .7, hA * .7), rx.uni(-hB * .7, hB * .7)); if (pasto(q) && claim(q[0], q[1], n === "pz_calesita" ? 2.5 : 1.6)) { put(n, q[0], q[1], { noClaim: true }); break; } } }
       // pasto, bichos y gente
       if (F.yy_mata) for (let k = 0, n = Math.round(A / 55); k < n; k++) { const q = at2(rz.uni(-hA, hA), rz.uni(-hB, hB));
         if (pasto(q)) put(rz.pick(["yy_cesped_margaritas", "yy_trebol_blanco", "yy_mata", "yy_manzanilla", "yy_trebol_blanco", "yy_hongos", "yy_vinagrillo", "yy_gramilla", "yy_llanten"]), q[0], q[1], { rad: .2 }); }
@@ -653,7 +645,6 @@ const Barrio = (() => {
     if (spec.t === "paredon") return Houses.paredon(spec.W, 700 + spec.s, phi);
     if (spec.t === "tapial") return Houses.tapial(spec.W, 500 + spec.s, spec.tk, phi);
     if (spec.t === "medianera") return Houses.medianera(spec.W, 600 + spec.s, spec.tk, phi);
-    if (spec.t === "juego") return Houses.juego(spec.k, 800 + spec.s, phi);
     return Houses.poste(7, phi, !!spec.l);
   }
   // Qué cuadro y qué espejo usa un prop que mira hacia (sx, sy) en pantalla: el dibujo mira a la derecha; si mira a la izquierda, en espejo
