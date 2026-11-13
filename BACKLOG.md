@@ -40,7 +40,7 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 - [ ] **Terrenos vacíos** — en curso. En Carabobo y en Parque Chas, lotes del tamaño de una o dos casas sin casa: con
   basura y yuyos, o sólo basura. Hecho (7d59c67): Parque Chas tiene baldíos (3 de cada 100 lotes; antes ninguno: su estilo no los
   traía), un tercio son sólo basura sobre la tierra, y la basura va en montones. Parque Chas: 66 baldíos (24 de basura); Carabobo: 152 (50).
-  Y lo que pidió el dueño (12/11), hecho (HASH_CARAS3): barriles, cajas, gomas, garrafas, colchones, chapas y escombro chocan y
+  Y lo que pidió el dueño (12/11), hecho (b9ce533): barriles, cajas, gomas, garrafas, colchones, chapas y escombro chocan y
   hacen sombra (GameObjects); las plantas no. En los de yuyos, unas tres veces más yuyos, arbustos y de uno a tres árboles; en los
   de basura, de cinco a nueve montones grandes y algún yuyo entre la basura.
 - [ ] **Techo con agujero en las esquinas con forma** — hecho (7d59c67). El techo iba en abanico desde un vértice: en una planta
@@ -110,11 +110,11 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 
 - [ ] **Ramas más angostas y menos hojas** — hecho (2bfae69). Ramas a 0,6 de su grosor (el tronco igual), la mitad de
   los racimos pelados y al resto le queda un cuarto de sus hojas.
-- [ ] **Árboles con ramas repetidas** — hecho (HASH_CARAS3; el dueño, 12/11). Cada especie, una librería de 4 ramas paradas y su
+- [ ] **Árboles con ramas repetidas** — hecho (b9ce533; el dueño, 12/11). Cada especie, una librería de 4 ramas paradas y su
   cima; cada tipo de árbol las usa giradas, una sí y una no en espejo, y estiradas. Un solo tronco (y otro a la cal), recto,
   estirado a cada árbol. Parque Chas: la hoja `arboles`, de 215 cuadros (2,71 Mpx, 1,0 MB) a 74 (0,99 Mpx, 0,48 MB); Carabobo,
   de 141 (1,83 Mpx) a 50 (0,70 Mpx).
-- [ ] **Hojas flotando; ramas que terminan en palo** — hecho (HASH_CARAS3; el dueño, 12/11). Las rosetas iban en una esfera
+- [ ] **Hojas flotando; ramas que terminan en palo** — hecho (b9ce533; el dueño, 12/11). Las rosetas iban en una esfera
   alrededor del extremo de la rama y muchas quedaban en el aire: ahora van sobre ramitas que salen del racimo. Los racimos de las
   puntas y la cima nunca quedan pelados, y la punta de cada ramita lleva su roseta.
 
@@ -161,7 +161,7 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   cuestan al juego esas piezas de más (memoria, carga, cuadro) en un aparato de verdad; los techos todavía guardan un recorte por
   medida (de medio metro en medio metro). Una decoración que repita su textura (tiling, como los sprites) haría innecesarios los
   recortes: sería un pedido a WeedJS.
-- [ ] **Caras, segunda y tercera vuelta** — hecho (HASH_CARAS3; el dueño, 12/11: «hay un montón de assets duplicados», «un simple
+- [ ] **Caras, segunda y tercera vuelta** — hecho (b9ce533; el dueño, 12/11: «hay un montón de assets duplicados», «un simple
   pattern que se repite», «decorations rotadas, con skew y scale»). El fondo de las paredes y los techos, un patrón: baldosas de
   6 × 3 m (techos, 6 × 6) repetidas y estiradas, sin variantes por manchas. Lo dibujado, cada cosa en su recuadro, cortado en franjas
   regulares desde su borde; las rayas a lo ancho de la pared, en su tira; lo que es la pared oscurecida pareja, negro translúcido
