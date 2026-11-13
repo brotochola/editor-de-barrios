@@ -33,8 +33,8 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   atlas). En Parque Chas (antes de ensanchar las calles) salieron 88. Pendiente: muchas esquinas no entran (la vereda o el
   lote de al lado no dejan); se podría probar con frentes más cortos.
 - [ ] **Fondos de las manzanas** — hecho (2608753): cada límite entre dos patios lleva una medianera de 1,8 m sin pilares
-  (tapia de revoque o de ladrillo, del patrón compartido) o un alambrado de 1,5 m, en 6 de cada 7; se corta con más tolerancia (PIE_FONDO,
-  32 px: casi no pasa gente) por el tope de decoraciones. Cada fondo, de su semilla: lindo (plantas lindas a lo largo de los bordes,
+  (tapia de revoque o de ladrillo, del patrón compartido) o un alambrado de 1,5 m, en 6 de cada 7; se cortaba con más tolerancia (32 px,
+  luego 16) por el tope de decoraciones; desde 750648d, en columnas de 8 px como las casas. Cada fondo, de su semilla: lindo (plantas lindas a lo largo de los bordes,
   un árbol, sillas, ropa colgada; la mitad en lo rico), abandonado (yuyos crecidos, basura, escombro; un tercio en lo pobre) o el de
   siempre. Parque Chas: 1 300 medianeras, 8 mil piezas; decoraciones de 441 a 469 mil (de 524 287). El pedido: Las casas dan a la calle, pero sus fondos (lo de adentro de la manzana)
   tienen que ser patios, jardines o la continuación de la casa, separados entre sí por medianeras y rejas (las paredes y
@@ -115,7 +115,7 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   giradas al rumbo de auto más cercano (cada 7,5°), no al de su lote: una de 26 m de un lote a 171,1° salía a 165,8°, 2,3 m fuera
   de su lugar y metida en la casa del fondo («esa línea que se va abriendo»). Ahora llevan su ángulo exacto (spec.ph; el diseño se
   comparte entre ángulos y el atlas no crece) y van en el marco de su lote. Una planta de atrás ya no queda encima: columnas de
-  16 px (antes 32) y la tapa ordenada por la punta de adelante de su pared. No pasan a menos de 0,5 m de la casa de otro lote (se
+  16 px (antes 32; 8 desde 750648d, con el tope de WeedJS en 1 048 575) y la tapa ordenada por la punta de adelante de su pared. No pasan a menos de 0,5 m de la casa de otro lote (se
   cortan en tramos) ni dejan pasillos de menos de 90 cm junto a la casa. Las casas siguen al rumbo de auto más cercano: en un lote
   que no está en uno de esos rumbos, la casa queda girada hasta 3,75° respecto del lote.
 
@@ -138,7 +138,9 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   WeedJS da una luz por entidad: la izquierda es la del auto y la derecha un `Faro`, una entidad con sólo su luz que el auto pone
   en su esquina y apunta en cada tick, y prende y apaga con la suya. Con `?raycast=1` el `Faro` no está en la grilla espacial
   (no tiene colisionador ni dibujo): su luz no busca las casas que la tapan. Si WeedJS diera más de una luz por entidad, el `Faro`
-  sobraría.
+  sobraría. El pool de `Faro` (uno por auto del barrio) dejó Parque Chas sin arrancar: 65 873 entidades, y WeedJS no pasa de
+  65 535 (Box2D). Arreglado en 750648d: cada clase de auto con su pool justo (el exportador cuenta los que circulan y las
+  chatarras); Parque Chas, 64 274.
 - [ ] **Resolución de la luz para pixel art** — charlar. ¿Tiene sentido `lighting.resolution: .5` en un juego pixel art?
 
 ## Cables
