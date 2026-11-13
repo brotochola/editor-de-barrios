@@ -68,7 +68,7 @@ const Barrio = (() => {
     }
     // nada crece de la baldosa ni del cemento (el dueño, 13/11): en un piso duro una planta de tierra (plm_) va en maceta, como en los
     // patios porteños (lindas en lo rico, baldes y gomas en lo pobre), y un yuyo o un árbol no va (los de grieta y cordón sí)
-    const DURO = new Set(["cem", "roja"]), duro = (x, y) => DURO.has(W.pisoEn(x, y)), GRIETA = /^yy_(grieta|musgo|cordon|brotes)$/;
+    const DURO = new Set(["cem", "roja", "calcareo", "ceramico", "ladrillo", "gris"]), duro = (x, y) => DURO.has(W.pisoEn(x, y)), GRIETA = /^yy_(grieta|musgo|cordon|brotes)$/;
     const MACETA = [["pl_balde", "pl_cubierta", "pl_botellas", "pl_balde"], ["pl_malvon", "pl_potus", "pl_sansevieria", "pl_aloe", "pl_cactus"],
       ["pl_hortensia", "pl_limonero", "pl_lavanda", "pl_azalea", "pl_clivia", "pl_helecho", "pl_ficus", "pl_boj"]];
     function put(name, x, y, opt = {}) {
@@ -295,6 +295,16 @@ const Barrio = (() => {
         oFondo = addObj("house", { t: "casa", k: k2, W: bw, D: bd, a: aIdx(lot.phi), wb: Math.min(1, wb), v: 0 }, lot, bx, by, phiQ, { u0: bu, uw: bw, v0: bv }, rect(bu, bu + bw, bv, bv + bd), { back: true });
         occRect(bu, bu + bw, bv - .6, bv + bd + .5); backV = bv;
       }
+      // el patio y el jardín del fondo (el dueño, 13/11: «muchas veces hay una parte de patio, de cerámicos o algo así, pero cada casa
+      // diferente, y una parte de jardín, con plantas»): las baldosas pegadas a la casa, de un material de su semilla (el exportador las
+      // alinea con la casa), y detrás el jardín: pasto, tierra en lo pobre, yuyos si el fondo está abandonado (el estilo de abajo, la
+      // misma tirada). A veces todo patio, más en lo pobre. Las plantas de tierra van en el jardín; en el patio, en maceta (duro)
+      if (lot.kind !== "villa") { const rp = R3.rng(lot.seed ^ 0x6a09e667), w = lot.w, q0 = R3.rng(lot.seed ^ 0x7c3aed11)();
+        const pL = w > .6 ? .5 : w > .35 ? .28 : .1, pA = w < .3 ? .35 : w < .55 ? .15 : .04;
+        lot.piso = pickW(rp, w < .3 ? [["cem", 4], ["roja", 2], ["gris", 1], ["tierra", 3]] : w < .6 ? [["roja", 4], ["calcareo", 2], ["ceramico", 2], ["cem", 2], ["gris", 2], ["ladrillo", 1]]
+          : [["calcareo", 3], ["ceramico", 3], ["roja", 3], ["ladrillo", 2], ["gris", 1]]);
+        lot.jardin = q0 >= pL && q0 < pL + pA ? "yuyo" : w < .3 && rp() < .6 ? "tierra" : "pasto";
+        lot.patioV = rp() < (w < .3 ? .3 : .12) ? lot.ld : depthTot + Math.min(Math.max(0, (backV || lot.ld) - depthTot), rp.uni(2.5, 6.5)); }
       if ((backV || lot.ld) - depthTot > 3.5) { const fin = (backV || lot.ld) - .8, cerca = Math.min(fin, depthTot + 9);
         // lo del patio cerca de la casa (no perdido en el fondo de un lote de 50 m); la parrilla contra una medianera. Mismas tiradas que antes
         const pp = () => LP(r.uni(.8, lot.fw - .8), r.uni(depthTot + 2.2, cerca)), ppLado = () => { const iz = r() < .5; return LP(iz ? .7 : lot.fw - .7, r.uni(depthTot + 1.8, Math.min(fin, depthTot + 5))); };

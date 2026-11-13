@@ -291,7 +291,9 @@ const Exportar = (() => {
     progreso("piso", .86); await espera();
     const GC = .5, CW = Math.ceil(MW / GC), CHh = Math.ceil(MH / GC), cellA = new Uint8Array(CW * CHh * 4), cellB = new Uint8Array(CW * CHh * 4);
     const TYPE = { ave: 0, calle: 1, pasaje: 2, pasillo: 3 }, MAT = { asf: 0, roto: 1, tierra: 2, pasillo: 3, adoquin: 4 };
-    const VER = { tierra: 1, vain: 2, gris: 3, roja: 3, cem: 4, pasto: 5 }, PAT = { pasto: 1, tierra: 2, yuyo: 3, roja: 4, cem: 5, sint: 1 };
+    const VER = { tierra: 1, vain: 2, gris: 3, roja: 3, cem: 4, pasto: 5 }, PAT = { pasto: 1, tierra: 2, yuyo: 3, roja: 4, cem: 5, sint: 1, calcareo: 6, ceramico: 7, ladrillo: 8, gris: 9 };
+    // el rumbo de cada lote, por celda (módulo 90°, en 256 pasos): el shader alinea las baldosas del patio con la casa
+    const patios = new Uint8Array(CW * CHh), Q4 = Math.PI / 2, rumbo = (lot) => Math.round(((lot.phi % Q4) + Q4) % Q4 / Q4 * 256) & 255;
     const NS = W.segs.length, segs = new Uint8Array(NS * 48), ENC = { pos: [20, 50], unit: [1, 32767.5], len: [0, 50], w: [0, 1000], int: [0, 1] };   // pos y len: 2 cm, hasta 1290 m
     W.segs.forEach((s, k) => { s._gid = k; const cr = s.cross.slice(0, 8); while (cr.length < 8) cr.push(null);
       const vals = [[s.a[0], "pos"], [s.a[1], "pos"], [s.dir[0], "unit"], [s.dir[1], "unit"], [s.n[0], "unit"], [s.n[1], "unit"], [s.len, "len"], [s.hw, "w"], [Math.max(0, s.sw), "w"], [s.med || 0, "w"],
@@ -310,7 +312,7 @@ const Exportar = (() => {
           if (!kind) { kind = s.w < .3 ? "tierra" : "vain"; dmg = s.w < .45; } else if (kind === "vain_d") { kind = "vain"; dmg = true; }
           cellB[o + 2] = (VER[kind] || 2) | (dmg ? 16 : 0); }
         // patio: el piso del lote (World.pisoLote: el del patio en los primeros 13 m, más al fondo pasto o tierra si el barrio tiene)
-        const lot = W.lotAt(x, y); if (lot) cellB[o + 3] = (PAT[W.pisoLote(lot, x, y)] || 5) | (lot.w < .4 ? 16 : 0);
+        const lot = W.lotAt(x, y); if (lot) { cellB[o + 3] = (PAT[W.pisoLote(lot, x, y)] || 5) | (lot.w < .4 ? 16 : 0); patios[j * CW + i] = rumbo(lot); }
         // en la Capital lo que queda entre lotes también es patio de cemento, no pasto (y no a parches: se veía un damero)
         else if (W.pasto < .5 && cl.k === 0 && W.dentro(x, y) && W.wealthAt(x, y) >= .3) cellB[o + 3] = PAT.cem;
       } }
@@ -323,7 +325,7 @@ const Exportar = (() => {
     for (const q of (B.pits || [])) { const i = Math.floor(q.x / 2), j = Math.floor(q.y / 2); if (i < 0 || j < 0 || i >= PWc || j >= PHc) continue; const o = (j * PWc + i) * 4;
       if (pits[o + 3]) continue; pits[o] = Math.round((q.x - i * 2) / 2 * 255); pits[o + 1] = Math.round((q.y - j * 2) / 2 * 255);
       pits[o + 2] = Math.round(((q.ang / (2 * Math.PI)) % 1 + 1) % 1 * 256) & 255; pits[o + 3] = q.tipo | (q.pasto ? 4 : 0); }
-    const partes = { cellA, cellB, wealth, noise, segs, pits }, offs = {}; let off = 0;
+    const partes = { cellA, cellB, wealth, noise, segs, pits, patios }, offs = {}; let off = 0;
     for (const k in partes) { offs[k] = [off, partes[k].length]; off += partes[k].length; off = (off + 3) & ~3; }
     const piso = new Uint8Array(off); for (const k in partes) piso.set(partes[k], offs[k][0]);
     archivos.push(["piso.bin", piso]);

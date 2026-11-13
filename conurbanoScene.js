@@ -727,7 +727,8 @@ export class ConurbanoScene extends Scene {
           fragment: { webgl: 'shaders/piso.frag' }, worldRect: { width: META.WW, height: META.WH },
           textures: [{ name: 'cellA', format: 'rgba8unorm', size: { width: META.CW, height: META.CH } }, { name: 'cellB', format: 'rgba8unorm', size: { width: META.CW, height: META.CH } },
           { name: 'wealth', format: 'r8unorm', size: { width: META.WG, height: META.HG } }, { name: 'noiseT', format: 'rgba8unorm', size: { width: 256, height: 256 } },
-          { name: 'segs', format: 'rgba8unorm', size: { width: 12, height: META.NS } }, { name: 'pits', format: 'rgba8unorm', size: { width: META.PW || 1, height: META.PH || 1 } }],
+          { name: 'segs', format: 'rgba8unorm', size: { width: 12, height: META.NS } }, { name: 'pits', format: 'rgba8unorm', size: { width: META.PW || 1, height: META.PH || 1 } },
+          { name: 'patios', format: 'r8unorm', size: { width: META.CW, height: META.CH } }],
           uniforms: {
             uMW: f32(META.MW), uMH: f32(META.MH), uK: f32(META.K), uSF: f32(META.SF), uSYN: f32(META.SYN), uGC: f32(META.GC), uCW: f32(META.CW), uCH: f32(META.CH), uWG: f32(META.WG), uHG: f32(META.HG), uPW: f32(META.PW || 1), uPH: f32(META.PH || 1),
             uRX: f32(ROT0 ? ROT0.mx : 0), uRY: f32(ROT0 ? ROT0.my : 0), uRI: f32(ROT0 ? ROT0.ri : 0), uRE: f32(ROT0 ? ROT0.re : 0)
@@ -755,7 +756,7 @@ export class ConurbanoScene extends Scene {
   static sharedResources = [
     [PisoData, {
       cellA: { type: Uint8Array, length: META.CW * META.CH * 4 }, cellB: { type: Uint8Array, length: META.CW * META.CH * 4 },
-      wealth: { type: Uint8Array, length: META.WG * META.HG }, noise: { type: Uint8Array, length: 256 * 256 * 4 }, segs: { type: Uint8Array, length: META.NS * 48 }, pits: { type: Uint8Array, length: (META.PW || 1) * (META.PH || 1) * 4 }
+      wealth: { type: Uint8Array, length: META.WG * META.HG }, patios: { type: Uint8Array, length: META.CW * META.CH }, noise: { type: Uint8Array, length: 256 * 256 * 4 }, segs: { type: Uint8Array, length: META.NS * 48 }, pits: { type: Uint8Array, length: (META.PW || 1) * (META.PH || 1) * 4 }
     }],
     [Estado, { manejando: { type: Int32Array, length: 1, mailbox: true } }],
     [Transito, { grid: { type: Uint16Array, length: Math.max(1, TR.W * TR.H) }, cruces: { type: Float32Array, length: Math.max(6, TR.n * 6) } }],
@@ -792,9 +793,10 @@ export class ConurbanoScene extends Scene {
     PisoData.noise.set(u8.subarray(parts.noise[0], parts.noise[0] + parts.noise[1]));
     PisoData.segs.set(u8.subarray(parts.segs[0], parts.segs[0] + parts.segs[1]));
     if (parts.pits) PisoData.pits.set(u8.subarray(parts.pits[0], parts.pits[0] + parts.pits[1]));
+    PisoData.patios.set(u8.subarray(parts.patios[0], parts.patios[0] + parts.patios[1]));   // el rumbo de cada lote (las baldosas del patio)
     const L = Layer.get('piso');
     L.updateTexture('cellA', PisoData.cellA); L.updateTexture('cellB', PisoData.cellB); L.updateTexture('wealth', PisoData.wealth);
-    L.updateTexture('noiseT', PisoData.noise); L.updateTexture('segs', PisoData.segs); if (parts.pits) L.updateTexture('pits', PisoData.pits);
+    L.updateTexture('noiseT', PisoData.noise); L.updateTexture('segs', PisoData.segs); if (parts.pits) L.updateTexture('pits', PisoData.pits); L.updateTexture('patios', PisoData.patios);
     // ---- objetos
     const w = await (await fetch(BARRIO + 'mundo.json')).json();
     const { Decoration } = WEED;

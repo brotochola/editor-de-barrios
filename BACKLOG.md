@@ -106,6 +106,14 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 - [ ] **Plantas y árboles saliendo de la baldosa** — hecho (4a27389; el dueño, 13/11: «no tiene sentido! salvo que estén en
   macetas»). En un patio de baldosa o cemento una planta de tierra va en maceta y no se ponen yuyos (los de grieta sí) ni árboles;
   la regla del piso es una sola (World.pisoLote), la misma con que el exportador lo pinta.
+- [ ] **Patio y jardín en cada fondo** — hecho (el dueño, 13/11: «el piso de los fondos es siempre el mismo... debería estar
+  alineado con la casa; muchas veces hay una parte de patio, de cerámicos o algo así, pero cada casa diferente, y una parte de
+  jardín, con plantas»). Cada casa: baldosas pegadas a la casa (roja, calcáreo blanco y negro, cerámico, ladrillo, vainilla gris o
+  cemento, de su semilla), alineadas con ella (piso.bin trae el rumbo de cada lote: la parte «patios»), y detrás su jardín: pasto,
+  tierra en lo pobre, yuyos si está abandonado; a veces todo patio. Las plantas de tierra, en el jardín; en el patio, macetas.
+- [ ] **Medianeras que se abren del lote; plantas encima de la tapa** — en curso (el dueño, 13/11). La medianera de un costado iba
+  girada al rumbo de auto más cercano (la perpendicular a la calle casi nunca es uno) y se abría del borde del lote, que sigue el
+  piso; y una planta detrás de una medianera se dibujaba encima de la pared y de su tapa (columnas de 32 px; la tapa, de una pieza).
 
 ## Luces
 

@@ -11,6 +11,7 @@ uniform sampler2D cellB;    // rg = calle 3 (+1), b = vereda (tipo | 16 dañada)
 uniform sampler2D wealth;   // riqueza, celdas de 10 m
 uniform sampler2D noiseT;   // r = ruido a, g = b, b = c, a = granulado
 uniform sampler2D segs;     // 12 texels RGBA8 por calle: 24 valores de 16 bits (punto fijo)
+uniform sampler2D patios;   // el rumbo del lote de cada celda, módulo 90° (r: /256 de cuarto de vuelta): las baldosas del patio van alineadas con la casa
 uniform sampler2D pits;     // cazuelas en celdas de 2 m: rg = centro en la celda, b = ángulo (/256 vuelta), a = tipo (1 ladrillo, 2 cemento, 3 sin borde) | 4 con pasto
 uniform float uMW, uMH, uK, uSF, uSYN, uGC, uCW, uCH, uWG, uHG, uPW, uPH;
 uniform float uRX, uRY, uRI, uRE;   // rotonda (Parque Chas): centro, radio de la isla y de la calzada, en m (uRE = 0: no hay)
@@ -199,7 +200,11 @@ Mat pixelMat(float wx, float wy, int ix, int iy) {
   int pk = sk.y;
   if (pk > 0) { int k = pk & 15; bool d = (pk & 16) != 0;
     if (k == 1) return grassM(.3); if (k == 2) { if (NB(ix, iy) > .6) return grassM(.8); return dirtM(1.0); }
-    if (k == 3) return yuyoM(ix, iy); if (k == 4) return tilesM(wx, wy, 6, false); return tilesM(wx, wy, 4, d); }
+    if (k == 3) return yuyoM(ix, iy);
+    // las baldosas del patio, en los ejes de su lote: 4 roja, 6 calcáreo, 7 cerámico, 8 ladrillo, 9 vainilla gris; si no, cemento
+    float an = texelFetch(patios, cc, 0).r * (255.0 / 256.0) * 1.5707963, ca = cos(an), sa = sin(an), pu = ca * wx + sa * wy, pv = ca * wy - sa * wx;
+    if (k == 4) return tilesM(pu, pv, 6, false); if (k == 6) return tilesM(pu, pv, 7, false); if (k == 7) return tilesM(pu, pv, 8, d);
+    if (k == 8) return tilesM(pu, pv, 9, false); if (k == 9) return tilesM(pu, pv, 3, d); return tilesM(pu, pv, 4, d); }
   // la villa (muy pobre): contrapiso de cemento gastado y tierra entre las casillas, casi sin pasto
   float wv = wealthAt(wx, wy);
   if (wv < .15) { if (NB(ix, iy) > .5) { float f = .8 + .14 * (NA(ix, iy) - .5) + (NG(ix * 3, iy * 3) > .9 ? -.12 : 0.0); return rgbM(vec3(156, 150, 140) * f); }
@@ -214,8 +219,24 @@ vec3 paint(Mat t, int ix, int iy) {
     float u = t.uv.x, v = t.uv.y; int kind = t.kind; bool dmg = t.dmg;
     if (kind == 5) { m = M_GRASS; dry = .4; }
     else if (kind == 1) { if (NB(ix, iy) > .55) { m = M_GRASS; dry = .9; } else m = M_DIRT; }
-    // kind: 1 tierra, 2 vainilla, 3 gris, 4 cemento (paños de 1,5 m con junta de 5 cm, peinado cada 12,5 cm), 5 pasto, 6 roja
-    else if (kind == 4) {
+    // kind: 1 tierra, 2 vainilla, 3 gris, 4 cemento (paños de 1,5 m con junta de 5 cm, peinado cada 12,5 cm), 5 pasto, 6 roja,
+    // 7 calcáreo (damero blanco y negro de 20 cm), 8 cerámico (de 30 cm, cada uno de su tono), 9 ladrillo (de 24 × 12 cm, trabado)
+    else if (kind == 7) {
+      float tu = floor(u / .2), tv = floor(v / .2), w = PXM / .2; bool negro = (int(tu + tv) & 1) == 1;
+      float f = 1.0 + (hash2(int(tu) * 31 + 7, int(tv) * 17 + 3) - .5) * .06 + (NA(ix, iy) - .5) * .08;
+      m = M_RGB; rgb = (negro ? vec3(58, 58, 62) : vec3(226, 222, 210)) * f; jc = vec3(150, 146, 138);
+      cj = juntas(junta(u / .2, .04, w), junta(v / .2, .04, w)) * .6;
+    } else if (kind == 8) {
+      float tu = floor(u / .3), tv = floor(v / .3), w = PXM / .3, h = hash2(int(tu) * 13 + 5, int(tv) * 29 + 11);
+      m = M_RGB; rgb = vec3(186, 142, 104) * (.9 + .2 * h) * (1.0 + (NA(ix, iy) - .5) * .08); jc = vec3(168, 160, 146);
+      if (dmg && h < .08) rgb = vec3(150, 146, 136);
+      cj = juntas(junta(u / .3, .05, w), junta(v / .3, .05, w));
+    } else if (kind == 9) {
+      float tv = floor(v / .12), uu = u + mod(tv, 2.0) * .12, tu = floor(uu / .24), w = PXM / .12;
+      float h = hash2(int(tu) * 23 + 1, int(tv) * 41 + 9);
+      m = M_RGB; rgb = vec3(168, 84, 60) * (.86 + .26 * h) * (1.0 + (NA(ix, iy) - .5) * .1); jc = vec3(176, 166, 150);
+      cj = juntas(junta(uu / .24, .06, w * .5), junta(v / .12, .1, w));
+    } else if (kind == 4) {
       float cj4 = juntas(junta(u / 1.5, .05 / 1.5, PXM / 1.5), junta(v / 1.5, .05 / 1.5, PXM / 1.5));
       float f = .95 + .1 * (NA(ix, iy) - .5) - .04 * junta(u * 8.0, .25, PXM * 8.0);
       m = M_RGB; rgb = mix(vec3(190, 188, 180) * f, vec3(138, 136, 128), cj4);
