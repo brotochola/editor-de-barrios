@@ -29,8 +29,11 @@ const LUZ = 0xffdcaa;
 const LUNA = 0x5473f2, LUNA_I = 0;
 // el alcance de cada luz (LightEmitter.radius, px). Los faroles y los postes alumbran desde arriba (LightEmitter.elevation): con
 // el alcance de una luz al ras el pie quedaría oscuro, así que llegan √2,2 veces más lejos (10·√(1800·2,2): el charco que tenían
-// con la intensidad de antes, I = (radio / 10)²). Los faros de los autos, 10·√700
-const R_FAROL = 10 * Math.sqrt(1800 * 2.2), R_POSTE = 10 * Math.sqrt(1500 * 2.2), R_FARO = 10 * Math.sqrt(700);
+// con la intensidad de antes, I = (radio / 10)²)
+const R_FAROL = 10 * Math.sqrt(1800 * 2.2), R_POSTE = 10 * Math.sqrt(1500 * 2.2);
+// los faros de los autos: un cono hacia adelante (LightEmitter.coneAngle), medido sobre el piso. Llega a unos 65 m (900 px; la
+// mitad de la luz a 90 px, 6,7 m, y un quinto a 13 m), abre 56° y el borde se esfuma en el 40 % de afuera de cada mitad
+const R_FARO = 900, CONO_FARO = 56 * Math.PI / 180, BORDE_FARO = .4;
 // el brillo en la lámpara (LightEmitter.glow, su alfa): el de antes, intensidad · 0,55 / 25 000 (0,5 en los postes)
 const BRILLO_FAROL = R_FAROL * R_FAROL / 100 * .55 / 25000, BRILLO_POSTE = R_POSTE * R_POSTE / 100 * .5 / 25000;
 const { ShapeType } = enums;
@@ -52,8 +55,9 @@ const SOMBRA_TEX = Q.get('siltex') !== '0';
 // proyectadas (gente, árboles, postes): quedan las de volumen de casas y autos
 const RAYCAST = Q.get('raycast') === '1';
 // hasta dónde proyecta sombras cada luz (shadowRange): sin raycast, 260 px los faroles y postes y 160 los faros (lo que daba su
-// Collider.visualRange); con raycast, todo su radio (0)
-const SOMBRA_FAROL = RAYCAST ? 0 : 260, SOMBRA_FARO = RAYCAST ? 0 : 160;
+// Collider.visualRange); con raycast, todo su radio (0) los faroles y 400 px los faros (el auto lee sus vecinos: su visualRange
+// tiene que llegar hasta ahí, y con todo el cono, 900 px, cada auto vería cientos)
+const SOMBRA_FAROL = RAYCAST ? 0 : 260, SOMBRA_FARO = RAYCAST ? 400 : 160;
 const NAV = globalThis.navigator || {}, HC = NAV.hardwareConcurrency || 4;
 const MOVIL = /Android|iPhone|iPad|Mobile/i.test(NAV.userAgent || '') || (NAV.maxTouchPoints > 1 && /Macintosh/.test(NAV.userAgent || ''));
 const GENTE_FIJA = Q.has('gente') ? Math.max(100, Math.min(23000, Q.get('gente') | 0)) : 0;
@@ -406,8 +410,9 @@ const _huella = [0, 0];
 // donde toca el piso y no tapa a los árboles y a la gente que tiene adelante
 const _apoyo = new Map();
 function apoyoDe(sheet) { let t = _apoyo.get(sheet); if (t === undefined) { t = APOYO[sheet.slice(5)] || null; _apoyo.set(sheet, t); } return t; }
-// los faros: la luz del propio auto, en el frente de su huella (LightEmitter.offsetX gira con el auto). No más adelante: lo que
-// está al costado del auto quedaba detrás de la luz, y su sombra caía hacia atrás. Sin brillos
+// los faros: la luz del propio auto, un cono (R_FARO) desde el frente de su huella (LightEmitter.offsetX gira con el auto, y el
+// cono apunta adonde mira: direction 0). El dibujo del auto se espeja con flipX, pero eso es del dibujo: la luz no lo sigue
+// (followFlip 0, el de siempre). Sin brillos
 const LUZ_FARO = 0xfff0d0;
 // los cables por su estilo (mundo.json cables[i][4], del editor): [grosor en px de mundo, tinte, alfa]. 0 de luz (los de la cruceta),
 // 1 de teléfono y tele (más gruesos), 2 bajada a una casa, 3 rienda al piso (acero galvanizado)
@@ -440,9 +445,10 @@ export class Auto extends GameObject {
     const L = this.lightEmitter; A.faros = c.faros ? 1 : 0;
     if (c.faros) {   // _frame corre la luz al frente de la huella cuando el auto gira
       L.color = LUZ_FARO; L.glow = 0; L.radius = R_FARO; L.shadowRange = SOMBRA_FARO; L.offsetX = A.hl; L.offsetY = 0; L.active = 1;
+      L.coneAngle = CONO_FARO; L.coneSoftness = BORDE_FARO; L.direction = 0;
       // (el auto lee sus vecinos: con raycast su luz busca las casas que la tapan sólo dentro de su visualRange, que llega
-      // hasta el alcance de la luz, en el frente)
-      if (RAYCAST) this.collider.visualRange = Math.ceil(R_FARO) + A.hl;
+      // hasta el alcance de sus sombras, desde el frente)
+      if (RAYCAST) this.collider.visualRange = SOMBRA_FARO + A.hl;
       luzNace(this, 0, 0, 0);   // los faros se prenden a su hora
     } else { L.radius = 0; L.offsetX = 0; L.offsetY = 0; L.active = 0; this.luzHora.base = 0; }
     this._frame();
