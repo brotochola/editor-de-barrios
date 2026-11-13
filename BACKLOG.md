@@ -62,15 +62,18 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 - [ ] **Casas de la rotonda: huecos y paredes «de papel»** — hecho (2bfae69). Entre el techo y la pared quedaba una rayita (el triángulo
   compartido de los techos, ahora más fino y pasado de la diagonal) y las paredes no tenían espesor (ahora llevan tapa arriba y el
   parapeto corrido hacia adentro).
-- [ ] **Contorno de las paredes del piso de arriba** — pendiente (el dueño, 13/11). A las paredes del piso de arriba de
-  una casa (la caja sobre el techo) les falta el contorno.
+- [ ] **Contorno de las paredes del piso de arriba** — hecho (5dc81ce; el dueño, 13/11). Las paredes de material llevaban sólo
+  el contorno de los costados (arriba y abajo los tapan el techo y el piso); una pared que no llega al piso (el piso de arriba, la
+  caja del techo) lleva ahora los cuatro, si mide 1,4 m o más (la cara de adentro de un petil ya tiene la línea de su tapa).
 - [ ] **Patios divididos** — pendiente (el dueño, 13/11). Los patios tienen que estar separados por paredes, cercas o algo; si no,
   parecen parte de la vereda. En Parque Chas los lotes no llenan la manzana: lo que queda entre ellos se pinta de baldosa, sin
   paredes, y llega hasta la vereda; y muchos patios tienen medianera de un solo lado.
-- [ ] **Casas iguales seguidas** — pendiente (el dueño, 13/11). Tres casas iguales una al lado de la otra quedan feas: las de la
-  misma medida, rumbo y riqueza salen de la misma clave del catálogo.
-- [ ] **Gente detrás de una pared** — pendiente (el dueño, 13/11). Gente parada en la vereda, delante de la pared de un edificio,
-  queda tapada por la pared (orden por Y).
+- [ ] **Casas iguales seguidas** — hecho (92d1a7b; el dueño, 13/11). Una casa que se ve como otra ya puesta a menos de 14 m
+  (casillas: 6 m) toma la del catálogo más parecida que no se vea como ninguna, o una variante propia. «Se ve como»: la misma clave
+  sin rumbo ni fondo. Pares de vecinas iguales: Parque Chas 154 → 0, Carabobo 4 920 → 6; caras de Carabobo 3,74 → 4,45 MB.
+- [ ] **Gente detrás de una pared** — hecho (c7d0128; el dueño, 13/11). La tapaba un cartel pegado: una pieza de pared iba con la
+  clave de la columna más baja que tapa, y en una pared en diagonal su punta alta quedaba delante de la gente. Ahora va en tiras de
+  8 texeles, cada una con su clave.
 - [ ] **La fuente tira agua** — hecho (cc6f691). Un chorro de gotas que sube de 0,8 a 1,15 m sobre el pico y cae en la taza de
   arriba, con gravedad de verdad (45 gotas por segundo, sin importar los fps). Partículas de GPU (`ParticleEmitter.emitGpu`, capa
   `agua`) que tira una entidad `Chorro` por fuente. El editor dice de dónde sale y adónde cae (`chorro` en `objetos.js`,
