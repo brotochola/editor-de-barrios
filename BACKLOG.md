@@ -62,6 +62,15 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 - [ ] **Casas de la rotonda: huecos y paredes «de papel»** — hecho (2bfae69). Entre el techo y la pared quedaba una rayita (el triángulo
   compartido de los techos, ahora más fino y pasado de la diagonal) y las paredes no tenían espesor (ahora llevan tapa arriba y el
   parapeto corrido hacia adentro).
+- [ ] **Contorno de las paredes del piso de arriba** — pendiente (el dueño, 13/11). A las paredes del piso de arriba de
+  una casa (la caja sobre el techo) les falta el contorno.
+- [ ] **Patios divididos** — pendiente (el dueño, 13/11). Los patios tienen que estar separados por paredes, cercas o algo; si no,
+  parecen parte de la vereda. En Parque Chas los lotes no llenan la manzana: lo que queda entre ellos se pinta de baldosa, sin
+  paredes, y llega hasta la vereda; y muchos patios tienen medianera de un solo lado.
+- [ ] **Casas iguales seguidas** — pendiente (el dueño, 13/11). Tres casas iguales una al lado de la otra quedan feas: las de la
+  misma medida, rumbo y riqueza salen de la misma clave del catálogo.
+- [ ] **Gente detrás de una pared** — pendiente (el dueño, 13/11). Gente parada en la vereda, delante de la pared de un edificio,
+  queda tapada por la pared (orden por Y).
 - [ ] **La fuente tira agua** — hecho (cc6f691). Un chorro de gotas que sube de 0,8 a 1,15 m sobre el pico y cae en la taza de
   arriba, con gravedad de verdad (45 gotas por segundo, sin importar los fps). Partículas de GPU (`ParticleEmitter.emitGpu`, capa
   `agua`) que tira una entidad `Chorro` por fuente. El editor dice de dónde sale y adónde cae (`chorro` en `objetos.js`,
@@ -87,8 +96,9 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 - [ ] **Calles parejas** — hecho (f00925d). Un solo material por calle (asfalto, asfalto roto, adoquín, tierra), el
   que más largo tenía entre sus cuadras. Una calle son las cuadras del mismo nombre; sin nombre, las que siguen derecho en
   la esquina.
-- [ ] **Plantas y árboles saliendo de la baldosa** — en curso (el dueño, 13/11: «no tiene sentido! salvo que estén en macetas»).
-  En los patios de cemento o baldosa salían árboles, plantas y yuyos del piso.
+- [ ] **Plantas y árboles saliendo de la baldosa** — hecho (4a27389; el dueño, 13/11: «no tiene sentido! salvo que estén en
+  macetas»). En un patio de baldosa o cemento una planta de tierra va en maceta y no se ponen yuyos (los de grieta sí) ni árboles;
+  la regla del piso es una sola (World.pisoLote), la misma con que el exportador lo pinta.
 
 ## Luces
 
