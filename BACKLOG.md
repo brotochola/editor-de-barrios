@@ -143,12 +143,14 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   chatarras); Parque Chas, 64 274.
 - [ ] **Baliza del patrullero** — hecho (304576b; el dueño, 13/11: «luz roja y azul en su techo, apuntando hacia los costados,
   intercaladamente azul y rojo de cada lado»). Cada patrullero, circulando o estacionado, lleva un cono a cada costado, desde el
-  costado de la huella hacia afuera: abre 120°, llega a 420 px y sale de la altura del techo (elevation), sin sombras. Cada
-  0,3 s los dos cambian de color, un lado rojo y el otro azul, y cada auto arranca en su propia fase. En el techo, una
-  lamparita de cada lado, del color de su lado (`_lightGradient` en la capa `brillos`, aditiva: se ve encima de las casas que
-  tapan al auto, como las de los faroles). Las lamparitas titilan siempre; los conos alumbran sólo de noche (de día la luz se
-  sumaría a la del sol y borraría las sombras). Las luces son `LuzAuto` (antes `Faro`), como el faro derecho; el pool suma dos
-  por patrullero (`META.nPoli`: 52 en Parque Chas, 25 en Carabobo).
+  costado de la huella hacia afuera: abre 120°, llega a 420 px, a 1,5 de brillo, y sale de la altura del techo (elevation), sin
+  sombras. Cada 0,3 s los dos cambian de color, un lado rojo y el otro azul, y cada auto arranca en su propia fase. En el techo,
+  de cada lado, un punto de su color (`_whiteCircle`, con el auto) sobre la lámpara pintada del dibujo, que se ve también de día,
+  y su halo (`_lightGradient` en la capa `brillos`, aditiva: se ve encima de las casas que tapan al auto, como las de los
+  faroles). Las lamparitas titilan siempre; los conos alumbran sólo de noche (de día la luz se sumaría a la del sol y borraría las
+  sombras). Las luces son `LuzAuto` (antes `Faro`), como el faro derecho; el pool suma dos por patrullero (`META.nPoli`: 52 en
+  Parque Chas, 25 en Carabobo). Las columnas de las decoraciones están en `DecorationComponent` (`Decoration` es la fachada de un
+  lugar del pool): escribir `Decoration.localX[d]` tiraba un error en el worker y cortaba el tick a la mitad.
 - [ ] **Resolución de la luz para pixel art** — charlar. ¿Tiene sentido `lighting.resolution: .5` en un juego pixel art?
 
 ## Cables
