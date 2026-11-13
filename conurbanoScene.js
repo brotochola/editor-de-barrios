@@ -797,7 +797,9 @@ export class ConurbanoScene extends Scene {
     [Transito, { grid: { type: Uint16Array, length: Math.max(1, TR.W * TR.H) }, cruces: { type: Float32Array, length: Math.max(6, TR.n * 6) } }],
     [Semaforos, { ids: { type: Int32Array, length: Math.max(4, (TR.nSem || 0) * 4) } }],
   ];
-  static entities = [[Casa, META.nCasas + 8], [Arbol, META.nArboles + 8], [Prop, META.nProps + 64], [Persona, GENTE_MAX], [AutoIA, Math.max(8, META.nAutos)], [AutoEstacionado, Math.max(8, META.nAutos)], [Chatarra, 64], [AutoJugador, 1], [Faro, Math.max(8, META.nAutos) + 1], [Chorro, 8]];
+  static entities = [[Casa, META.nCasas + 8], [Arbol, META.nArboles + 8], [Prop, META.nProps + 64], [Persona, GENTE_MAX], [AutoIA, META.nAutosM + 8], [AutoEstacionado, META.nAutos - META.nAutosM - META.nChatarras + 8], [Chatarra, META.nChatarras + 8], [AutoJugador, 1], [Faro, META.nAutosM + 9], [Chorro, 8]];
+  // (cada clase de auto, su pool justo: WeedJS no pasa de 65 535 entidades (Box2D) y Parque Chas, con 23 000 personas, llega cerca;
+  // antes los que circulan y los estacionados tenían lugar para todos los autos del barrio cada uno)
 
   // los faroles cuya lámpara queda detrás de una casa: la lámpara (a la altura del farol) cae dentro del
   // dibujo de la casa (la envolvente de su planta y de sus puntos de sombra subidos a su altura) y el pie del farol está más
