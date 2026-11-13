@@ -619,18 +619,28 @@ const Barrio = (() => {
         if (!best || bs > 40) { keep.add(o.e.id); kept.push(o.e); continue; }
         o.e.n--; best.n++; o.e = best;
         const lot = o.lot, u = o.place.u0 + (o.place.uw - best.spec.W) / 2, v = o.place.v0; o.x0 = lot.o[0] + lot.ux[0] * u + lot.nOut[0] * v; o.y0 = lot.o[1] + lot.ux[1] * u + lot.nOut[1] * v; }
-      // dos casas iguales pegadas en la misma cuadra se notan (cuatro "TALLER" seguidos): la segunda toma la casa del catálogo
-      // más parecida que no sea igual a su vecina (mismo rumbo, que entre en el lote)
-      { const fr = objs.filter(o => o.kind === "house" && !o.back && o.lot && o.lot.seg && o.place);
+      // dos casas iguales pegadas se notan (cuatro "TALLER" seguidos; tres iguales en Parque Chas, el dueño 13/11): una casa que se ve
+      // como otra de las ya puestas a menos de VECINA m toma la del catálogo más parecida que no se vea como ninguna de ellas (mismo
+      // rumbo, o hasta dos de distancia en una casilla, como en el recorte; que entre en el lote); si no hay, una variante propia (otra semilla). «Se ve como»: la misma clave sin el rumbo ni el
+      // fondo (caras.js comparte el diseño entre rumbos, y el fondo no entra en la semilla: de frente, son iguales). En orden a lo largo
+      // de cada cuadra, pero mirando a las vecinas por distancia (en las calles curvas, la de al lado suele ser de otro tramo); en la
+      // villa, sólo las pegadas (6 m: las casillas están apretadas, y cada una pedía muchas variantes)
+      { const fr = objs.filter(o => o.kind === "house" && o.lot && o.lot.seg && o.place);
         const tOf = (o) => (o.lot.o[0] - o.lot.seg.a[0]) * o.lot.seg.dir[0] + (o.lot.o[1] - o.lot.seg.a[1]) * o.lot.seg.dir[1];
-        fr.sort((a, b) => a.lot.seg.id - b.lot.seg.id || a.lot.side - b.lot.side || tOf(a) - tOf(b));
+        fr.sort((a, b) => a.lot.seg.id - b.lot.seg.id || a.lot.side - b.lot.side || !!a.back - !!b.back || tOf(a) - tOf(b));   // (las del fondo, también)
         const score = (q, sp) => (q.k === sp.k ? 0 : 4) + Math.abs((q.p || 0) - (sp.p || 0)) * 8 + Math.abs(q.W - sp.W) * .6 + Math.abs(q.D - sp.D) * .4 + (q.wb !== sp.wb ? 1 : 0) + ((q.co != null) !== (sp.co != null) ? 12 : q.co !== sp.co ? 3 : 0) + (!q.tj !== !sp.tj ? 6 : 0) + (q.ct !== sp.ct ? 60 : 0);
-        for (let i = 1; i < fr.length; i++) { const a = fr[i - 1], o = fr[i]; if (a.lot.seg !== o.lot.seg || a.lot.side !== o.lot.side || a.e !== o.e) continue;
-          const sp = o.e.spec, ed = (k) => k === "edificio" || k === "petit" || k === "villa"; if (ed(sp.k)) continue;
-          let best = null, bs = 1e9; for (const e of kept) { const q = e.spec; if (e === o.e || q.a !== sp.a || ed(q.k) || q.W > o.place.uw + .01 || q.D > sp.D + .01) continue; const sc = score(q, sp); if (sc < bs) { bs = sc; best = e; } }
-          if (!best || bs > 20) continue;
-          o.e.n--; best.n++; o.e = best; const lot = o.lot, u = o.place.u0 + (o.place.uw - best.spec.W) / 2, v = o.place.v0;
-          o.x0 = lot.o[0] + lot.ux[0] * u + lot.nOut[0] * v; o.y0 = lot.o[1] + lot.ux[1] * u + lot.nOut[1] * v; } }
+        const aspecto = (sp) => { const { a, D, ...x } = sp; return JSON.stringify(x); }, VECINA = 14, grilla = new Map();
+        const ed = (k) => k === "edificio" || k === "petit" || k === "villa";
+        for (const o of fr) { const ci = Math.floor(o.x0 / VECINA), cj = Math.floor(o.y0 / VECINA), cerca = new Set(), rv = o.e.spec.k === "villa" ? 6 : VECINA;
+          for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) for (const c of grilla.get(i * 65536 + j) || [])
+            if ((c.x - o.x0) ** 2 + (c.y - o.y0) ** 2 < rv * rv) cerca.add(c.k);
+          const sp = o.e.spec;
+          if (cerca.has(aspecto(sp))) {   // (un edificio o una casilla, por otro igual de su clase)
+            let best = null, bs = 1e9; for (const e of kept) { const q = e.spec; if (e === o.e || (sp.k === "villa" ? Math.min(Math.abs(q.a - sp.a), 48 - Math.abs(q.a - sp.a)) > 2 : q.a !== sp.a) || ed(q.k) !== ed(sp.k) || (ed(sp.k) && (q.k !== sp.k || q.p !== sp.p)) || q.W > o.place.uw + .01 || q.D > sp.D + .01 || cerca.has(aspecto(q))) continue; const sc = score(q, sp); if (sc < bs) { bs = sc; best = e; } }
+            if (!best || bs > 20) { let v = sp.v + 1; while (cerca.has(aspecto({ ...sp, v }))) v++; best = want({ ...sp, v }); best.n--; }
+            o.e.n--; best.n++; o.e = best; const lot = o.lot, u = o.place.u0 + (o.place.uw - best.spec.W) / 2, v = o.place.v0;
+            o.x0 = lot.o[0] + lot.ux[0] * u + lot.nOut[0] * v; o.y0 = lot.o[1] + lot.ux[1] * u + lot.nOut[1] * v; }
+          let l = grilla.get(ci * 65536 + cj); if (!l) grilla.set(ci * 65536 + cj, l = []); l.push({ k: aspecto(o.e.spec), x: o.x0, y: o.y0 }); } }
       for (const [k, e] of [...cat]) if (e.n <= 0) cat.delete(k); }
     // cazuelas: también en el mundo (el piso del editor las dibuja), con una grilla de 2 m para buscarlas rápido
     W.pits = pits; W.pitGrid = new Map(); for (const q of pits) { const k = Math.floor(q.x / 2) + "," + Math.floor(q.y / 2); if (!W.pitGrid.has(k)) W.pitGrid.set(k, []); W.pitGrid.get(k).push(q); }
