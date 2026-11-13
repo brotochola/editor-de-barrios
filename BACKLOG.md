@@ -32,7 +32,7 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   estilo comparten sus texturas. Los techos en abanico usan un medio cuadrado blanco compartido (si no, cada triángulo iba al
   atlas). En Parque Chas (antes de ensanchar las calles) salieron 88. Pendiente: muchas esquinas no entran (la vereda o el
   lote de al lado no dejan); se podría probar con frentes más cortos.
-- [ ] **Fondos de las manzanas** — hecho (HASH_FONDOS): cada límite entre dos patios lleva una medianera de 1,8 m sin pilares
+- [ ] **Fondos de las manzanas** — hecho (2608753): cada límite entre dos patios lleva una medianera de 1,8 m sin pilares
   (tapia de revoque o de ladrillo, del patrón compartido) o un alambrado de 1,5 m, en 6 de cada 7; se corta con más tolerancia (PIE_FONDO,
   32 px: casi no pasa gente) por el tope de decoraciones. Cada fondo, de su semilla: lindo (plantas lindas a lo largo de los bordes,
   un árbol, sillas, ropa colgada; la mitad en lo rico), abandonado (yuyos crecidos, basura, escombro; un tercio en lo pobre) o el de
