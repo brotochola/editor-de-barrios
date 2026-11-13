@@ -65,7 +65,7 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 - [ ] **Contorno de las paredes del piso de arriba** — hecho (5dc81ce; el dueño, 13/11). Las paredes de material llevaban sólo
   el contorno de los costados (arriba y abajo los tapan el techo y el piso); una pared que no llega al piso (el piso de arriba, la
   caja del techo) lleva ahora los cuatro, si mide 1,4 m o más (la cara de adentro de un petil ya tiene la línea de su tapa).
-- [ ] **Patios divididos** — hecho (el dueño, 13/11). Los patios tienen que estar separados por paredes, cercas o algo; si no,
+- [ ] **Patios divididos** — hecho (08891a7; el dueño, 13/11). Los patios tienen que estar separados por paredes, cercas o algo; si no,
   parecen parte de la vereda. En Parque Chas los lotes no llenan la manzana: lo que queda entre ellos se pinta de baldosa, sin
   paredes, y llega hasta la vereda; y muchos patios tenían medianera de un solo lado. Ahora cada patio está cerrado (medianeras a
   los costados y al fondo, puestas después del recorte del catálogo, con la casa que quedó: si deja un pasillo, la medianera
