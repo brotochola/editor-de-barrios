@@ -397,22 +397,25 @@ const Caras = (() => {
               const sp = saturar(m.prom[0], m.prom[1], m.prom[2]); base = [sp[0] * L[0], sp[1] * L[1], sp[2] * L[2]]; }
             const os = Contorno.oscuro(base[0], base[1], base[2]), tA = Contorno.fuerza(R3.LIGHT.outline), tn = hexDe(base.map((v, j) => v + (os[j] - v) * tA)), th = GROSOR / R3.TD;
             const e1 = len(F.E1), e2 = len(F.E2), i1 = sc3(F.E1, th / e1), i2 = sc3(F.E2, th / e2), lejos1 = add(F.O, F.E1), lejos2 = add(F.O, F.E2);
-            // (en una pared de material compartido, sólo los costados: las esquinas de la casa; arriba y abajo la tapan el techo y el piso,
-            // y cortados en columnas eran muchas piezas)
-            for (const [O, E1, E2] of (desc ? [] : [[F.O, F.E1, i2], [sub3(lejos2, i2), F.E1, i2]]).concat([[F.O, i1, F.E2], [sub3(lejos1, i1), i1, F.E2]])) {
+            // (en una pared que llega al piso, sólo los costados: las esquinas de la casa; arriba y abajo los tapan el techo, el petil y el
+            // piso, y cortados en columnas como la pared eran muchas piezas: el tope de decoraciones de WeedJS)
+            for (const [O, E1, E2] of (desc || pared ? [] : [[F.O, F.E1, i2], [sub3(lejos2, i2), F.E1, i2]]).concat([[F.O, i1, F.E2], [sub3(lejos1, i1), i1, F.E2]])) {
               // la orientación que deja escala y skew sanos (la textura blanca es igual de cualquier lado)
               const A2 = J(E1), B2 = J(E2), la = Math.hypot(A2[0], A2[1]) || 1e-9, lb = Math.hypot(B2[0], B2[1]) || 1e-9;
               const qn = Math.min(Math.abs(A2[0]) / la, Math.abs(B2[1]) / lb), qt = Math.min(Math.abs(B2[0]) / lb, Math.abs(A2[1]) / la);
-              sub.push(qt > qn ? { reg: BLANCO, O: add(O, E1), E1: E2, E2: sc3(E1, -1), tinte: tn, girable: false, borde: true } : { reg: BLANCO, O, E1, E2, tinte: tn, girable: false, borde: true }); } } }
+              const bk = desc ? "pared" : mat ? "techo" : Math.abs(F.n[2]) < .1 ? "lisaV" : "lisaH";
+              sub.push(qt > qn ? { reg: BLANCO, O: add(O, E1), E1: E2, E2: sc3(E1, -1), tinte: tn, girable: false, borde: true, bk } : { reg: BLANCO, O, E1, E2, tinte: tn, girable: false, borde: true, bk }); } } }
         // orientación de cada pieza: la normal (u = E1) o la traspuesta (u = E2, v = −E1), la que deja escala y skew sanos
         for (const q of sub) { if (q.reg) continue;
           const A2 = J(q.E1), B2 = J(q.E2), la = Math.hypot(A2[0], A2[1]), lb = Math.hypot(B2[0], B2[1]);
           const qn = Math.min(Math.abs(A2[0]) / la, Math.abs(B2[1]) / lb), qt = Math.min(Math.abs(B2[0]) / lb, Math.abs(A2[1]) / la);
           if (q.girable && qt > qn) { const k = "t:" + q.clave; let Tt = D.tex.get(k); if (!Tt) { Tt = transponer(q.T); D.tex.set(k, Tt); }
             q.O = add(q.O, q.E1); const e1 = q.E1; q.E1 = q.E2; q.E2 = sc3(e1, -1); q.T = Tt; q.trans = true; }
-          // en una pared, columnas tan finas como haga falta para que cada pieza se ordene bien con lo que está al pie
+          // en una pared, columnas tan finas como haga falta para que cada pieza se ordene bien con lo que está al pie. El fondo de una pared
+          // de material (la baldosa, compartida por todas) se corta con las de este uso: con la más fina de todos sus usos, una pared de frente
+          // iba en columnas finísimas por la pared más inclinada del barrio (piezas de más: el tope de WeedJS); sus copias por nivel son chicas
           if (pared) { const hor1 = Math.abs(q.E1[2]) <= Math.abs(q.E2[2]), k = hashDe(q.T) + (hor1 ? "u" : "v"), cu = hor1 ? columna(q.E1, q.T.w) : columna(q.E2, q.T.h);
-            q.corte = k; cortes.set(k, Math.min(cortes.get(k) ?? TILE, cu)); } }
+            q.corte = k; if (q.pre === "m") q.cu = cu; else cortes.set(k, Math.min(cortes.get(k) ?? TILE, cu)); } }
         const el = elementoCara(F), idx = E.length; E.push(el);
         for (const q of sub) items.push({ el: idx, q, pared, F });
         // una pared que llega al piso, lisa o con su dibujo, sin trasponer: candidata para grafitis (ranuras, más abajo)
@@ -426,7 +429,7 @@ const Caras = (() => {
     fase.forEach(({ e, D, phi, c, s, E, items, cands }, n) => {
       if (n % 16 === 0) progreso(.3 + .7 * n / fase.length);
       for (const it of items) { const q = it.q; if (!q || q.reg) continue;
-        const k = q.corte, cu = k ? cortes.get(k) : TILE;
+        const k = q.corte, cu = q.cu || (k ? cortes.get(k) : TILE);
         const pre = q.pre || "c"; q.reg = !k ? registrar(q.T, pre) : k.endsWith("u") ? registrar(q.T, pre, cu, TILE) : registrar(q.T, pre, TILE, cu); }
       // ---- accesorios: un sprite cada uno, parado en su punto
       for (const a of D.acc) { const P = rot(c, s, [a.x, a.y, a.z]), oct = a.tipo === "tanque" || a.tipo === "maceta" ? 0 : ((Math.round(phi / (Math.PI / 4)) % 8) + 8) % 8;
@@ -461,7 +464,7 @@ const Caras = (() => {
           for (let k = 0; k < n; k++) {
             const O = add(q.O, sc3(Eh, k / n)), P = add(O, add(sc3(e1, .5), sc3(e2, .5))), j0 = J(O);
             // su y de orden: la de una pieza de dibujo (abajo)
-            tiles.push({ rank: r, cuadro: "_white", p: J(P), sx: A1[0] / 8, sy: B1[1] / 8, kx: B1[0] / B1[1], ky: A1[1] / A1[0], tn: q.tinte, iz, objetivo: buscada(vert, P, O, e1, e2, tira), borde: !!q.borde, n: it.F.n, z: P[2], el: it.el,
+            tiles.push({ rank: r, cuadro: "_white", p: J(P), sx: A1[0] / 8, sy: B1[1] / 8, kx: B1[0] / B1[1], ky: A1[1] / A1[0], tn: q.tinte, iz, objetivo: buscada(vert, P, O, e1, e2, tira), borde: !!q.borde, bk: q.bk, n: it.F.n, z: P[2], el: it.el,
               uv: hor1 ? [k / n, 0, (k + 1) / n, 1] : [0, k / n, 1, (k + 1) / n], poli: [j0, [j0[0] + A1[0], j0[1] + A1[1]], [j0[0] + A1[0] + B1[0], j0[1] + A1[1] + B1[1]], [j0[0] + B1[0], j0[1] + B1[1]]] });
           }
           continue;
@@ -471,7 +474,7 @@ const Caras = (() => {
           const q0 = add(q.O, add(sc3(q.E1, g.x0 / T.w), sc3(q.E2, g.y0 / T.h))), da = J(sc3(q.E1, g.w / T.w)), db = J(sc3(q.E2, g.h / T.h)), j0 = J(q0);
           const objetivo = buscada(vert, P, q0, sc3(q.E1, g.w / T.w), sc3(q.E2, g.h / T.h), tira, q.tri);
           const fr = q.fr && !q.trans ? [q.fr[0] + (q.fr[2] - q.fr[0]) * g.x0 / T.w, q.fr[1] + (q.fr[3] - q.fr[1]) * g.y0 / T.h, q.fr[0] + (q.fr[2] - q.fr[0]) * (g.x0 + g.w) / T.w, q.fr[1] + (q.fr[3] - q.fr[1]) * (g.y0 + g.h) / T.h] : null;
-          tiles.push({ rank: r, cuadro: g.nombre, p, sx: g.nombre === "_white" ? A[0] / 8 : sx, sy: g.nombre === "_white" ? B[1] / 8 : sy, kx, ky, tn: q.tinte, iz, objetivo, borde: !!q.borde, n: it.F.n, z: P[2], el: it.el, g, capa: q.capa || 0, fr, pre: q.pre,
+          tiles.push({ rank: r, cuadro: g.nombre, p, sx: g.nombre === "_white" ? A[0] / 8 : sx, sy: g.nombre === "_white" ? B[1] / 8 : sy, kx, ky, tn: q.tinte, iz, objetivo, borde: !!q.borde, bk: q.bk, n: it.F.n, z: P[2], el: it.el, g, capa: q.capa || 0, fr, pre: q.pre,
             poli: q.tri ? [j0, [j0[0] + da[0], j0[1] + da[1]], [j0[0] + db[0], j0[1] + db[1]]] : [j0, [j0[0] + da[0], j0[1] + da[1]], [j0[0] + da[0] + db[0], j0[1] + da[1] + db[1]], [j0[0] + db[0], j0[1] + db[1]]] });
         }
       }
@@ -503,7 +506,7 @@ const Caras = (() => {
       // las piezas de caras llevan además hacia dónde mira su cara (la normal, ya girada como la casa) y la altura de su centro (m):
       // el juego se las da a WeedJS (Decoration.spawn: faceNormalX, faceNormalY, faceNormalZ, faceHeight)
       // piezas en el mundo, por clase (cuántas casas usan esta variante: e.n)
-      for (const t of tiles) { const k = "p_" + (t.borde ? "borde" : t.cuadro === "_white" ? "liso" : t.pre === "m" ? "fondo" : t.pre === "d" ? "dibujo" : t.pre === "b" ? "manchas" : "propia"); st[k] = (st[k] || 0) + (e.n || 1); }
+      for (const t of tiles) { const k = "p_" + (t.borde ? "borde" + (t.bk ? "_" + t.bk : "") : t.cuadro === "_white" ? "liso" : t.pre === "m" ? "fondo" : t.pre === "d" ? "dibujo" : t.pre === "b" ? "manchas" : "propia"); st[k] = (st[k] || 0) + (e.n || 1); }
       variantes[e.id] = tiles.map(t => { const v = [t.cuadro, r2(t.p[0]), r2(t.p[1]), r4(t.sx), r4(t.sy), r4(t.kx), r4(t.ky), t.tn, r2(t.clave - t.p[1]), t.iz];
         if (t.n) v.push(r2(t.n[0]), r2(t.n[1]), r2(t.n[2]), r2(t.z)); return v; });
       // el pie de la casa (de donde cuelgan el colisionador y la sombra): el punto más al frente de las cajas apoyadas

@@ -35,7 +35,7 @@ WeedJS usa `SharedArrayBuffer`, así que la página tiene que estar "aislada" (e
       - las piezas de fachada de Gemini (ventanas, puertas, frentes de local, cortinas): la imagen original, una sola vez, escalada a cada uso;
       - las pintadas (`graffiti.js`): en una capa aparte, de una de 16 variantes por ancho; la misma se repite igual;
       - el borde, sólo a los costados (las esquinas de la casa).
-      Cada pieza se recorta a lo que tiene. Parque Chas: el atlas de caras pasó de 12,9 Mpx en 4 hojas (20,7 MB) a 3,9 Mpx en 2 (3,6 MB); Carabobo, de 9,6 a 3,2 Mpx en una hoja. El costo: más piezas (Parque Chas, de 232 a 400 mil). WeedJS numera las decoraciones con 19 bits: más de 524 287 no carga (con baldosas de 3 m Parque Chas pedía 536 mil; con 6 m, 497 mil);
+      Cada pieza se recorta a lo que tiene. Parque Chas: el atlas de caras pasó de 12,9 Mpx en 4 hojas (20,7 MB) a 4,2 Mpx en 2 (3,8 MB); Carabobo, de 9,6 a 3,4 Mpx en una hoja. El costo: más piezas (Parque Chas, de 232 a 344 mil). WeedJS numera las decoraciones con 19 bits: más de 524 287 no carga (con baldosas de 3 m Parque Chas pedía 536 mil; ahora, 441 mil). Por eso el fondo de una pared se corta con la columna que pide esa pared (una copia por nivel: son chicas), y las paredes que llegan al piso llevan borde sólo a los costados;
     - las caras con dibujo propio que no son de material (rejas, triángulos, lo chico), con su contorno y la oclusión del piso, en piezas de hasta 128 px (en una pared que corre hacia el fondo, columnas más finas: ver el orden de dibujo);
     - una pieza igual a otra (los mismos pixeles) va una sola vez;
     - los techos, una baldosa de 6 × 6 m por material, compartida por todas las casas, repetida y estirada (media baldosa para los chicos);

@@ -171,11 +171,12 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 
   | | Esta mañana | Ahora |
   |---|---|---|
-  | Parque Chas | 12,9 Mpx, 4 hojas, 20,7 MB; 232 mil piezas | 3,9 Mpx, 2 hojas, 3,6 MB; 400 mil piezas |
-  | Carabobo | 9,6 Mpx, 3 hojas, 15,4 MB; 236 mil piezas | 3,2 Mpx, 1 hoja, 3,1 MB; 374 mil piezas |
+  | Parque Chas | 12,9 Mpx, 4 hojas, 20,7 MB; 232 mil piezas | 4,2 Mpx, 2 hojas, 3,8 MB; 344 mil piezas |
+  | Carabobo | 9,6 Mpx, 3 hojas, 15,4 MB; 236 mil piezas | 3,4 Mpx, 1 hoja, 3,3 MB; 316 mil piezas |
 
   El tope: WeedJS numera las decoraciones con 19 bits, más de 524 287 no carga. Con baldosas de 3 m Parque Chas pedía 536 mil y el
-  juego no arrancaba; con 6 m pide 497 mil. Para achicar más sin pasarse, sacar piezas (los bordes de 1 px de cada pared son 88 mil).
+  juego no arrancaba; con 6 m pedía 497 mil, y cortando el fondo de cada pared con su propia columna (no con la más fina de todas
+  las paredes que comparten la baldosa) y con borde sólo a los costados en las paredes, 441 mil (Carabobo, 379 mil).
 
 ## Formato
 
