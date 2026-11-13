@@ -41,7 +41,7 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   rejas que el mapa ya genera). Cada fondo, lindo o abandonado:
   - lindo: un jardín bien armado, con plantas lindas, sillas, mesa, ropa colgada;
   - abandonado, como un baldío: yuyos crecidos, basura, escombros.
-- [ ] **Terrenos vacíos** — en curso. En Carabobo y en Parque Chas, lotes del tamaño de una o dos casas sin casa: con
+- [ ] **Terrenos vacíos** — hecho (7d59c67, b9ce533). En Carabobo y en Parque Chas, lotes del tamaño de una o dos casas sin casa: con
   basura y yuyos, o sólo basura. Hecho (7d59c67): Parque Chas tiene baldíos (3 de cada 100 lotes; antes ninguno: su estilo no los
   traía), un tercio son sólo basura sobre la tierra, y la basura va en montones. Parque Chas: 66 baldíos (24 de basura); Carabobo: 152 (50).
   Y lo que pidió el dueño (12/11), hecho (b9ce533): barriles, cajas, gomas, garrafas, colchones, chapas y escombro chocan y
