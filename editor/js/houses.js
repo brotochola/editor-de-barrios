@@ -868,8 +868,21 @@ const Houses = (() => {
       sc.quad([a[0], a[1], Htot], [dx, dy, 0], [0, 0, -Htot], fachada(rol, calle, L, i));
       sc.quad([a[0], a[1], Htot], [en[0], en[1], 0], [dx, dy, 0], tapa);
       sc.quad([b[0] + en[0], b[1] + en[1], Htot], [-dx, -dy, 0], [0, 0, -PAR], mix(T.wall, [200, 196, 188], .5)); sc.casters.push({ c: sc.P([(a[0] + b[0]) / 2 - uy * .15, (a[1] + b[1]) / 2 + ux * .15, Htot / 2]), ax: [sc.V([ux, uy, 0]), sc.V([-uy, ux, 0]), [0, 0, 1]], h: [L / 2, .15, Htot / 2], fid: sc.nid() }); }
-    // (sin contorno: si no, se ven las líneas del abanico cruzando la terraza)
-    for (let i = 1; i + 1 < N; i++) { const a = P[0], b = P[i], c = P[i + 1]; sc.quad([a[0], a[1], zr], [c[0] - a[0], c[1] - a[1], 0], [b[0] - a[0], b[1] - a[1], 0], techo, { tri: true }); sc.faces[sc.faces.length - 1].sinContorno = true; }
+    // el techo: la planta en triángulos, por orejas (la planta de una esquina rara no es convexa: en abanico desde un vértice, algún
+    // triángulo quedaba dado vuelta, mirando para abajo, el horneado lo descartaba y quedaba un agujero en el techo). Cada triángulo en
+    // sentido antihorario, mirando para arriba; sin contorno (si no, se ven las líneas cruzando la terraza)
+    { const tri = (A, B, C) => { sc.quad([A[0], A[1], zr], [C[0] - A[0], C[1] - A[1], 0], [B[0] - A[0], B[1] - A[1], 0], techo, { tri: true }); sc.faces[sc.faces.length - 1].sinContorno = true; };
+      const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+      const adentro = (p, a, b, c) => cr(a, b, p) > 1e-9 && cr(b, c, p) > 1e-9 && cr(c, a, p) > 1e-9;
+      let a2 = 0; for (let i = 0; i < N; i++) { const a = P[i], b = P[(i + 1) % N]; a2 += a[0] * b[1] - b[0] * a[1]; }
+      const idx = []; for (let i = 0; i < N; i++) idx.push(i); if (a2 < 0) idx.reverse();
+      for (let vueltas = 0; idx.length > 3 && vueltas < 4 * N; vueltas++) { let saque = false;
+        for (let k = 0; k < idx.length; k++) { const ia = idx[(k + idx.length - 1) % idx.length], ib = idx[k], ic = idx[(k + 1) % idx.length], A = P[ia], B = P[ib], C = P[ic], c = cr(A, B, C);
+          if (Math.abs(c) <= 1e-9) { idx.splice(k, 1); saque = true; break; }   // alineado: el vértice sobra
+          if (c < 0 || idx.some(j => j !== ia && j !== ib && j !== ic && adentro(P[j], A, B, C))) continue;
+          tri(A, B, C); idx.splice(k, 1); saque = true; break; }
+        if (!saque) break; }
+      if (idx.length === 3 && Math.abs(cr(P[idx[0]], P[idx[1]], P[idx[2]])) > 1e-9) tri(P[idx[0]], P[idx[1]], P[idx[2]]); }
     tank(sc, cx, cy, zr, seed);   // el tanque de agua (en una de cada seis)
     if (spec.tipo !== "moderno") ac(sc, cx + 1.5, cy - .8, zr, seed + 3, false);
     return { sc, storeys: n, depth: 10, shop: spec.tipo === "keops" ? "PIZZERIA" : null, height: zr };

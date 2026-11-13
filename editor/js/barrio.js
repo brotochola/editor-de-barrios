@@ -16,6 +16,8 @@ const Barrio = (() => {
     ["u_refugio", .9], ["u_kiosco", 1.1], ["carro_cartonero", .7], ["u_tanque", .45], ["u_banco", .45], ["u_parada", .08], ["u_cesto", .1], ["u_poste_trafo", .22], ["u_valla", .35], ["obra_material", .5], ["parrilla", .55], ["pileta", 1.3], ["u_tablero", .3], ["u_caja", .25]];
   const lookup = (tbl, n, d) => { for (const [p, v] of tbl) if (n.startsWith(p)) return v; return d; };
   const SH = (n) => n.startsWith("plm_") ? "sh_small" : n.startsWith("u_farol") || n.startsWith("u_poste") || n.startsWith("u_parada") ? "sh_pole" : n.startsWith("u_cesto") || n.startsWith("u_banco") || n.startsWith("u_kiosco") ? "sh_small" : n.startsWith("u_contenedor") || n.startsWith("canasto") || n.startsWith("u_campana") ? "sh_small" : null;
+  // lo que se tira en un baldío (roles de arte/objetos; las bolsas, más)
+  const BASURA = ["bolsas_0", "bolsas_0", "bolsas_1", "bolsas_1", "gomas", "chapas", "b_pallets", "obra_material", "k_colchon", "cajones", "b_tacho_azul", "garrafa"];
   // colores de autos: el juego elige el modelo y usa este color si el modelo lo tiene; "poli" = patrullero, "burnt" = chatarra
   const COLORES = [["red", 1.6], ["white", 1.6], ["black", 1.4], ["blue", 1.4], ["yellow", 1], ["poli", .4]];
   const pickW = (r, tbl) => { let t = tbl.reduce((a, b) => a + b[1], 0) * r(); for (const [n, w] of tbl) { t -= w; if (t <= 0) return n; } return tbl[0][0]; };
@@ -231,6 +233,13 @@ const Barrio = (() => {
         if (r() < .5) put("bolsas_" + r.int(0, 1), c[0] + r.uni(-2, 2), c[1] + r.uni(-2, 2));
         if (F.b_cartel_vende && rx() < .3) { const q = LP(rx.uni(1, lot.fw - 1), .6); put("b_cartel_vende", q[0], q[1]); }
         if (F.b_arco && lot.fw > 8 && lot.ld > 12 && rx() < .3) { const q = LP(lot.fw / 2, lot.ld * .7); put("b_arco", q[0], q[1], { noCollide: true }); const b = LP(lot.fw / 2 + rx.uni(-2, 2), lot.ld * .45); put("b_pelota", b[0], b[1], { noCollide: true }); }
+        // basura en montones (bolsas, gomas, chapas, pallets, escombro, un colchón, cajones, un tambor, una garrafa): uno o dos donde hay
+        // yuyos; en los baldíos que son sólo basura (lot.basura, un tercio, sobre la tierra), de tres a seis montones grandes y nada de
+        // yuyos. Sale de la semilla del lote, no del sorteo de lo demás
+        { const rb = R3.rng(lot.seed ^ 0x6a09e667), nM = lot.basura ? rb.int(3, 6) : rb.int(1, 2);
+          for (let m = 0; m < nM; m++) { const cm = LP(rb.uni(1.2, Math.max(1.3, lot.fw - 1.2)), rb.uni(1.5, Math.max(1.6, lot.ld - 1))), n = lot.basura ? rb.int(4, 9) : rb.int(2, 4);
+            for (let k = 0; k < n; k++) put(rb.pick(BASURA), cm[0] + rb.uni(-1.7, 1.7), cm[1] + rb.uni(-1.2, 1.2), { rad: .15 }); } }   // (apilada: casi sin lugar propio)
+        if (lot.basura) continue;
         // yuyos del baldío: matas altas y secas, cardos, ortigas, mostacilla
         if (F.yy_seco_alto) { const n = Math.round(lot.fw * lot.ld / 14 * rx.uni(.5, 1.2));
           for (let k = 0; k < n; k++) { const q = LP(rx.uni(.4, lot.fw - .4), rx.uni(.6, lot.ld - .4));

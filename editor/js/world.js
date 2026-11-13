@@ -19,6 +19,7 @@ const World = (() => {
     const C = CFG.v, RS = typeof REALES !== "undefined" ? REALES : {}, RM = C.real ? (RS[["", "carabobo", "parquechas"][C.real | 0]] || RS.carabobo || null) : null;
     const MG = RM ? RM.MG : Math.max(0, C.margen || 0), MW = RM ? RM.MW : C.mapW + 2 * MG, MH = RM ? RM.MH : C.mapH + 2 * MG, r = rng(seed);
     const PASTO = RM && RM.estilo && RM.estilo.pasto != null ? RM.estilo.pasto : 1;   // cuánto pasto de siempre (la Capital: casi nada)
+    const BALDIO_REAL = 3;   // baldíos de cada 100 lotes en un barrio real cuyo estilo no los trae (Parque Chas), con el knob baldios en 1
     const dentro = (x, y) => x >= MG && y >= MG && x <= MW - MG && y <= MH - MG;
     // ---------- riqueza (0 = pobre, 1 = acomodado)
     const WG = Math.ceil(MW / 10), HG = Math.ceil(MH / 10), n1 = vnoise(WG, HG, Math.max(2, Math.round(C.zonaRiqueza / 10)), r), n2 = vnoise(WG, HG, 6, r);
@@ -488,7 +489,9 @@ const World = (() => {
       else if (RM && zona(o[0] + nOut[0] * 3, o[1] + nOut[1] * 3) === 2) kind = pickW(r, [["chalet", 4], ["casa", 3], ["casa2", 2.5], ["negocio_casa", nearEnd ? 1 : .2]]);   // complejo (Rivadavia I: casitas con jardín)
       // un barrio real con su propio estilo (Parque Chas: casas bajas, PH y chalets; casi sin comercio adentro): pesos por
       // tipo, en avenida o no; los locales pesan más en las esquinas (×3)
-      else if (RM && RM.estilo && RM.estilo.casas) { const L = s.type === "ave" && RM.estilo.casasAvenida ? RM.estilo.casasAvenida : RM.estilo.casas;
+      // (y algún baldío, aunque el estilo no lo traiga: BALDIO_REAL de cada 100 lotes, por el knob baldios)
+      else if (RM && RM.estilo && RM.estilo.casas) { const L0 = s.type === "ave" && RM.estilo.casasAvenida ? RM.estilo.casasAvenida : RM.estilo.casas;
+        const L = L0.some(([k]) => k === "baldio") || s.type === "ave" ? L0 : L0.concat([["baldio", BALDIO_REAL * L0.reduce((a, [, p]) => a + p, 0) / 100]]);
         kind = pickW(r, L.map(([k, p]) => [k, p * (nearEnd && (k === "negocio" || k === "negocio_casa") ? 3 : 1) * (k === "baldio" ? C.baldios : 1) * (k === "edificio" || k === "petit" ? (C.edificios ?? 1) : 1)])); }
       else if (s.type === "ave") kind = pickW(r, [["negocio", 30], ["negocio_casa", 30], ["ph", 14], ["galpon", 7], ["casa2", 10], ["casa", 6], ["baldio", 3 * C.baldios], ["edificio", 22 * (C.edificios ?? 1) * (.3 + w)]]);
       else if (w < .3) kind = pickW(r, [["casa", 26], ["obra", 24], ["villa", 14], ["casa2", 8], ["negocio", nearEnd ? 18 : 6], ["galpon", 4], ["baldio", 15 * C.baldios]]);
@@ -496,10 +499,13 @@ const World = (() => {
       else kind = pickW(r, [["casa", 22], ["casa2", 26], ["chalet", 28], ["ph", 4], ["negocio", nearEnd ? 12 : 4], ["negocio_casa", nearEnd ? 8 : 3], ["baldio", 2 * C.baldios],
         ["edificio", 16 * (C.edificios ?? 1) * (w - .45)], ["petit", 12 * (C.edificios ?? 1) * (w - .45)]]);
       const phi = Math.atan2(ux[1], ux[0]);   // local x -> ux ; local -y -> hacia la calle
-      return { id, q, o, ux, nOut, fw, ld, seg: s, side, w, kind, phi, seed: (r() * 1e9) | 0,
+      const L = { id, q, o, ux, nOut, fw, ld, seg: s, side, w, kind, phi, seed: (r() * 1e9) | 0,
         vereda: w < .3 ? pickW(r, [["tierra", 4], ["cem", 2], ["vain_d", 1.5], ["pasto", 3]]) : pickW(r, [["vain", 5], ["vain_d", 1.6], ["gris", 2.5], ["cem", 2.5], ["roja", 1], ["tierra", w < .5 ? .6 : 0]]),
         // patio: en la Capital casi no hay pasto (estilo.pasto: cuánto del de siempre); baldosa colorada o cemento
         patio: kind === "baldio" ? "yuyo" : w < .3 ? pickW(r, [["tierra", 4], ["pasto", 2 * PASTO], ["cem", 3]]) : w < .65 ? pickW(r, [["pasto", 2.5 * PASTO], ["cem", 3.5], ["roja", 3]]) : pickW(r, [["pasto", 5 * PASTO], ["cem", 1.5], ["roja", 2]]) };
+      // un baldío de cada tres es sólo basura, sobre la tierra (los otros, yuyos y basura): sale de su semilla, no del sorteo
+      if (kind === "baldio") { L.basura = ((L.seed >>> 4) % 3) === 0; if (L.basura) L.patio = "tierra"; }
+      return L;
     }
     // relleno denso de villas: casillas pegadas mirando al pasillo/calle más cercano
     for (const d of villaBlocks) {

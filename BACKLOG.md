@@ -37,8 +37,14 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   rejas que el mapa ya genera). Cada fondo, lindo o abandonado:
   - lindo: un jardín bien armado, con plantas lindas, sillas, mesa, ropa colgada;
   - abandonado, como un baldío: yuyos crecidos, basura, escombros.
-- [ ] **Terrenos vacíos** — pendiente. En Carabobo y en Parque Chas, lotes del tamaño de una o dos casas sin casa: con
-  basura y yuyos, o sólo basura.
+- [ ] **Terrenos vacíos** — en curso. En Carabobo y en Parque Chas, lotes del tamaño de una o dos casas sin casa: con
+  basura y yuyos, o sólo basura. Hecho (HASH_BALD): Parque Chas tiene baldíos (3 de cada 100 lotes; antes ninguno: su estilo no los
+  traía), un tercio son sólo basura sobre la tierra, y la basura va en montones. Parque Chas: 66 baldíos (24 de basura); Carabobo: 152 (50).
+  Falta (el dueño, 12/11): barriles, cajas y lo sólido como GameObjects (colisionador y sombra), las plantas no; muchas más plantas
+  saliendo del piso (yuyos, arbustos, algún árbol) y mucha más basura y escombros.
+- [ ] **Techo con agujero en las esquinas con forma** — hecho (HASH_BALD). El techo iba en abanico desde un vértice: en una planta
+  no convexa algún triángulo quedaba dado vuelta (mirando para abajo), el horneado lo descartaba y se veía el patio por el agujero.
+  Ahora va por orejas, todos los triángulos mirando para arriba.
 
 - [ ] **Autos y techos se pelean por el orden** — hecho (ef7f96d). Un auto que pasaba detrás de una casa quedaba encima
   del techo, y la medianera de la casa de al lado cruzaba techos: en f00925d los techos se ordenaban por su borde de atrás.
