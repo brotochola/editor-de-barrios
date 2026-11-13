@@ -15,6 +15,8 @@
 // desde la izquierda mirando desde la calle, sobre el frente de verdad (ancho). Tipos: puerta (m: madera, chapa, vidrio; c color),
 // reja (puerta de reja), ventana (e: persiana, cerrado, lama, reja, arco, none; c color de la lama o la persiana; r: reja delante),
 // porton (c), cortina (persiana de chapa de garaje).
+// Una cuadra parcial (parcial: true) es sólo unas casas de un tramo, junto a una esquina real: no se achican, van pegadas a la punta
+// que dice ancla (por lado: desde o hasta) y el resto del tramo lo arma el generador; esquinas: {} deja las del generador.
 (window.CUADRAS_REALES = window.CUADRAS_REALES || {}).parquechas = [{
   calle: "Varsovia", desde: [-58.482057, -34.583204], hasta: [-58.482938, -34.583962],   // los ejes de Bucarelli y de Andonaegui
   origen: [-34.5858, -58.4788],   // el de recursos/osm_parquechas.json (lat, lon): las calles del barrio se proyectan desde ahí
@@ -98,5 +100,58 @@
       casa: { k: "casa2", pisos: 2, pared: [200, 200, 196], paFin: "brick", D: 9, techo: "tejas", tejaC: [92, 76, 66],
         pb: [["puerta", .4, .9, { m: "madera" }], ["ventana", 2.6, 1.4, { e: "lama", c: [232, 232, 228] }]],
         pa: [["ventana", 1.6, 1.8, { e: "persiana" }]] } },
+  ],
+}, {
+  // ---- Bucarelli, de Liverpool a Varsovia: las casas pegadas a la esquina de Varsovia 2901 (der) y las de enfrente, que miran al
+  // final de Varsovia (izq). Parcial: sólo estos lotes, con su ancho de verdad, pegados a la punta de Varsovia (ancla «hasta»: la
+  // esquina, o el cruce); el resto del tramo lo llena el generador
+  calle: "Bucarelli", desde: [-58.482159, -34.582669], hasta: [-58.482057, -34.583204], origen: [-34.5858, -58.4788],
+  parcial: true, ancla: { der: "hasta", izq: "hasta" }, esquinas: {},
+  lotes: [
+    { smp: "061-166-026", dir: "Bucarelli 1652", lado: "der", s0: 33.6, s1: 45.8, fondo: 14.4,
+      casa: { k: "casa2", pisos: 2, pared: [214, 108, 66], paPared: [236, 234, 228], retiro: 1.8, D: 9, techo: "tejas", tejaC: [84, 84, 90],
+        pb: [["ventana", .6, 2.0, { e: "reja" }], ["reja", 4.4, .8], ["cortina", 6.6, 3.2]],
+        pa: [["ventana", 1.4, 1.6, { e: "persiana" }], ["ventana", 6.8, 1.6, { e: "persiana" }]] } },
+    { smp: "061-166-025B", dir: "Bucarelli 1642", lado: "der", s0: 45.8, s1: 55.4, fondo: 16.3,
+      // (con jardín adelante y reja; en el editor la manzana es más chica y el jardín no entra: la reja va contra el frente)
+      casa: { k: "casa2", pisos: 2, pared: [198, 152, 112], fin: "brick", D: 7, techo: "tejas", tejaC: [96, 88, 82],
+        pb: [["reja", .3, 3.2], ["puerta", 5.2, 1.0, { m: "madera" }], ["ventana", 7.0, 1.6, { e: "reja" }]],
+        pa: [["ventana", 1.0, 1.2, { e: "arco" }], ["ventana", 5.4, 1.6, { e: "persiana" }]] } },
+    { smp: "061-170-007", dir: "Bucarelli 1645", lado: "izq", s0: 45.6, s1: 55.3, fondo: 23.6,
+      casa: { k: "casa", pisos: 1, pared: [178, 54, 42], banda: [150, 40, 32], D: 11, techo: "losa",
+        pb: [["puerta", .4, .9, { m: "chapa", c: [238, 238, 234] }], ["cortina", 2.2, 2.9], ["puerta", 5.6, .9, { m: "chapa", c: [238, 238, 234] }], ["ventana", 7.4, 1.6, { e: "lama", c: [236, 236, 232] }]] } },
+    { smp: "061-170-008a", dir: "Bucarelli 1639", lado: "izq", s0: 55.3, s1: 60.1, fondo: 23.8,
+      casa: { k: "casa2", pisos: 2, pared: [186, 62, 48], paFin: "brick", paC: [176, 82, 60], D: 11, techo: "losa",
+        pb: [["ventana", .6, 2.2, { e: "none", r: 1 }]],
+        pa: [["ventana", 1.4, 1.4, { e: "persiana" }]] } },
+  ],
+}, {
+  // ---- Bucarelli, de Varsovia a Gándara: las casas pegadas a la esquina de Bucarelli 1634 (der) y las de enfrente (izq),
+  // pegadas al cruce (ancla «desde»)
+  calle: "Bucarelli", desde: [-58.482057, -34.583204], hasta: [-58.481759, -34.583780], origen: [-34.5858, -58.4788],
+  parcial: true, ancla: { der: "desde", izq: "desde" }, esquinas: {},
+  lotes: [
+    { smp: "061-165-023", dir: "Bucarelli 1628", lado: "der", s0: 24.9, s1: 33.3, fondo: 18.4,
+      casa: { k: "casa2", pisos: 2, pared: [238, 236, 230], D: 9, techo: "tejas",
+        pb: [["reja", .5, 2.4], ["porton", 5.2, 2.6, { c: [150, 94, 48] }]],
+        pa: [["ventana", 1.0, 1.4, { e: "arco" }], ["ventana", 5.0, 1.6, { e: "persiana" }]] } },
+    { smp: "061-165-022", dir: "Bucarelli 1618", lado: "der", s0: 33.3, s1: 42.0, fondo: 18.0,
+      casa: { k: "casa2", pisos: 2, pared: [236, 234, 228], revest: "granito", revestH: 2.9, revestC: [128, 116, 104], D: 9, techo: "losa",
+        pb: [["ventana", .9, 1.7, { e: "lama", c: [120, 84, 54] }], ["puerta", 4.2, .95, { m: "madera" }], ["ventana", 6.5, 1.5, { e: "reja" }]],
+        pa: [["ventana", 1.0, 1.4, { e: "cerrado", c: [198, 130, 54] }], ["ventana", 5.8, 1.4, { e: "cerrado", c: [198, 130, 54] }]] } },
+    { smp: "061-170-008b", dir: "Bucarelli 1639", lado: "izq", s0: 1.6, s1: 6.7, fondo: 24.2,
+      casa: { k: "casa2", pisos: 2, pared: [186, 62, 48], paFin: "brick", paC: [176, 82, 60], D: 11, techo: "losa",
+        pb: [["puerta", .4, .9, { m: "chapa", c: [238, 238, 234] }], ["puerta", 1.7, 1.6, { m: "chapa", c: [238, 238, 234] }]],
+        pa: [["ventana", 1.6, 1.4, { e: "persiana" }]] } },
+    { smp: "061-170-009", dir: "Bucarelli 1635", lado: "izq", s0: 8.8, s1: 16.9, fondo: 23.8,
+      casa: { k: "casa2", pisos: 2, pared: [238, 236, 230], revest: "marmol", revestH: 1.0, revestC: [196, 112, 62], D: 11, techo: "losa",
+        pb: [["reja", .6, 1.0], ["ventana", 3.0, 1.5, { e: "cerrado", c: [118, 70, 40] }], ["ventana", 6.0, 1.3, { e: "cerrado", c: [118, 70, 40] }]],
+        pa: [["ventana", 1.0, 1.4, { e: "persiana" }], ["ventana", 5.4, 1.4, { e: "persiana" }]] } },
+    { smp: "061-170-010", dir: "Bucarelli 1627", lado: "izq", s0: 16.9, s1: 26.9, fondo: 23.6,
+      casa: { k: "casa", pisos: 1, pared: [178, 172, 160], D: 11, techo: "losa",
+        pb: [["puerta", .5, 1.0, { m: "madera" }], ["ventana", 3.0, 1.2, { e: "reja" }], ["reja", 5.4, 1.0], ["ventana", 7.8, 1.3, { e: "reja" }]] } },
+    { smp: "061-170-011", dir: "Bucarelli 1617", lado: "izq", s0: 26.9, s1: 36.8, fondo: 23.8,
+      casa: { k: "casa", pisos: 1, pared: [214, 210, 202], revest: "granito", revestH: 3.4, revestC: [112, 104, 96], D: 11, techo: "losa",
+        pb: [["puerta", .3, .9, { m: "madera" }], ["puerta", 2.0, 1.6, { m: "chapa", c: [238, 238, 234] }], ["puerta", 4.0, .8, { m: "chapa", c: [238, 238, 234] }], ["ventana", 5.8, 1.6, { e: "reja" }]] } },
   ],
 }];

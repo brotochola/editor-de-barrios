@@ -470,16 +470,35 @@ const World = (() => {
     // se comen 11,9 m de cada punta de Varsovia en vez de 5,5); el fondo, el del catastro si entra. Cada lote lleva su casa (lot.real).
     // El tramo queda marcado (s.real): el reparto de siempre no le pone lotes; barrio.js corre los árboles del censo con la misma regla
     // (s.mapaReal: por lado, el s del primer lote, dónde empieza y cuánto se achica)
-    for (const { Q, s } of cuadras) { s.real = true; s.mapaReal = {};
+    // Una cuadra parcial (Q.parcial: unas casas de un tramo, junto a una esquina real) no se achica: sus lotes van con su ancho de verdad,
+    // pegados a la punta que dice Q.ancla (desde/hasta: donde empieza lo libre de ese lado), y el resto del tramo lo llena el reparto de siempre
+    // (las parciales primero: son las casas junto a una esquina, que se ven de frente; en una esquina aguda, los lotes de la otra calle
+    // se corren y se achican un poco más)
+    for (const { Q, s } of cuadras.slice().sort((a, b) => !!b.Q.parcial - !!a.Q.parcial)) { if (!Q.parcial) { s.real = true; s.mapaReal = {}; }
       for (const [lado, side] of [["izq", 1], ["der", -1]]) { const L = Q.lotes.filter(l => l.lado === lado); if (!L.length) continue;
         const nOut = [s.n[0] * side, s.n[1] * side], off = s.hw + s.sw + .05, en = (t) => [s.a[0] + s.dir[0] * t + nOut[0] * off, s.a[1] + s.dir[1] * t + nOut[1] * off];
-        const libre = (t) => { const p = en(t); return free(p[0] + nOut[0] * .8, p[1] + nOut[1] * .8); };
+        // (libre: la línea del lote, y 5,5 m detrás: en una esquina aguda la cuña de la manzana es finita, y con las calles más anchas del
+        // editor un lote de ahí se pisaba con los de la otra calle o quedaba de 1,7 m de fondo)
+        const libre = (t) => { const p = en(t); return free(p[0] + nOut[0] * .8, p[1] + nOut[1] * .8) && free(p[0] + nOut[0] * 5.5, p[1] + nOut[1] * 5.5); };
         let t0 = .5; while (t0 < s.len / 2 && !libre(t0)) t0 += .25; let t1 = s.len - .5; while (t1 > s.len / 2 && !libre(t1)) t1 -= .25;
-        const sF = Math.min(...L.map(l => l.s0)), sL = Math.max(...L.map(l => l.s1)), k = (t1 - t0) / (sL - sF);
-        s.mapaReal[side] = { sF, t0, k };
-        for (const l of L) { const tt = t0 + (l.s0 - sF) * k, fw = (l.s1 - l.s0) * k, p = en(tt), ux = [nOut[1], -nOut[0]], o = side === 1 ? p : [p[0] + s.dir[0] * fw, p[1] + s.dir[1] * fw];
-          let half = l.fondo; for (let dd = 4; dd < 110; dd += 1.5) { const qx = p[0] + nOut[0] * dd, qy = p[1] + nOut[1] * dd; if (classify(qx, qy)) { half = Math.min(l.fondo, dd / 2 - .3); break; } }
-          let ld = half, q = quadPts(o, ux, nOut, fw, ld); while (!quadFree(q) && ld > 6) { ld -= 1; q = quadPts(o, ux, nOut, fw, ld); }
+        const sF = Math.min(...L.map(l => l.s0)), sL = Math.max(...L.map(l => l.s1)), k = Q.parcial ? 1 : (t1 - t0) / (sL - sF);
+        const base = !Q.parcial ? t0 - sF * k : Q.ancla && Q.ancla[lado] === "desde" ? t0 - sF : t1 - sL;
+        if (!Q.parcial) s.mapaReal[side] = { sF, t0, k };
+        // un lote en tt: su marco y su fondo (el del catastro, hasta la calle de atrás: no hasta la mitad de la manzana, como los demás,
+        // que en una cuña no deja nada; si pisa otro lote, se achica), o null si no entra (pisa otro, o le queda poco fondo)
+        const prueba = (l, tt) => { const fw = (l.s1 - l.s0) * k, p = en(tt), ux = [nOut[1], -nOut[0]], o = side === 1 ? p : [p[0] + s.dir[0] * fw, p[1] + s.dir[1] * fw];
+          let ld = l.fondo; for (let dd = 4; dd < 110; dd += 1.5) { const qx = p[0] + nOut[0] * dd, qy = p[1] + nOut[1] * dd; if (classify(qx, qy)) { ld = Math.min(l.fondo, dd - .8); break; } }
+          let q = quadPts(o, ux, nOut, fw, ld); while (!quadFree(q) && ld > 6) { ld -= 1; q = quadPts(o, ux, nOut, fw, ld); }
+          return quadFree(q) && ld >= (l.casa.k === "chalet" ? 8 : 5) ? { tt, fw, p, ux, o, ld, q } : null; };
+        // en una parcial, un lote que no entra en su lugar se corre de a medio metro alejándose de la punta (hasta 14 m), y los que siguen
+        // con él (el fondo de una esquina va en diagonal: el primer lote pegado la pisaba a cualquier fondo); el que igual no entra, no va
+        // (lo llena el reparto de siempre)
+        const sentido = Q.parcial && !(Q.ancla && Q.ancla[lado] === "desde") ? -1 : 1;
+        let corr = 0;
+        for (const l of L.slice().sort((x, y) => sentido * (x.s0 - y.s0))) {
+          let P = null; for (let c = corr; Math.abs(c - corr) <= (Q.parcial ? 14 : 0) + 1e-9 && !P; c += .5 * sentido) { P = prueba(l, base + l.s0 * k + c); if (P) corr = c; }
+          if (!P) { console.warn("lote real que no entra:", l.smp, l.dir); continue; }
+          const { tt, fw, p, ux, o, ld, q } = P;
           let h = 0x51ed27; for (let i = 0; i < l.smp.length; i++) h = Math.imul(h ^ l.smp.charCodeAt(i), 16777619);
           const id = lots.length, lot = { id, q, o, ux, nOut, fw, ld, seg: s, side, w: wealthAt(p[0], p[1]), kind: l.casa.k, phi: Math.atan2(ux[1], ux[0]), seed: (h >>> 0) % 1000000007, vereda: "gris", patio: "cem", real: l };
           lots.push(lot); stamp(q, id); s.lots[side].push({ t0: tt, t1: tt + fw, lot }); } } }

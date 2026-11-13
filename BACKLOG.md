@@ -237,8 +237,10 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   Bucarelli, estilos propios de `Houses.chas` (2901 con paños de ladrillo, 1634 lila con la esquina redonda); los árboles del censo
   corridos con los lotes. Diferencias que quedan: las calles del editor son más anchas (los frentes, achicados un 7 % para que
   entren); las fachadas del lado par miran para el otro lado de la cámara; los postes salen como en todo el barrio; los balcones
-  no van (se sacaron de todas las casas); y las casas de Bucarelli al lado de la esquina y las de enfrente (1642, 1652, 1628;
-  1635, 1639, 1645) siguen al azar (las fotos están en `D:\tmp\varsovia\fotos`, manzanas 061-166 y 061-170). Lo pedido:
+  no van (se sacaron de todas las casas). Después (el dueño, 13/11: «que se haga ahora»), las de Bucarelli junto a la esquina, en
+  cuadras parciales (con su ancho real, pegadas a la esquina o al cruce): enfrente 1645, 1639, 1635, 1627 y 1617, y del lado de
+  Varsovia 1628; 1652, 1642 y 1618 no entran (con las calles más anchas, las manzanas del editor son más chicas ahí; las fotos
+  están en `D:\tmp\varsovia\fotos`). Lo pedido:
   En Parque Chas, la esquina de Varsovia y Bucarelli
   tiene que quedar como es de verdad, y sobre todo la cuadra de Varsovia al 2900: lo más parecida posible, casa por casa (ancho
   del frente, alto, materiales y colores, puertas, ventanas, rejas, portones, techos), y también la vereda, los árboles y los
