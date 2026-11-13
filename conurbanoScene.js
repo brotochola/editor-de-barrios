@@ -31,9 +31,10 @@ const LUNA = 0x5473f2, LUNA_I = 0;
 // el alcance de una luz al ras el pie quedaría oscuro, así que llegan √2,2 veces más lejos (10·√(1800·2,2): el charco que tenían
 // con la intensidad de antes, I = (radio / 10)²)
 const R_FAROL = 10 * Math.sqrt(1800 * 2.2), R_POSTE = 10 * Math.sqrt(1500 * 2.2);
-// los faros de los autos: un cono hacia adelante (LightEmitter.coneAngle), medido sobre el piso. Llega a unos 65 m (900 px; la
-// mitad de la luz a 90 px, 6,7 m, y un quinto a 13 m), abre 56° y el borde se esfuma en el 40 % de afuera de cada mitad
-const R_FARO = 900, CONO_FARO = 56 * Math.PI / 180, BORDE_FARO = .4;
+// los faros de los autos: dos conos hacia adelante (LightEmitter.coneAngle), uno en cada esquina del frente (FARO_LADO del medio
+// ancho de la huella), medidos sobre el piso. Llegan a unos 65 m (900 px; la mitad de la luz a 90 px, 6,7 m, y un quinto a 13 m);
+// cada uno abre 44° y se esfuma en la mitad de afuera de cada lado, a 0,7 de brillo (donde se juntan, adelante, suman)
+const R_FARO = 900, CONO_FARO = 44 * Math.PI / 180, BORDE_FARO = .5, BRILLO_FARO = .7, FARO_LADO = .62;
 // el brillo en la lámpara (LightEmitter.glow, su alfa): el de antes, intensidad · 0,55 / 25 000 (0,5 en los postes)
 const BRILLO_FAROL = R_FAROL * R_FAROL / 100 * .55 / 25000, BRILLO_POSTE = R_POSTE * R_POSTE / 100 * .5 / 25000;
 const { ShapeType } = enums;
@@ -98,7 +99,8 @@ export class AutoComp extends Component {
     minSteerFactor: Float32Array, maxSteerSpeed: Float32Array, lastKey: Int16Array,
     hl: Float32Array, hw: Float32Array,   // medio largo y medio ancho del colisionador (px): la IA y la gente miran el tamaño de cada vehículo
     ha: Float32Array, hb: Float32Array,   // medio largo y medio ancho de la huella en el piso, en px del dibujo (18 px/m, piso aplastado a AUTO_S)
-    faros: Uint8Array,                    // 1: lleva faros (su luz, corrida adelante con offsetX, y dos brillos)
+    faros: Uint8Array,                    // 1: lleva faros (su luz, en la esquina izquierda del frente, y la del Faro de la derecha)
+    faro: Int32Array,                     // el Faro de la derecha: su índice + 1 (0: no tiene)
     // estado de la IA: en componentes (no en campos del objeto), porque una entidad puede pasar de un worker de lógica a otro
     sx: Float32Array, sy: Float32Array, sr: Float32Array, lx: Float32Array, ly: Float32Array, stuck: Float32Array, libre: Float32Array, parado: Float32Array,
     pf: Float32Array,      // qué tan cerca de la máxima maneja (0,8 a 0,97: nadie se pasa)
@@ -410,10 +412,20 @@ const _huella = [0, 0];
 // donde toca el piso y no tapa a los árboles y a la gente que tiene adelante
 const _apoyo = new Map();
 function apoyoDe(sheet) { let t = _apoyo.get(sheet); if (t === undefined) { t = APOYO[sheet.slice(5)] || null; _apoyo.set(sheet, t); } return t; }
-// los faros: la luz del propio auto, un cono (R_FARO) desde el frente de su huella (LightEmitter.offsetX gira con el auto, y el
-// cono apunta adonde mira: direction 0). El dibujo del auto se espeja con flipX, pero eso es del dibujo: la luz no lo sigue
-// (followFlip 0, el de siempre). Sin brillos
+// los faros: dos conos (R_FARO) desde las esquinas del frente de la huella. WeedJS da una luz por entidad: la de la izquierda es
+// la del propio auto (LightEmitter.offsetX/offsetY giran con él, y el cono apunta adonde mira: direction 0); la de la derecha, un
+// Faro, una entidad con sólo su luz que el auto pone en su esquina y apunta en cada tick (y prende y apaga con la suya). El dibujo
+// del auto se espeja con flipX, pero eso es del dibujo: la luz no lo sigue (followFlip 0, el de siempre). Sin brillos
 const LUZ_FARO = 0xfff0d0;
+function conoFaro(L) {
+  L.color = LUZ_FARO; L.glow = 0; L.radius = R_FARO; L.brightness = BRILLO_FARO; L.shadowRange = SOMBRA_FARO;
+  L.coneAngle = CONO_FARO; L.coneSoftness = BORDE_FARO; L.direction = 0;
+}
+// (con ?raycast=1 el Faro, sin colisionador ni dibujo, no está en la grilla espacial: su luz no busca las casas que la tapan)
+export class Faro extends GameObject {
+  static components = [LightEmitter];
+  onSpawned() { conoFaro(this.lightEmitter); this.lightEmitter.active = 0; }
+}
 // los cables por su estilo (mundo.json cables[i][4], del editor): [grosor en px de mundo, tinte, alfa]. 0 de luz (los de la cruceta),
 // 1 de teléfono y tele (más gruesos), 2 bajada a una casa, 3 rienda al piso (acero galvanizado)
 const CABLE = [[1, 0x17171b, .9], [1.5, 0x232327, .9], [.9, 0x1c1c20, .85], [.8, 0x6a6a70, .8]];
@@ -443,17 +455,26 @@ export class Auto extends GameObject {
     const [sh, sk] = altoAuto(c.hoja);
     this.volumeShadowCaster.setBox(A.ha * 2, A.hb * 2, sh, { topScale: sk, floorScaleY: AUTO_S });
     const L = this.lightEmitter; A.faros = c.faros ? 1 : 0;
-    if (c.faros) {   // _frame corre la luz al frente de la huella cuando el auto gira
-      L.color = LUZ_FARO; L.glow = 0; L.radius = R_FARO; L.shadowRange = SOMBRA_FARO; L.offsetX = A.hl; L.offsetY = 0; L.active = 1;
-      L.coneAngle = CONO_FARO; L.coneSoftness = BORDE_FARO; L.direction = 0;
+    A.faro = 0;
+    if (c.faros) {   // _frame corre las luces a las esquinas del frente de la huella cuando el auto gira
+      conoFaro(L); L.offsetX = A.hl; L.offsetY = -A.hw * FARO_LADO; L.active = 1;
+      const f = Faro.spawn({ x: this.x, y: this.y }); if (f) A.faro = f.index + 1;
       // (el auto lee sus vecinos: con raycast su luz busca las casas que la tapan sólo dentro de su visualRange, que llega
       // hasta el alcance de sus sombras, desde el frente)
       if (RAYCAST) this.collider.visualRange = SOMBRA_FARO + A.hl;
       luzNace(this, 0, 0, 0);   // los faros se prenden a su hora
     } else { L.radius = 0; L.offsetX = 0; L.offsetY = 0; L.active = 0; this.luzHora.base = 0; }
-    this._frame();
+    this._frame(); this._faro();
   }
-  onDespawned() { this.autoComp.active = 0; }
+  onDespawned() { const A = this.autoComp; A.active = 0; if (A.faro) { Faro.despawn(A.faro - 1); A.faro = 0; } }
+  // el Faro de la derecha: en la esquina derecha del frente (la de la luz propia, espejada de costado), apuntando adonde mira el
+  // auto (el Faro no gira: su direction es el rumbo), prendido y apagado con la luz propia
+  _faro() {
+    const i = this.index, f = AutoComp.faro[i] - 1; if (f < 0) return;
+    const c = Transform.rotC ? Transform.rotC[i] : 1, s = Transform.rotS ? Transform.rotS[i] : 0, ox = LightEmitter.offsetX[i], oy = -LightEmitter.offsetY[i];
+    const go = GameObject.get(f); if (go) { go.x = this.x + c * ox - s * oy; go.y = this.y + s * ox + c * oy; }
+    LightEmitter.dirC[f] = c; LightEmitter.dirS[f] = s; LightEmitter.radius[f] = LightEmitter.radius[i]; LightEmitter.active[f] = LightEmitter.active[i];
+  }
   // agarre lateral (las ruedas no patinan de costado)
   _friction() {
     const i = this.index; GameObject.getHeadingAxes(i, _h);
@@ -486,11 +507,11 @@ export class Auto extends GameObject {
       // el colisionador, a la medida de la huella con este rumbo; la luz de los faros, en el frente de la huella
       const [L, W] = huellaAuto(AutoComp, i, k.c, k.s, _huella);
       if (Math.abs(L * .5 - AutoComp.hl[i]) > .5 || Math.abs(W * .5 - AutoComp.hw[i]) > .5) { this.collider.width = L; this.collider.height = W; AutoComp.hl[i] = L * .5; AutoComp.hw[i] = W * .5; }
-      if (AutoComp.faros[i]) LightEmitter.offsetX[i] = L * .5;   // la luz, en el frente de la huella
+      if (AutoComp.faros[i]) { LightEmitter.offsetX[i] = L * .5; LightEmitter.offsetY[i] = -W * .5 * FARO_LADO; }   // la luz, en la esquina izquierda del frente
     }
   }
   tick() {
-    const i = this.index; if (!Transform.active[i]) return; this._friction(); this._frame(); luzHora(this);
+    const i = this.index; if (!Transform.active[i]) return; this._friction(); this._frame(); luzHora(this); this._faro();
   }
 }
 export class AutoEstacionado extends Auto { }
@@ -776,7 +797,7 @@ export class ConurbanoScene extends Scene {
     [Transito, { grid: { type: Uint16Array, length: Math.max(1, TR.W * TR.H) }, cruces: { type: Float32Array, length: Math.max(6, TR.n * 6) } }],
     [Semaforos, { ids: { type: Int32Array, length: Math.max(4, (TR.nSem || 0) * 4) } }],
   ];
-  static entities = [[Casa, META.nCasas + 8], [Arbol, META.nArboles + 8], [Prop, META.nProps + 64], [Persona, GENTE_MAX], [AutoIA, Math.max(8, META.nAutos)], [AutoEstacionado, Math.max(8, META.nAutos)], [Chatarra, 64], [AutoJugador, 1], [Chorro, 8]];
+  static entities = [[Casa, META.nCasas + 8], [Arbol, META.nArboles + 8], [Prop, META.nProps + 64], [Persona, GENTE_MAX], [AutoIA, Math.max(8, META.nAutos)], [AutoEstacionado, Math.max(8, META.nAutos)], [Chatarra, 64], [AutoJugador, 1], [Faro, Math.max(8, META.nAutos) + 1], [Chorro, 8]];
 
   // los faroles cuya lámpara queda detrás de una casa: la lámpara (a la altura del farol) cae dentro del
   // dibujo de la casa (la envolvente de su planta y de sus puntos de sombra subidos a su altura) y el pie del farol está más
