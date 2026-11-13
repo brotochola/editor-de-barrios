@@ -11,7 +11,7 @@
 // Cuántos: según el lugar (grafitis: más en lo pobre, en tapiales y paredones; enredaderas: más en lo de más plata) y los knobs
 // «grafitis» y «plantas». Todo sale de la posición de la casa (no del sorteo del barrio), así el resto no cambia.
 const Paredes = (() => {
-  const TONOS = 6, LEJOS_MISMO = 45, LEJOS_IGUAL = 160, CELDA = 40;
+  const TONOS = 6, LEJOS_MISMO = 45, LEJOS_IGUAL = 160, CELDA = 40, TIRA = 8;   // TIRA: el ancho de las tiras (ver pieza)
   const FIRMA = [[44, 44, 50], [44, 44, 50], [44, 44, 50], [200, 48, 56], [56, 88, 196], [206, 210, 218], [58, 156, 84], [236, 204, 64], [214, 92, 168]];
   const r2 = (v) => Math.round(v * 100) / 100, r4 = (v) => Math.round(v * 1e4) / 1e4;
   const hex = (c) => (Math.max(0, Math.min(255, Math.round(c[0]))) << 16) | (Math.max(0, Math.min(255, Math.round(c[1]))) << 8) | Math.max(0, Math.min(255, Math.round(c[2])));
@@ -40,15 +40,27 @@ const Paredes = (() => {
       }
       return null; }
     // una pieza de w × h texeles con su esquina en (u0, v0) de la ranura: [cuadro, x, y, sx, sy, kx, ky, tinte, sortDy, innerZ, nx, ny, nz, z, alfa]
-    // (lo mismo que las piezas de las caras, más el alfa). El dibujo se lee derecho aunque la pared corra hacia la izquierda en pantalla
+    // (lo mismo que las piezas de las caras, más el alfa). El dibujo se lee derecho aunque la pared corra hacia la izquierda en pantalla.
+    // Va encima de las columnas de su pared que tapa, con la clave de la más baja: si es más ancha que esas columnas (una pared que
+    // corre en diagonal), en tiras de TIRA texeles (la columna más fina de una pared), cada una con su clave; si no, la punta alta de
+    // un cartel ancho tapaba a la gente parada en la vereda (el dueño, 13/11). Las tiras son cuadros propios (nombre~8_k), uno solo
+    // por dibujo y tira (con anchos a la medida de cada pared, cada dibujo iba a la hoja cuatro veces). Devuelve la lista de piezas
     function pieza(s, nombre, u0, v0, w, h, tinte, alfa, extra) {
-      const uc = u0 + w / 2, vc = v0 + h / 2, x = s.O[0] + s.a[0] * uc + s.b[0] * vc, y = s.O[1] + s.a[1] * uc + s.b[1] * vc;
-      const a = s.a[0] < 0 ? [-s.a[0], -s.a[1]] : s.a, b = s.b[1] < 0 ? [-s.b[0], -s.b[1]] : s.b;
-      let clave = -Infinity; for (const p of s.pz) if (p[0] < u0 + w && p[2] > u0 && p[1] < v0 + h && p[3] > v0) clave = Math.max(clave, p[4]);
-      if (clave === -Infinity) clave = y;
-      const z = s.O3[2] + s.E1[2] * uc / s.Tw + s.E2[2] * vc / s.Th;
-      usados.add(nombre); n++;
-      return ["grafitis_" + nombre, r2(x), r2(y), r4(a[0]), r4(b[1]), r4(b[0] / b[1]), r4(a[1] / a[0]), tinte, r2(clave + .01 + extra * .001 - y), s.iz, s.n[0], s.n[1], s.n[2], r2(z), r2(alfa)];
+      const a = s.a[0] < 0 ? [-s.a[0], -s.a[1]] : s.a, b = s.b[1] < 0 ? [-s.b[0], -s.b[1]] : s.b, vc = v0 + h / 2;
+      const tapa = (ua, ub) => s.pz.filter(p => p[0] < ub && p[2] > ua && p[1] < v0 + h && p[3] > v0);
+      let cw = Infinity; for (const p of tapa(u0, u0 + w)) cw = Math.min(cw, p[2] - p[0]);
+      const sw = cw < w ? TIRA : w;
+      const out = [];
+      for (let k = 0; k * sw < w; k++) {
+        const ws = Math.min(sw, w - k * sw), ui = a === s.a ? u0 + k * sw : u0 + w - k * sw - ws, uc = ui + ws / 2;   // la tira k del dibujo, en la ranura
+        const x = s.O[0] + s.a[0] * uc + s.b[0] * vc, y = s.O[1] + s.a[1] * uc + s.b[1] * vc;
+        let clave = -Infinity; for (const p of tapa(ui, ui + ws)) clave = Math.max(clave, p[4]);
+        if (clave === -Infinity) clave = y;
+        const z = s.O3[2] + s.E1[2] * uc / s.Tw + s.E2[2] * vc / s.Th, nm = sw < w ? nombre + "~" + sw + "_" + k : nombre;
+        usados.add(nm); n++;
+        out.push(["grafitis_" + nm, r2(x), r2(y), r4(a[0]), r4(b[1]), r4(b[0] / b[1]), r4(a[1] / a[0]), tinte, r2(clave + .01 + extra * .001 - y), s.iz, s.n[0], s.n[1], s.n[2], r2(z), r2(alfa)]);
+      }
+      return out;
     }
     // ---- las tres clases
     function grande(s, libre, rng, x, y, out) {
@@ -58,7 +70,7 @@ const Paredes = (() => {
         if (!tonos.length) continue;
         const d = dim(g), pos = lugar(s, libre, d.w, d.h, rng); if (!pos) continue;
         const k = tonos.sort((p, q) => p[1] - q[1])[0][0];
-        out.push(pieza(s, k, pos[0], pos[1], d.w, d.h, tinteL([255, 255, 255]), .62 + rng() * .38, out.length));
+        out.push(...pieza(s, k, pos[0], pos[1], d.w, d.h, tinteL([255, 255, 255]), .62 + rng() * .38, out.length));
         anotar(x, y, g); anotar(x, y, k); return true; }
       return false; }
     function firma(s, libre, rng, x, y, out) {
@@ -66,13 +78,13 @@ const Paredes = (() => {
       for (let i = 0; i < nl; i++) { const l = G.letras[(rng() * G.letras.length) | 0], d = dim(l), sep = i ? -((rng() * 3) | 0) : 0; letras.push([l, w + sep, d]); w += d.w + sep; h = Math.max(h, d.h); }
       const pos = lugar(s, libre, w, h + 2, rng); if (!pos) return false;
       const col = FIRMA[(rng() * FIRMA.length) | 0], tn = tinteL(col), al = .7 + rng() * .3;
-      for (const [l, du, d] of letras) out.push(pieza(s, l, pos[0] + du, pos[1] + 1 + Math.round((rng() - .5) * 2), d.w, d.h, tn, al, out.length));
+      for (const [l, du, d] of letras) out.push(...pieza(s, l, pos[0] + du, pos[1] + 1 + Math.round((rng() - .5) * 2), d.w, d.h, tn, al, out.length));
       return true; }
     function carteles(s, libre, rng, x, y, out) {
       const nc = 1 + ((rng() * rng() * 4) | 0), pool = G.carteles.slice(), elegidos = []; let w = 0, h = 0;
       for (let i = 0; i < nc && pool.length; i++) { const c = pool.splice((rng() * pool.length) | 0, 1)[0], d = dim(c), sep = i ? 1 + ((rng() * 3) | 0) : 0; elegidos.push([c, w + sep, d]); w += d.w + sep; h = Math.max(h, d.h); }
       const pos = lugar(s, libre, w, h + 2, rng); if (!pos) return false;
-      for (const [c, du, d] of elegidos) out.push(pieza(s, c, pos[0] + du, pos[1] + 1 + ((rng() * 3) | 0), d.w, d.h, tinteL([255, 255, 255], .82 + rng() * .18), .85 + rng() * .15, out.length));
+      for (const [c, du, d] of elegidos) out.push(...pieza(s, c, pos[0] + du, pos[1] + 1 + ((rng() * 3) | 0), d.w, d.h, tinteL([255, 255, 255], .82 + rng() * .18), .85 + rng() * .15, out.length));
       return true; }
 
     // la enredadera en su espaldera: parada en el piso contra la pared (el pie en la base de la pared), donde todo lo que tapa está
@@ -88,7 +100,7 @@ const Paredes = (() => {
         for (let j = j0; j <= j1 && ok; j++) { if (zf(j) < .25) continue; for (let i = i0; i < i0 + cw; i++) if (!libre[j * s.nx + i]) { ok = false; break; } }
         if (!ok) continue;
         for (let j = j0; j <= j1; j++) for (let i = i0; i < i0 + cw; i++) libre[j * s.nx + i] = 0;
-        out.push(pieza(s, nm, Math.round(i0 * C4 + (cw * C4 - d.w) / 2), v0, d.w, d.h, tinteL([255, 255, 255]), 1, out.length));
+        out.push(...pieza(s, nm, Math.round(i0 * C4 + (cw * C4 - d.w) / 2), v0, d.w, d.h, tinteL([255, 255, 255]), 1, out.length));
         return true; }
       return false; }
 
@@ -115,9 +127,10 @@ const Paredes = (() => {
     // los cuadros que se usaron, para la hoja de props: [nombre, canvas]. Los grandes, en su tono; todos con la saturación de las casas
     function cuadros() {
       const out = [], sat = R3.LIGHT.sat;
-      for (const nm of usados) { const m = /^(.*)_t(\d)$/.exec(nm), base = m ? m[1] : nm, t = m ? +m[2] : 0, d = dim(base);
-        const cv = document.createElement("canvas"); cv.width = d.w; cv.height = d.h; const g = cv.getContext("2d"); g.drawImage(d.img, d.x, d.y, d.w, d.h, 0, 0, d.w, d.h);
-        const im = g.getImageData(0, 0, d.w, d.h), px = im.data;
+      for (const nm of usados) { const tira = /^(.*)~(\d+)_(\d+)$/.exec(nm), nm0 = tira ? tira[1] : nm, m = /^(.*)_t(\d)$/.exec(nm0), base = m ? m[1] : nm0, t = m ? +m[2] : 0, d = dim(base);
+        const x0 = tira ? +tira[2] * +tira[3] : 0, w = tira ? Math.min(+tira[2], d.w - x0) : d.w;
+        const cv = document.createElement("canvas"); cv.width = w; cv.height = d.h; const g = cv.getContext("2d"); g.drawImage(d.img, d.x + x0, d.y, w, d.h, 0, 0, w, d.h);
+        const im = g.getImageData(0, 0, w, d.h), px = im.data;
         for (let i = 0; i < px.length; i += 4) { if (!px[i + 3]) continue; let r = px[i], gg = px[i + 1], b = px[i + 2];
           if (t) [r, gg, b] = girarTono(r, gg, b, t * 360 / TONOS);
           const l = .3 * r + .59 * gg + .11 * b; px[i] = l + (r - l) * sat; px[i + 1] = l + (gg - l) * sat; px[i + 2] = l + (b - l) * sat; }
