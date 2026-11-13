@@ -233,7 +233,14 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 
 - [ ] **Reexportar el barrio inventado y Carabobo** — hecho (fffa219): los tres barrios, reexportados juntos.
 - [x] **Rama `objetos-zip`** — mergeada a main el 12/11 (sin subir a GitHub).
-- [ ] **Varsovia y Bucarelli, tal cual** — pendiente (el dueño, 12/11). En Parque Chas, la esquina de Varsovia y Bucarelli
+- [ ] **Varsovia y Bucarelli, tal cual** — hecho (el dueño, 12/11 y 13/11). Los 20 lotes de la cuadra, del catastro, y cada casa
+  de la foto más nueva de su fachada (`editor/recursos/cuadras_reales.js`, `Houses.build` con `spec.d`); las dos esquinas de
+  Bucarelli, estilos propios de `Houses.chas` (2901 con paños de ladrillo, 1634 lila con la esquina redonda); los árboles del censo
+  corridos con los lotes. Diferencias que quedan: las calles del editor son más anchas (los frentes, achicados un 7 % para que
+  entren); las fachadas del lado par miran para el otro lado de la cámara; los postes salen como en todo el barrio; los balcones
+  no van (se sacaron de todas las casas); y las casas de Bucarelli al lado de la esquina y las de enfrente (1642, 1652, 1628;
+  1635, 1639, 1645) siguen al azar (las fotos están en `D:\tmp\varsovia\fotos`, manzanas 061-166 y 061-170). Lo pedido:
+  En Parque Chas, la esquina de Varsovia y Bucarelli
   tiene que quedar como es de verdad, y sobre todo la cuadra de Varsovia al 2900: lo más parecida posible, casa por casa (ancho
   del frente, alto, materiales y colores, puertas, ventanas, rejas, portones, techos), y también la vereda, los árboles y los
   postes. Mirarla en Google Maps, Street View o lo que haya. En el mapa, Varsovia al 2900 es la cuadra de 116 m entre Bucarelli y

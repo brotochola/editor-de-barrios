@@ -371,6 +371,22 @@ const World = (() => {
           for (let x = Math.max(0, Math.floor(Math.min(...xs) * LR)); x <= Math.min(LW - 1, Math.ceil(Math.max(...xs) * LR)); x++) {
             const wx = (x + .5) / LR, wy = (y + .5) / LR; if (lotGrid[y * LW + x] < 0 && inside(poly, [wx, wy]) > 0 && !classify(wx, wy)) lotGrid[y * LW + x] = id; } }
     }
+    // ---------- cuadras de un barrio real armadas tal cual (recursos/cuadras_reales.js): su tramo (la calle con las dos esquinas en
+    // las puntas), y qué esquina va en cada punta: la de «desde», con su estilo, sus pisos y sus frentes; la de «hasta», ninguna del
+    // generador (los lotes del catastro llegan hasta el cruce). geo: (lon, lat) a metros del mapa, como osm_real.py
+    const CUADRAS = (RM && typeof CUADRAS_REALES !== "undefined" && CUADRAS_REALES[RM.carpeta]) || [];
+    const geo = ([lon, lat], O) => { const x = (lon - O[1]) * 111320 * Math.cos(O[0] * Math.PI / 180) - RM.cen[0], y = (lat - O[0]) * 110950 - RM.cen[1], c = Math.cos(RM.rot * Math.PI / 180), s = Math.sin(RM.rot * Math.PI / 180);
+      return [c * x - s * y + RM.MW / 2, s * x + c * y + RM.MH / 2]; };
+    const cuadras = CUADRAS.map(Q => { const A = geo(Q.desde, Q.origen), B = geo(Q.hasta, Q.origen);
+      const s = segs.find(q => q.nombre === Q.calle && Math.hypot(q.a[0] - A[0], q.a[1] - A[1]) < 4 && Math.hypot(q.b[0] - B[0], q.b[1] - B[1]) < 4);
+      if (!s) console.warn("cuadra real sin su tramo:", Q.calle); return s ? { Q, A, B, s } : null; }).filter(Boolean);
+    // la esquina real del cruce p entre sA y sB, del lado de la cuadra hacia donde abre la esquina (m): su configuración, "no" (ninguna)
+    // o null (la del generador)
+    const esqReal = (p, sA, sB, m) => { for (const c of cuadras) { if (sA !== c.s && sB !== c.s) continue;
+        for (const [k, P] of [["desde", c.A], ["hasta", c.B]]) { if (Math.hypot(p[0] - P[0], p[1] - P[1]) > 4) continue;
+          const E = c.Q.esquinas[k]; if (E === null) return "no"; if (!E) return null;
+          return E[m[0] * c.s.n[0] + m[1] * c.s.n[1] > 0 ? "izq" : "der"] || null; } }
+      return null; };
     // ---------- esquinas con ochava: en cada esquina de manzana casi en escuadra (no en la villa ni en la plaza), un lote cuadrado
     // de 10 m con la casa de esquina; los lotes de las dos calles empiezan después. Marco: la calle de adelante es la que deja a la
     // otra del lado izquierdo (x = 0), así la ochava siempre queda en la esquina (0, 0) del lote. Sin sorteos: sale del lugar.
@@ -378,6 +394,7 @@ const World = (() => {
       const { s, o, p } = it;
       if ([s, o].some(q => q.type === "pasillo" || q.type === "pasaje" || q.mat === "tierra")) continue;
       if (Math.abs(s.dir[0] * o.dir[0] + s.dir[1] * o.dir[1]) > .2) continue;
+      if (esqReal(p, s, o, [0, 0]) === "no") continue;
       for (const a of [1, -1]) for (const b of [1, -1]) {
         const u = [s.dir[0] * a, s.dir[1] * a], v = [s.n[0] * b, s.n[1] * b];
         if (u[0] * o.n[0] + u[1] * o.n[1] === 0) continue;
@@ -415,16 +432,22 @@ const World = (() => {
         if (A.u[0] * Bq.u[1] - A.u[1] * Bq.u[0] < 0) [A, Bq] = [Bq, A];   // la primera calle es la que gira hacia la otra en sentido antihorario
         const u1 = A.u, u2 = Bq.u, n1 = [-u1[1], u1[0]], n2 = [u2[1], -u2[0]], d1 = A.s.hw + A.s.sw + .05, d2 = Bq.s.hw + Bq.s.sw + .05;
         const K = cruce([p[0] + n1[0] * d1, p[1] + n1[1] * d1], u1, [p[0] + n2[0] * d2, p[1] + n2[1] * d2], u2); if (!K) continue;
+        // una esquina de verdad (cuadras reales): su ochava, sus frentes y si es redonda
+        const er = esqReal(p, A.s, Bq.s, [u1[0] + u2[0], u1[1] + u2[1]]); if (er === "no") continue;
+        const OCHe = er && er.och != null ? er.och : OCH, f1 = er && er.frente && er.frente[A.s.nombre] || FRENTE, f2 = er && er.frente && er.frente[Bq.s.nombre] || FRENTE;
         if (K[0] < 6 || K[1] < 6 || K[0] > MW - 6 || K[1] > MH - 6 || !dentro(K[0], K[1])) continue;
         const wq = wealthAt(K[0], K[1]); if (wq < .2) continue;
-        const ang = Math.acos(Math.max(-1, Math.min(1, cs))), a = OCH / 2 / Math.sin(ang / 2);
+        const ang = Math.acos(Math.max(-1, Math.min(1, cs))), a = OCHe / 2 / Math.sin(ang / 2);
         const O1 = [K[0] + u1[0] * a, K[1] + u1[1] * a], O2 = [K[0] + u2[0] * a, K[1] + u2[1] * a];
-        const F1 = [O1[0] + u1[0] * FRENTE, O1[1] + u1[1] * FRENTE], F2 = [O2[0] + u2[0] * FRENTE, O2[1] + u2[1] * FRENTE];
+        const F1 = [O1[0] + u1[0] * f1, O1[1] + u1[1] * f1], F2 = [O2[0] + u2[0] * f2, O2[1] + u2[1] * f2];
         if (villaAt(F1[0], F1[1]) || villaAt(F2[0], F2[1])) continue;
         // el fondo: donde se cruzan las medianeras, o dos puntos a FONDO m de cada frente si se cruzan más lejos
         const X = cruce(F1, n1, F2, n2), dX = X ? (X[0] - F1[0]) * n1[0] + (X[1] - F1[1]) * n1[1] : Infinity;
         const B1 = dX > 1 && dX <= FONDO ? X : [F1[0] + n1[0] * FONDO, F1[1] + n1[1] * FONDO], B2 = dX > 1 && dX <= FONDO ? X : [F2[0] + n2[0] * FONDO, F2[1] + n2[1] * FONDO];
         const poly = [O1, F1, B1, B2, F2, O2], rol = ["f1", "m", "m", "m", "f2", "o"];
+        // la esquina redonda (art déco): tres tramos más entre O2 y O1, que salen hacia el cruce
+        if (er && er.redonda) { const bl = Math.hypot(u1[0] + u2[0], u1[1] + u2[1]) || 1, b = [(u1[0] + u2[0]) / bl, (u1[1] + u2[1]) / bl], hq = Math.hypot(O2[0] - O1[0], O2[1] - O1[1]) * .22;
+          for (const t of [.25, .5, .75]) { const k = Math.sin(t * Math.PI) * hq; poly.push([O2[0] + (O1[0] - O2[0]) * t - b[0] * k, O2[1] + (O1[1] - O2[1]) * t - b[1] * k]); rol.push("o"); } }
         // vereda delante de los dos frentes y de la ochava, y adentro de la manzana, libre (sin calles ni otros lotes)
         const vereda = (P, n) => { const c = classify(P[0] - n[0] * .6, P[1] - n[1] * .6); return c && c.k === "walk"; };
         if (!vereda(O1, n1) || !vereda(F1, n1) || !vereda(O2, n2) || !vereda(F2, n2)) continue;
@@ -434,16 +457,34 @@ const World = (() => {
         if (!libre) continue;
         const id = lots.length, h = Math.abs(Math.imul(Math.round(K[0] * 10), 73856093) ^ Math.imul(Math.round(K[1] * 10), 19349663));
         const tipos = wq > .6 ? ["balaustres", "moderno", "ladrillo"] : wq > .35 ? ["gris", "ladrillo", "balaustres"] : ["gris", "ladrillo"];
-        const lot = { id, q: poly, o: O1, ux: u1, nOut: n1, fw: FRENTE, ld: Math.min(FONDO, dX), seg: A.s, side: n1[0] * A.s.n[0] + n1[1] * A.s.n[1] > 0 ? 1 : -1, w: wq, kind: "esquinaChas",
+        const lot = { id, q: poly, o: O1, ux: u1, nOut: n1, fw: f1, ld: Math.min(FONDO, dX), seg: A.s, side: n1[0] * A.s.n[0] + n1[1] * A.s.n[1] > 0 ? 1 : -1, w: wq, kind: "esquinaChas",
           phi: Math.atan2(u1[1], u1[0]), seed: h % 1000000007, vereda: wq < .45 ? "cem" : ["vain", "vain", "gris", "roja"][h % 4], patio: "cem",
-          chas: { tipo: tipos[(h >>> 3) % tipos.length], pisos: wq < .35 || (h >>> 6) % 3 === 0 ? 1 : 2, rol, calles: [A.s.nombre, Bq.s.nombre], generica: true } };
+          chas: { tipo: er ? er.tipo : tipos[(h >>> 3) % tipos.length], pisos: er ? er.pisos : wq < .35 || (h >>> 6) % 3 === 0 ? 1 : 2, rol, calles: [A.s.nombre, Bq.s.nombre], generica: true } };
         lots.push(lot);
         for (let y = Math.max(0, Math.floor(Math.min(...ys) * LR)); y <= Math.min(LH - 1, Math.ceil(Math.max(...ys) * LR)); y++)
           for (let x = Math.max(0, Math.floor(Math.min(...xs) * LR)); x <= Math.min(LW - 1, Math.ceil(Math.max(...xs) * LR)); x++) {
             const wx = (x + .5) / LR, wy = (y + .5) / LR; if (lotGrid[y * LW + x] < 0 && inside(poly, [wx, wy]) > 0 && !classify(wx, wy)) lotGrid[y * LW + x] = id; }
       } }
+    // los lotes de una cuadra real: los del catastro, en su orden y con sus frentes, achicados lo justo para que entren entre lo que ya
+    // hay en las puntas (las esquinas, o la vereda de la calle que cruza: las calles del editor son más anchas, y Bucarelli y Andonaegui
+    // se comen 11,9 m de cada punta de Varsovia en vez de 5,5); el fondo, el del catastro si entra. Cada lote lleva su casa (lot.real).
+    // El tramo queda marcado (s.real): el reparto de siempre no le pone lotes; barrio.js corre los árboles del censo con la misma regla
+    // (s.mapaReal: por lado, el s del primer lote, dónde empieza y cuánto se achica)
+    for (const { Q, s } of cuadras) { s.real = true; s.mapaReal = {};
+      for (const [lado, side] of [["izq", 1], ["der", -1]]) { const L = Q.lotes.filter(l => l.lado === lado); if (!L.length) continue;
+        const nOut = [s.n[0] * side, s.n[1] * side], off = s.hw + s.sw + .05, en = (t) => [s.a[0] + s.dir[0] * t + nOut[0] * off, s.a[1] + s.dir[1] * t + nOut[1] * off];
+        const libre = (t) => { const p = en(t); return free(p[0] + nOut[0] * .8, p[1] + nOut[1] * .8); };
+        let t0 = .5; while (t0 < s.len / 2 && !libre(t0)) t0 += .25; let t1 = s.len - .5; while (t1 > s.len / 2 && !libre(t1)) t1 -= .25;
+        const sF = Math.min(...L.map(l => l.s0)), sL = Math.max(...L.map(l => l.s1)), k = (t1 - t0) / (sL - sF);
+        s.mapaReal[side] = { sF, t0, k };
+        for (const l of L) { const tt = t0 + (l.s0 - sF) * k, fw = (l.s1 - l.s0) * k, p = en(tt), ux = [nOut[1], -nOut[0]], o = side === 1 ? p : [p[0] + s.dir[0] * fw, p[1] + s.dir[1] * fw];
+          let half = l.fondo; for (let dd = 4; dd < 110; dd += 1.5) { const qx = p[0] + nOut[0] * dd, qy = p[1] + nOut[1] * dd; if (classify(qx, qy)) { half = Math.min(l.fondo, dd / 2 - .3); break; } }
+          let ld = half, q = quadPts(o, ux, nOut, fw, ld); while (!quadFree(q) && ld > 6) { ld -= 1; q = quadPts(o, ux, nOut, fw, ld); }
+          let h = 0x51ed27; for (let i = 0; i < l.smp.length; i++) h = Math.imul(h ^ l.smp.charCodeAt(i), 16777619);
+          const id = lots.length, lot = { id, q, o, ux, nOut, fw, ld, seg: s, side, w: wealthAt(p[0], p[1]), kind: l.casa.k, phi: Math.atan2(ux[1], ux[0]), seed: (h >>> 0) % 1000000007, vereda: "gris", patio: "cem", real: l };
+          lots.push(lot); stamp(q, id); s.lots[side].push({ t0: tt, t1: tt + fw, lot }); } } }
     const order = segs.slice().sort((a, b) => b.cls - a.cls || r() - .5);
-    for (const s of order) {
+    for (const s of order) { if (s.real) continue;
       for (const side of [1, -1]) {
         const nOut = [s.n[0] * side, s.n[1] * side], off = s.hw + s.sw + .05;
         let t = s.type === "pasillo" ? r.uni(0, 2) : r.uni(1, 4);

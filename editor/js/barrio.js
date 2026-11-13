@@ -20,6 +20,9 @@ const Barrio = (() => {
   const BASURA = ["bolsas_0", "bolsas_0", "bolsas_1", "bolsas_1", "gomas", "chapas", "b_pallets", "obra_material", "k_colchon", "cajones", "cajones", "b_tacho_azul", "b_tacho_azul", "garrafa", "escombro", "escombro"];
   // y lo que crece en un baldío: arbustos y matas altas
   const MATAS = ["plm_pindo", "plm_cortadera", "plm_yuyos", "plm_yuyos", "plm_tomates", "plm_romero"];
+  // las casas de verdad de las cuadras reales (recursos/cuadras_reales.js), por su lote del catastro: su descripción y su frente real
+  const CASAS_REALES = {};
+  if (typeof CUADRAS_REALES !== "undefined") for (const b in CUADRAS_REALES) for (const Q of CUADRAS_REALES[b]) for (const l of Q.lotes) CASAS_REALES[l.smp] = { ...l.casa, ancho: l.s1 - l.s0 };
   // los lotes que tienen patio (y ponen sus paredes)
   const PATIOS = new Set(["casa", "casa2", "obra", "negocio", "negocio_casa", "ph", "chalet", "galpon"]);
   // y lo que se planta en un jardín lindo
@@ -268,7 +271,8 @@ const Barrio = (() => {
       const deep = ["casa", "casa2", "obra", "negocio", "negocio_casa", "ph"].includes(lot.kind);
       let D = lot.kind === "chalet" ? 4.6 : lot.kind === "villa" ? Math.min(lot.ld - .4, r.uni(3.6, 5.5)) : deep ? Math.max(4.2, Math.min(lot.ld - 2.5, r.uni(6, 12))) : lot.kind === "galpon" ? Math.min(lot.ld - 1, r.uni(8, 14)) : 5;
       D = lot.kind === "villa" ? (D < 4.5 ? 4 : 5) : lot.kind === "galpon" ? (D < 11 ? 9 : 12) : Db(D, deep);
-      const depthTot = (lot.kind === "chalet" ? 2.6 : 0) + D, step = lot.kind === "villa" ? 1.5 : 2, wq = Math.min(lot.fw, Wb(lot.fw, step));
+      if (lot.real) D = Math.min(lot.real.casa.D || 9, lot.ld - (lot.kind === "chalet" ? 4.6 : 2));   // una casa de verdad: su fondo
+      const depthTot = (lot.kind === "chalet" ? 2.6 : 0) + D, step = lot.kind === "villa" ? 1.5 : 2, wq = lot.real ? Math.round(lot.fw * 10) / 10 : Math.min(lot.fw, Wb(lot.fw, step));
       const wb = lot.w < .45 ? 0 : 1, o = LP((lot.fw - wq) / 2, 0);
       // Barrio Coreano: los locales sobre Av. Carabobo tienen frente coreano (cartel en hangul)
       const co = (lot.kind === "negocio" || lot.kind === "negocio_casa") && lot.seg && /Carabobo/.test(lot.seg.nombre || "") ? { co: lot.seed % 8 }
@@ -277,14 +281,15 @@ const Barrio = (() => {
       if (W.estilo && W.estilo.tejas && (lot.kind === "casa" || lot.kind === "casa2") && (lot.seed % 1000) / 1000 < W.estilo.tejas) co.tj = 1;
       // un comercio con nombre de un barrio real (Pizzería Keops, Café Chas): su cartel y su rubro
       if (lot.cartel) { co.ct = lot.cartel; co.rb = lot.rubro; }
+      if (lot.real) { co.hr = lot.real.smp; delete co.tj; }   // una casa de verdad: la arma su descripción (build3D)
       const oCasa = addObj("house", { t: "casa", k: lot.kind, W: wq, D, a: aIdx(lot.phi), wb, v: 0, ...co }, lot, o[0], o[1], phiQ, { u0: 0, uw: lot.fw, v0: 0 }, rect(0, lot.fw, 0, depthTot));
       const occRect = (u0, u1, v0, v1) => { for (let u = u0; u < u1; u += .4) for (let v = v0; v < v1; v += .4) { const [x, y] = LP(u, v); occ.add(Math.floor(x / OC) * 100000 + Math.floor(y / OC)); } };
       occRect(.2, lot.fw, -.6, depthTot + 1.5);
       let backV = 0, oFondo = null;
       // en lotes hondos casi siempre hay algo en el fondo (PH, otra casa, un galpón), como en las manzanas de Flores
       // (un barrio de la Capital tiene las manzanas llenas: estilo.fondos multiplica lo que se construye al fondo)
-      const pBack = Math.min(.9, (lot.w < .3 ? .65 : lot.w < .55 ? .4 : .12) * C.fondoConstr * ((W.estilo && W.estilo.fondos) || 1)), hondo = lot.ld - depthTot > 22;
-      if (lot.kind !== "villa" && lot.ld - depthTot > 8 && (r() < pBack || (hondo && rx() < .75))) {
+      const pBack = lot.real ? 0 : Math.min(.9, (lot.w < .3 ? .65 : lot.w < .55 ? .4 : .12) * C.fondoConstr * ((W.estilo && W.estilo.fondos) || 1)), hondo = lot.ld - depthTot > 22;
+      if (lot.kind !== "villa" && lot.ld - depthTot > 8 && (r() < pBack || (hondo && !lot.real && rx() < .75))) {
         const bw = Wb(Math.min(lot.fw, r.uni(4, lot.fw)), 2), bu = r() < .5 ? 0 : lot.fw - bw, bd = Math.min(lot.ld - depthTot - 4, r.uni(3.8, 5.5)) < 4.6 ? 4 : 5, bv = lot.ld - bd - .3;
         const k2 = r.pick(lot.w < .3 ? ["obra", "villa", "casa"] : ["casa", "casa", "obra"]), [bx, by] = LP(bu, bv);
         oFondo = addObj("house", { t: "casa", k: k2, W: bw, D: bd, a: aIdx(lot.phi), wb: Math.min(1, wb), v: 0 }, lot, bx, by, phiQ, { u0: bu, uw: bw, v0: bv }, rect(bu, bu + bw, bv, bv + bd), { back: true });
@@ -428,7 +433,9 @@ const Barrio = (() => {
             if (rx() < Math.min(.95, .6 * PL)) { const q = at(s, t + rx.pick([-.32, .32]), side * (s.hw + .55 + rx.uni(-.25, .25)));
               put(rx() < Math.min(.9, .35 * PL) && s.w > .3 ? rx.pick(["plm_agapanto", "pl_boj", "plm_lantana", "plm_romero"]) : rx.pick(["yy_diente_leon", "yy_trebol", "yy_llanten", "yy_cola_zorro", "yy_ortiga_b", "yy_brotes", "yy_pasto_seco"]), q[0], q[1], { noClaim: true }); } } };
       for (const side of [1, -1]) {
-        if (reales.size) { const L = reales.get(s); if (L) for (const [t, esp] of L[side > 0 ? 0 : 1]) if (!crossNear(t)) plantar(side, t, esp); }
+        // (en una cuadra real, cada árbol se corre como los lotes: sigue delante de su casa)
+        if (reales.size) { const L = reales.get(s), M = s.mapaReal && s.mapaReal[side], mv = (t) => M ? Math.max(1, Math.min(s.len - 1, M.t0 + (t - M.sF) * M.k)) : t;
+          if (L) for (const [t, esp] of L[side > 0 ? 0 : 1]) if (!crossNear(mv(t))) plantar(side, mv(t), esp); }
         else if (s.sw >= 2.2) for (let t = r.uni(3, 9); t < s.len - 3; t += r.uni(7, 13)) {
           if (crossNear(t) || r() > (.3 + .55 * s.w) * C.arboles) continue; plantar(side, t, null); }
         // canteros y cazuelas: agapantos, yuyos, bojs y arbolitos con jaula cerca del cordón
@@ -608,13 +615,14 @@ const Barrio = (() => {
     { const tope = Math.round(Math.max(20, C.variedad | 0) * (W.estilo && W.estilo.variedad != null ? W.estilo.variedad : W.real ? .62 : 1)), hs = [...cat.values()].filter(e => e.spec.t === "casa").sort((a, b) => b.n - a.n), keep = new Set(hs.slice(0, tope).map(e => e.id));
       hs.filter(e => e.spec.co != null).slice(0, 20).forEach(e => keep.add(e.id));   // los locales coreanos de Carabobo no se pierden en el recorte
       hs.filter(e => e.spec.ct).forEach(e => keep.add(e.id));   // ni los comercios con nombre
+      hs.filter(e => e.spec.hr).forEach(e => keep.add(e.id));   // ni las casas de verdad (cuadras reales)
       const kept = hs.filter(e => keep.has(e.id));
       for (const o of objs) { if (o.e.spec.t !== "casa" || keep.has(o.e.id)) continue; const sp = o.e.spec; let best = null, bs = 1e9;
         // las casillas de la villa pueden tomar una de hasta dos rumbos de distancia (15°): en la villa nada está en escuadra, y los
         // pasillos van para todos lados (en el barrio real serían cientos de casillas distintas sólo por el rumbo)
         // la que la reemplaza tiene que entrar en el lugar: ni más ancha que el lote ni más honda que la original (si no, en las
         // esquinas en ángulo de Parque Chas la casa se come la vereda de la otra calle)
-        for (const e of kept) { const q = e.spec, da = Math.min(Math.abs(q.a - sp.a), 48 - Math.abs(q.a - sp.a)); if (da > (q.k === "villa" && sp.k === "villa" ? 2 : 0)) continue;
+        for (const e of kept) { const q = e.spec, da = Math.min(Math.abs(q.a - sp.a), 48 - Math.abs(q.a - sp.a)); if (q.hr || da > (q.k === "villa" && sp.k === "villa" ? 2 : 0)) continue;
           if (q.W > o.place.uw + .01 || q.D > sp.D + .01) continue;
           const ed = (k) => k === "edificio" || k === "petit", sc = da * 6 + (q.k === sp.k ? 0 : (q.k === "villa") !== (sp.k === "villa") || ed(q.k) || ed(sp.k) ? 50 : 4) + Math.abs((q.p || 0) - (sp.p || 0)) * 8 + Math.abs(q.W - sp.W) * .6 + (q.W > o.place.uw + .01 ? 30 : 0) + Math.abs(q.D - sp.D) * .4 + (q.wb !== sp.wb ? 1 : 0) + ((q.co != null) !== (sp.co != null) ? 12 : q.co !== sp.co ? 3 : 0) + (!q.tj !== !sp.tj ? 6 : 0) + (q.ct !== sp.ct ? 60 : 0);
           if (sc < bs) { bs = sc; best = e; } }
@@ -638,7 +646,7 @@ const Barrio = (() => {
             if ((c.x - o.x0) ** 2 + (c.y - o.y0) ** 2 < rv * rv) cerca.add(c.k);
           const sp = o.e.spec;
           if (cerca.has(aspecto(sp))) {   // (un edificio o una casilla, por otro igual de su clase)
-            let best = null, bs = 1e9; for (const e of kept) { const q = e.spec; if (e === o.e || (sp.k === "villa" ? Math.min(Math.abs(q.a - sp.a), 48 - Math.abs(q.a - sp.a)) > 2 : q.a !== sp.a) || ed(q.k) !== ed(sp.k) || (ed(sp.k) && (q.k !== sp.k || q.p !== sp.p)) || q.W > o.place.uw + .01 || q.D > sp.D + .01 || cerca.has(aspecto(q))) continue; const sc = score(q, sp); if (sc < bs) { bs = sc; best = e; } }
+            let best = null, bs = 1e9; for (const e of kept) { const q = e.spec; if (e === o.e || q.hr || (sp.k === "villa" ? Math.min(Math.abs(q.a - sp.a), 48 - Math.abs(q.a - sp.a)) > 2 : q.a !== sp.a) || ed(q.k) !== ed(sp.k) || (ed(sp.k) && (q.k !== sp.k || q.p !== sp.p)) || q.W > o.place.uw + .01 || q.D > sp.D + .01 || cerca.has(aspecto(q))) continue; const sc = score(q, sp); if (sc < bs) { bs = sc; best = e; } }
             if (!best || bs > 20) { let v = sp.v + 1; while (cerca.has(aspecto({ ...sp, v }))) v++; best = want({ ...sp, v }); best.n--; }
             o.e.n--; best.n++; o.e = best; const lot = o.lot, u = o.place.u0 + (o.place.uw - best.spec.W) / 2, v = o.place.v0;
             o.x0 = lot.o[0] + lot.ux[0] * u + lot.nOut[0] * v; o.y0 = lot.o[1] + lot.ux[1] * u + lot.nOut[1] * v; }
@@ -681,7 +689,7 @@ const Barrio = (() => {
   // la casa/tapial/poste 3D de una clave del catálogo (misma semilla en el visor y en la exportación)
   function build3D(spec) {
     const phi = World.ANG[spec.a];
-    if (spec.t === "casa") return Houses.build({ kind: spec.k, W: spec.W, D: spec.D, p: spec.p, seed: 1000 + spec.v * 7919 + spec.wb * 104729 + spec.a * 31 + Math.round(spec.W * 10) * 17 + (spec.co ?? 0) * 613 + (spec.tj ?? 0) * 389 + (spec.ct ? spec.ct.length * 977 + spec.ct.charCodeAt(spec.ct.length - 1) * 131 : 0), wealth: [.25, .7][spec.wb], co: spec.co, al: spec.al, tj: spec.tj, ct: spec.ct, rb: spec.rb }, phi);
+    if (spec.t === "casa") return Houses.build({ kind: spec.k, W: spec.W, D: spec.D, p: spec.p, seed: 1000 + spec.v * 7919 + spec.wb * 104729 + spec.a * 31 + Math.round(spec.W * 10) * 17 + (spec.co ?? 0) * 613 + (spec.tj ?? 0) * 389 + (spec.ct ? spec.ct.length * 977 + spec.ct.charCodeAt(spec.ct.length - 1) * 131 : 0), wealth: [.25, .7][spec.wb], co: spec.co, al: spec.al, tj: spec.tj, ct: spec.ct, rb: spec.rb, ...(spec.hr ? { d: CASAS_REALES[spec.hr] } : {}) }, phi);
     if (spec.t === "chas") return Houses.chas(spec, phi);
     if (spec.t === "esquina") return Houses.esquina({ W: spec.W, D: spec.D, c: spec.c, p: spec.p, rub: spec.rub, seed: 9000 + spec.rub * 7919 + spec.p * 104729 + spec.a * 31, wealth: .5 }, phi);
     if (spec.t === "tapial") return Houses.tapial(spec.W, 500 + spec.s, spec.tk, phi);
