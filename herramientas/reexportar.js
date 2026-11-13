@@ -1,6 +1,6 @@
 // Reexporta un barrio con el editor: lo mismo que abrir el editor, tocar 📦 Exportar, descomprimir el zip sobre la carpeta y correr
 // barrios.js, pero sin manos. Para rehacer un barrio después de cambiar el exportador. El atlas lo arma WeedJS al cargar el juego.
-// Con el juego servido (node herramientas/servir.js 8010): node herramientas/reexportar.js <barrio|carabobo|parquechas> [--opción …]
+// Con el juego servido (node herramientas/servir.js 8010): node herramientas/reexportar.js <carabobo|parquechas> [--opción …]
 //   --url http://127.0.0.1:8010   dónde está servido (por defecto, ese)
 //   --sal <carpeta>               escribe el barrio exportado ahí y no toca el del juego; sirve para ver qué cambiaría
 //   --con-ventana                 muestra el navegador
@@ -33,7 +33,7 @@ function sinFecha(nombre, b) {
 }
 
 (async () => {
-  if (!['barrio', 'carabobo', 'parquechas'].includes(DIR)) { console.log('uso: node herramientas/reexportar.js <barrio|carabobo|parquechas> [--url …] [--sal carpeta] [--con-ventana] [--knob clave=valor]'); process.exit(1); }
+  if (!['carabobo', 'parquechas'].includes(DIR)) { console.log('uso: node herramientas/reexportar.js <carabobo|parquechas> [--url …] [--sal carpeta] [--con-ventana] [--knob clave=valor]'); process.exit(1); }
   try { await fetch(URL0 + '/editor/index.html'); } catch (e) { throw new Error('no hay nada servido en ' + URL0 + ': levantá el juego o pasá --url'); }
   const B = path.join(R, DIR), meta = JSON.parse(fs.readFileSync(path.join(B, 'meta.json'), 'utf8')), t0 = Date.now();
   if (!meta.seed || !meta.knobs) throw new Error(DIR + '/meta.json no trae la semilla o los knobs');

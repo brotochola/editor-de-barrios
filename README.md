@@ -45,7 +45,6 @@ WeedJS usa `SharedArrayBuffer`, así que la página tiene que estar "aislada" (e
     - dentro de la casa, el de pintor entre las caras (`innerZ`);
     - con el resto (la gente, los árboles, los objetos): una pared, el punto del piso que tiene debajo; un techo, el borde de adelante de su pieza sobre el piso (lo que se le superpone en pantalla está siempre más lejos); un piso al ras o una tira fina en alto (tapa de muro, alero), su borde de atrás; subida lo justo para no quedar detrás de una pieza de la misma casa que la tapa. Una pared que corre hacia el fondo va en columnas en las que su pie no cambia más de 8 px (las lisas también: no van en una pieza sola), así la gente parada al pie, adelante, no queda detrás. Cada textura se corta una sola vez, con la columna más fina que pida cualquiera de sus usos.
   - **En el juego:** las piezas son decoraciones del mundo, no colgadas (la casa no se mueve), así no pasan por el paso de las decoraciones colgadas en cada cuadro. Se cargan con un solo objeto de configuración reusado.
-  - **Barrio inventado:** el atlas pasó de 7982 × 4094 a 6071 × 4094 (las casas, de unos 17 a 10,7 Mpx). En 0, `skew` hornea como antes.
 - **Árboles:** salen del editor (esqueleto tipo L-system, hojas en rosetas), de otoño: ramas finas (`RAMA_FINA`, 0,6 de lo que les tocaba) y pocas hojas (la mitad de los racimos pelados y al resto le queda un cuarto), así se ve a través de la copa. Cada uno es una entidad `Arbol`: el tronco es su sprite y cada rama es una decoración colgada, anclada en su base, que se mece (`sway`, apenas).
 - **Gente:** de 3500 a más de 15 000 personas LPC con cuerpo de Box2D, según el aparato. Arranca con 6000 en un celu de 8 núcleos (3500 en uno más chico, 10 000 en compu) y durante el primer minuto se ajusta sola. Mira los fps del render y de cada worker. Si sobra, suma de a 10 %; si no da, saca de a 12 %, siempre fuera de cámara. Si sacar gente no mejora nada (el freno es la GPU), la devuelve y deja de tocar. `?gente=8000` en la URL fija la cantidad. Los lugares (~23 000 en las veredas) están en `data/gente.bin` (`node herramientas/hornear_gente.js`). Siguen 6 flowfields estáticos con costos (vereda 10, calle 220), así que cruzan por las sendas y no caminan por la calle. Se separan entre sí y esquivan autos.
 - **Autos:**
@@ -72,26 +71,26 @@ WeedJS usa `SharedArrayBuffer`, así que la página tiene que estar "aislada" (e
 `editor/` es el editor de barrios (la versión Three.js con todos los knobs). Se abre en `http://localhost:8000/editor/`.
 
 1. Tocás los knobs (mapa, loteos, riqueza, calles, casas, árboles, gente y autos opcionales, luz) y elegís la semilla con 🎲.
-2. **📦 Exportar** baja `barrio_<semilla>.zip`. Adentro está la carpeta `barrio/`:
+2. **📦 Exportar** baja `barrio_<semilla>.zip`. Adentro está la carpeta del barrio (`carabobo/` o `parquechas/`):
    - `meta.js`/`meta.json`: tamaños y cantidades;
    - `mundo.json`: casas, árboles, props, autos y cables;
    - `piso.bin`;
    - flowfields `ff_*.bin`: peatones, veredas (vuelta manzana) y calles, en el formato binario de WeedJS (con gzip: un 3 o 4 % de lo que pesarían en `.json`, y el juego no los parsea);
    - hojas de sprites en `img/`: las caras de las casas (`caras*`), los árboles y los grafitis de las paredes.
-3. Reemplazás la carpeta `barrio/` del juego por esa.
+3. Reemplazás la carpeta del juego por esa (o, sin manos: `node herramientas/reexportar.js <carabobo|parquechas>`, más abajo).
 
 El editor arma sólo las hojas del barrio (casas, árboles, piso). Los objetos están en `img/objetos/`, comunes a todos los barrios. El
 juego carga las hojas enteras y WeedJS arma el bigAtlas al cargar.
 
 ## El barrio real: Av. Carabobo al 1500 y la villa 1-11-14 (Bajo Flores)
 
-El juego tiene tres barrios: el **inventado** (carpeta `barrio/`, el de siempre) y dos **reales**, Carabobo (`carabobo/`) y Parque
-Chas (`parquechas/`). Se elige con `?barrio=carabobo` o `?barrio=parquechas` en la URL (si no, el último que se jugó) y el botón 🗺️
-pasa al siguiente. Una sola escena sirve para todos: `barrios.js` junta los `meta.json` de cada carpeta (`node herramientas/barrios.js`,
+El juego tiene dos barrios, los dos **reales**: Carabobo (`carabobo/`) y Parque Chas (`parquechas/`). El inventado (`barrio/`) se
+borró el 12/11 (el dueño: sólo importan estos dos). Se elige con `?barrio=carabobo` o `?barrio=parquechas` en la URL (si no, el
+último que se jugó, o Parque Chas) y el botón 🗺️ pasa al otro. Una sola escena sirve para todos: `barrios.js` junta los `meta.json` de cada carpeta (`node herramientas/barrios.js`,
 después de exportar) y la escena toma el que diga su URL.
 
 En el editor, con el parámetro `real` en 1 o 2 no se inventa el barrio: se arma con datos de verdad y el zip trae la carpeta
-`carabobo/` o `parquechas/`; con `real` en 0, el inventado, en `barrio/`.
+`carabobo/` o `parquechas/`. Con `real` en 0 el editor todavía inventa uno (en `barrio/`), pero el juego ya no lo trae.
 
 - **Qué entra:** una franja de 480 × 1080 m jugables (más 40 m de margen), girada 15,5° para que la grilla de Bajo Flores quede casi derecha en pantalla. Arriba, Av. Carabobo con Balbastro, Lautaro y Saraza (el juego arranca en Carabobo al 1500); en el medio, Av. Castañares, Bonorino y el Barrio Rivadavia I con sus pasajes peatonales; abajo, la villa 1-11-14 hasta Av. Riestra.
 - **Calles:** las de OSM, clasificadas (avenida, calle, pasaje, pasillo de villa), con su ancho, y encajadas en los 48 rumbos de los autos: cada tramo toma el rumbo más cercano y los nodos se mueven por mínimos cuadrados (en promedio 1,7 m), así las esquinas son las mismas.

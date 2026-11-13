@@ -1,11 +1,11 @@
 // ===================== conurbanoScene.js — el barrio del conurbano en WeedJS =====================
 // Mundo de WeedJS = píxeles de la proyección oblicua (18 px/m de ancho, 9 px/m de profundidad), igual que littleCity.
-// Todo el barrio sale del editor de barrios (editor/): exportás el zip y su carpeta `barrio/` va al lado de este archivo.
+// Todo el barrio sale del editor de barrios (editor/): exportás el zip y su carpeta (carabobo/ o parquechas/) va al lado de este archivo.
 //   piso       -> capa worldRect con un shader que pinta calles/veredas/patios en la GPU (shaders/piso.frag)
 //   casas      -> entidades estáticas con su sprite horneado + colisionador poligonal + sombra (malla)
 //   gente      -> miles de personas LPC (se ajusta sola a lo que aguante el aparato) siguiendo flowfields estáticos con costos (cruzan, no caminan por la calle)
 //   autos      -> Box2D (patrón de carScene/littleCity), IA por el flowfield de carriles; V para manejar
-// ---------- el barrio exportado por el editor: barrio/ (el inventado), carabobo/ (Av. Carabobo al 1500 y la villa 1-11-14) o parquechas/ (Parque Chas).
+// ---------- el barrio exportado por el editor: carabobo/ (Av. Carabobo al 1500 y la villa 1-11-14) o parquechas/ (Parque Chas).
 // barrios.js junta los meta de los dos (herramientas/barrios.js) y lo importan todos los hilos. Cuál se juega lo dice ?barrio=… en la
 // URL de esta escena (index.html la arma así); en los workers import.meta.url es esa misma URL, así todos los hilos eligen el mismo.
 import { BARRIOS } from './barrios.js';
@@ -15,7 +15,7 @@ import { AUTOS, CHATARRA } from './img/autos/autos.js';
 import { APOYO } from './img/autos/apoyo.js';
 // la sombra de los autos al sol: la del volumen (huella + techo corrido), no el sprite dado vuelta
 import { altoAuto } from './sombraAuto.js';
-const DIR = (() => { try { const b = new URL(import.meta.url).searchParams.get('barrio'); return b && BARRIOS[b] ? b : 'barrio'; } catch (e) { return 'barrio'; } })();
+const DIR = (() => { try { const b = new URL(import.meta.url).searchParams.get('barrio'); return b && BARRIOS[b] ? b : 'parquechas'; } catch (e) { return 'parquechas'; } })();
 const META = BARRIOS[DIR] || BARRIOS[Object.keys(BARRIOS)[0]];
 const BARRIO = new URL('./' + DIR + '/', import.meta.url).href;
 

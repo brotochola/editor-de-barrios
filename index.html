@@ -29,15 +29,15 @@
   // WeedJS de producción (más rápido); con ?debug, el de debug con el panel
   const { default: WEED } = await import(q.has('debug') ? './weed/weed.bundle.esm.min.js' : './weed/weed.prod.bundle.esm.min.js');
   if (q.has('debug')) document.body.classList.add('dbg');
-  // dos barrios: el inventado (barrio/) y el real (carabobo/: Av. Carabobo al 1500 y la villa 1-11-14, Bajo Flores).
-  // ?barrio=carabobo elige; si no viene, el último que se jugó. El botón 🗺️ cambia al otro.
+  // dos barrios reales: Parque Chas (parquechas/) y Carabobo (carabobo/: Av. Carabobo al 1500 y la villa 1-11-14, Bajo Flores).
+  // ?barrio=carabobo elige; si no viene, el último que se jugó (o Parque Chas). El botón 🗺️ cambia al otro.
   const { BARRIOS } = await import('./barrios.js');
   let guardado = null; try { guardado = localStorage.getItem('conurbano_barrio'); } catch (e) {}
-  const DIR = [q.get('barrio'), guardado, 'barrio', ...Object.keys(BARRIOS)].find(b => b && BARRIOS[b]);
+  const DIR = [q.get('barrio'), guardado, 'parquechas', ...Object.keys(BARRIOS)].find(b => b && BARRIOS[b]);
   try { localStorage.setItem('conurbano_barrio', DIR); } catch (e) {}
   const META = BARRIOS[DIR], KS = Object.keys(BARRIOS), otro = KS.length > 1 ? KS[(KS.indexOf(DIR) + 1) % KS.length] : null;
-  const NOMBRE = { barrio: 'Conurbano inventado', carabobo: 'Carabobo y la 1-11-14', parquechas: 'Parque Chas' };
-  $('tit').textContent = DIR === 'parquechas' ? 'PARQUE CHAS · EL LABERINTO' : META.lugar ? 'BAJO FLORES · ' + META.lugar.toUpperCase() : 'BARRIO · CONURBANO';
+  const NOMBRE = { carabobo: 'Carabobo y la 1-11-14', parquechas: 'Parque Chas' };
+  $('tit').textContent = DIR === 'parquechas' ? 'PARQUE CHAS · EL LABERINTO' : 'BAJO FLORES · ' + META.lugar.toUpperCase();
   if (otro) { $('bB').textContent = '🗺️ ' + (NOMBRE[otro] || BARRIOS[otro].lugar || otro);
     $('bB').onclick = () => { const u = new URL(location.href); u.searchParams.set('barrio', otro); location.href = u.href; }; } else $('bB').hidden = true;
   // diagnóstico visible en el celu: aislamiento, progreso, tiempo y cualquier error
