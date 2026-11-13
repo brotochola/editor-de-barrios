@@ -27,8 +27,12 @@ const LUZ = 0xffdcaa;
 // la luz de la noche (lighting.sun.night): una luna azulada que WeedJS suma a la luz de la escena cuando el sol baja de 0,4
 // (completa en 0,1), sin tocar Sun.intensity: las sombras del sol se apagan solas y las de los faroles no se debilitan
 const LUNA = 0x5473f2, LUNA_I = 0;
-// los faroles alumbran desde arriba (LightEmitter.sourceHeight): con la misma intensidad el pie quedaría oscuro
-const FAROL_K = 2.2;
+// el alcance de cada luz (LightEmitter.radius, px). Los faroles y los postes alumbran desde arriba (LightEmitter.elevation): con
+// el alcance de una luz al ras el pie quedaría oscuro, así que llegan √2,2 veces más lejos (10·√(1800·2,2): el charco que tenían
+// con la intensidad de antes, I = (radio / 10)²). Los faros de los autos, 10·√700
+const R_FAROL = 10 * Math.sqrt(1800 * 2.2), R_POSTE = 10 * Math.sqrt(1500 * 2.2), R_FARO = 10 * Math.sqrt(700);
+// el brillo en la lámpara (LightEmitter.glow, su alfa): el de antes, intensidad · 0,55 / 25 000 (0,5 en los postes)
+const BRILLO_FAROL = R_FAROL * R_FAROL / 100 * .55 / 25000, BRILLO_POSTE = R_POSTE * R_POSTE / 100 * .5 / 25000;
 const { ShapeType } = enums;
 
 const NLPC = 19, NPED = META.peatones, PXM = META.PXM;
@@ -44,10 +48,12 @@ const Q = WEED.params || new URLSearchParams(typeof globalThis.location?.search 
 const SOMBRA_TEX = Q.get('siltex') !== '0';
 // ?raycast=1 (prueba, sección 7 del plan): las luces de faroles, postes y autos no atraviesan las casas. WeedJS arma un
 // polígono de visibilidad por luz (lighting.raycasted) con los colisionadores de las casas (LightOccluder); cada luz busca
-// obstáculos hasta su Collider.visualRange, que acá es su alcance (10·√intensidad). Con esto WeedJS apaga la capa de sombras
+// obstáculos hasta su alcance (LightEmitter.shadowRange 0: su radio). Con esto WeedJS apaga la capa de sombras
 // proyectadas (gente, árboles, postes): quedan las de volumen de casas y autos
 const RAYCAST = Q.get('raycast') === '1';
-const alcanceLuz = (I) => RAYCAST ? Math.ceil(10 * Math.sqrt(I)) : 0;
+// hasta dónde proyecta sombras cada luz (shadowRange): sin raycast, 260 px los faroles y postes y 160 los faros (lo que daba su
+// Collider.visualRange); con raycast, todo su radio (0)
+const SOMBRA_FAROL = RAYCAST ? 0 : 260, SOMBRA_FARO = RAYCAST ? 0 : 160;
 const NAV = globalThis.navigator || {}, HC = NAV.hardwareConcurrency || 4;
 const MOVIL = /Android|iPhone|iPad|Mobile/i.test(NAV.userAgent || '') || (NAV.maxTouchPoints > 1 && /Macintosh/.test(NAV.userAgent || ''));
 const GENTE_FIJA = Q.has('gente') ? Math.max(100, Math.min(23000, Q.get('gente') | 0)) : 0;
@@ -102,7 +108,7 @@ export class AutoComp extends Component {
 // prende o la apaga con sus brillos. De día tienen que estar apagadas: su luz se sumaría a la del sol y, como la iluminación
 // recorta en 1, borraría las sombras de alrededor. En un componente (no en campos del objeto): los ve cualquier hilo
 export class LuzHora extends Component {
-  // prende, apaga: horas; base: intensidad de su luz (0: no es una luz); on: 1 prendida, 0 apagada, 2 sin decidir;
+  // prende, apaga: horas; base: el radio de su luz (0: no es una luz); on: 1 prendida, 0 apagada, 2 sin decidir;
   // ag: cuántas de sus decoraciones son brillos (las primeras), y su alfa (a0 la de las pares, a1 la de las impares)
   static ARRAY_SCHEMA = { prende: Float32Array, apaga: Float32Array, base: Float32Array, on: Uint8Array, ag: Uint8Array, a0: Float32Array, a1: Float32Array };
 }
@@ -115,13 +121,13 @@ function horasLuz(x, y, out) {
 }
 function luzNace(go, ag, a0, a1, c) {
   const i = go.index, L = LuzHora; if (c) { horasLuz(c.x, c.y, _hl); L.prende[i] = _hl[0]; L.apaga[i] = _hl[1]; } else { L.prende[i] = 18 + rng(); L.apaga[i] = 6 + rng(); }
-  L.base[i] = LightEmitter.lightIntensity[i];
+  L.base[i] = LightEmitter.radius[i];
   L.on[i] = 2; L.ag[i] = ag; L.a0[i] = a0; L.a1[i] = a1; luzHora(go);
 }
 function luzHora(go) {
   const i = go.index, L = LuzHora; if (!(L.base[i] > 0)) return;
   const h = Sun.hour, on = h >= L.prende[i] || h < L.apaga[i] ? 1 : 0; if (on === L.on[i]) return;
-  L.on[i] = on; LightEmitter.active[i] = on; LightEmitter.lightIntensity[i] = on ? L.base[i] : 0;
+  L.on[i] = on; LightEmitter.active[i] = on; LightEmitter.radius[i] = on ? L.base[i] : 0;
   for (let q = 0, n = Math.min(L.ag[i], go.getAttachedDecorationCount()); q < n; q++) { const d = go.getAttachedDecoration(q); if (d) d.alpha = on ? (q & 1 ? L.a1[i] : L.a0[i]) : 0; }
 }
 
@@ -150,9 +156,9 @@ export class Casa extends GameObject {
     this.collider.visualRange = 260;
     // las casas no alumbran; los postes de madera con lámpara (calles de tierra y villas) sí
     const L = this.lightEmitter, on = c.k === 'poste' && !!c.l;
-    L.lightColor = LUZ; L.height = 0; L.glowHeightOffset = 7 * META.CZ * META.SF; L.hasGlowSprite = on ? .5 : 0;
-    L.sourceHeight = on ? 50 : 0; L.lightIntensity = on ? 1500 * FAROL_K : 0; L.active = on ? 1 : 0; this.collider.visualRange = on ? (alcanceLuz(L.lightIntensity) || 260) : this.collider.visualRange;
-    luzNace(this, 0, 0, 0, c);   // el poste se prende a su hora (su brillo es el de la luz: hasGlowSprite)
+    L.color = LUZ; L.glowOffsetY = -7 * META.CZ * META.SF; L.glow = on ? BRILLO_POSTE : 0;
+    L.elevation = on ? 50 : 0; L.radius = on ? R_POSTE : 0; L.shadowRange = SOMBRA_FAROL; L.active = on ? 1 : 0;
+    luzNace(this, 0, 0, 0, c);   // el poste se prende a su hora (su brillo es el de la luz: glow)
   }
   tick() { luzHora(this); }
 }
@@ -200,10 +206,10 @@ export class Prop extends GameObject {
     const LM = META.lamparas[c.f];
     this._fOff = P; this._fOn = LM && LM.on ? META.props[LM.on] : null; this._prendido = -1;
     if (LM) {            // farol: charco de luz en la vereda + brillo en la lámpara
-      L.lightColor = LUZ; L.height = 0; L.glowHeightOffset = top * (an[1] - LM.l[0][1]) / an[1];
-      // la luz sale de la lámpara (sourceHeight, a media altura del poste: el charco queda más parejo) y por eso más fuerte
-      L.sourceHeight = top * .5; L.lightIntensity = 1800 * FAROL_K; L.hasGlowSprite = .55; L.active = 1;
-      this.collider.visualRange = alcanceLuz(L.lightIntensity) || 260;   // alcance para las sombras que proyecta su luz (y, con ?raycast=1, las casas que la tapan)
+      L.color = LUZ; L.glowOffsetY = -top * (an[1] - LM.l[0][1]) / an[1];
+      // la luz sale de la lámpara (elevation, a media altura del poste: el charco queda más parejo) y por eso llega más lejos
+      L.elevation = top * .5; L.radius = R_FAROL; L.glow = BRILLO_FAROL; L.active = 1;
+      L.shadowRange = SOMBRA_FAROL;   // alcance para las sombras que proyecta su luz (y, con ?raycast=1, las casas que la tapan)
       // brillo en cada lámpara (se prende con la luz): un centro chico y un halo, en la capa 'noche' (aditiva, arriba de todo:
       // debajo de la luz, multiplicados por el charco, no se veían). Esa capa no se ordena con las casas: el farol que tiene su
       // lámpara detrás de una casa (c.tp, ConurbanoScene._lamparasTapadas, al cargar) va sin brillo
@@ -215,7 +221,7 @@ export class Prop extends GameObject {
       }
       luzNace(this, ls ? ls.length * 2 : 0, 1, .5, c);   // se prende a su hora, con sus brillos (centro y halo de cada lámpara)
     } else {
-      L.lightIntensity = 0; L.active = 0; this.luzHora.base = 0;
+      L.radius = 0; L.active = 0; this.luzHora.base = 0;
       // semáforo: sin luz al piso, sólo un punto de color en la lámpara (el gradiente de WeedJS, en una capa aditiva);
       // con datos de tránsito: rojo, amarillo y verde (y una tapa para la roja, que en el dibujo está prendida), pegados al semáforo
       // y apagados; la escena los prende según el ciclo de su cruce. Si no, una luz fija
@@ -433,10 +439,12 @@ export class Auto extends GameObject {
     this.volumeShadowCaster.setBox(A.ha * 2, A.hb * 2, sh, { topScale: sk, floorScaleY: AUTO_S });
     const L = this.lightEmitter; A.faros = c.faros ? 1 : 0;
     if (c.faros) {   // _frame corre la luz al frente de la huella cuando el auto gira
-      L.lightColor = LUZ_FARO; L.height = 0; L.hasGlowSprite = 0; L.lightIntensity = c.i || 700; L.offsetX = A.hl; L.offsetY = 0; L.active = 1;
-      if (RAYCAST) this.collider.visualRange = alcanceLuz(L.lightIntensity) + A.hl;   // la luz está en el frente
+      L.color = LUZ_FARO; L.glow = 0; L.radius = R_FARO; L.shadowRange = SOMBRA_FARO; L.offsetX = A.hl; L.offsetY = 0; L.active = 1;
+      // (el auto lee sus vecinos: con raycast su luz busca las casas que la tapan sólo dentro de su visualRange, que llega
+      // hasta el alcance de la luz, en el frente)
+      if (RAYCAST) this.collider.visualRange = Math.ceil(R_FARO) + A.hl;
       luzNace(this, 0, 0, 0);   // los faros se prenden a su hora
-    } else { L.lightIntensity = 0; L.offsetX = 0; L.offsetY = 0; L.active = 0; this.luzHora.base = 0; }
+    } else { L.radius = 0; L.offsetX = 0; L.offsetY = 0; L.active = 0; this.luzHora.base = 0; }
     this._frame();
   }
   onDespawned() { this.autoComp.active = 0; }

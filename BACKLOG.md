@@ -124,7 +124,7 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 - [ ] **Faros de los autos** — hecho (f00925d). La luz sale del frente del auto, no 18 px más adelante (la sombra de
   un árbol al costado caía hacia atrás), y el auto ya no lleva destellos.
 - [ ] **Brillos ordenados por Y** — motor. Los brillos tienen que ordenarse por Y con lo demás. El brillo propio de cada
-  luz (`hasGlowSprite`, con `lightGlow: 'sprite'`) ya va con las entidades, pero la luz de la noche lo multiplica y casi no
+  luz (`LightEmitter.glow`, con `lightGlow: 'sprite'`) ya va con las entidades, pero la luz de la noche lo multiplica y casi no
   se ve; por eso las lámparas de los faroles y los semáforos llevan su brillo en capas aditivas, encima de todo (la lámpara
   detrás de una casa va sin brillo). Probado: en la capa de entidades la lámpara queda opaca y sin halo. Hace falta que
   WeedJS dibuje un brillo en el orden de las entidades sin que la luz lo oscurezca (por ejemplo, la pasada aditiva de los
@@ -173,6 +173,12 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   (`hornear_atlas.js` y las carpetas `atlas/` de los barrios, fuera). El editor sólo arma lo del barrio: caras, árboles, piso y
   la hoja de grafitis de las paredes (`img/grafitis`). `META.props` dice la hoja, el cuadro, el ancla, la escala y si se mece de
   cada objeto (antes, `META.anclas` y `META.escalas` y una hoja `img/props` por barrio).
+- [ ] **Hasta un millón de decoraciones** — hecho (motor: WeedJS 39c1edf0, rama `deco/1m`; el dueño, 13/11). WeedJS
+  numeraba las decoraciones con 19 bits: más de 524 287 no cargaba, y Parque Chas ya pedía 514 mil. Ahora acepta hasta
+  1 048 575. Ese bundle trae también la API nueva de luces (sin compatibilidad): `radius` en vez de `lightIntensity`
+  (radio = 10·√intensidad), `color`, `glow` (el alfa del brillo: intensidad · hasGlowSprite / 25 000), `glowOffsetY` (hacia
+  arriba es negativo), `elevation` y `shadowRange` (el alcance de las sombras, que antes daba el `visualRange` de la luz).
+  Las luces del juego pasaron con esas cuentas: de noche se ven iguales, con y sin `?raycast=1`.
 - [ ] **Fuera los objetos de Gemini** — hecho (fffa219). Se borraron sus dibujos (`arte/gemini`, `hd_props`, el .rar) y las
   herramientas que los limpiaban y achicaban (`achicar.py`, `armar_hd.py`, `pixelar.py`, `variantes.py`, `fuente_mosaico.py`,
   `variantes.html`). Quedan las piezas de fachada (`arte/fachadas`, con las hojas originales en `arte/fachadas/gemini`); su hoja
@@ -211,7 +217,7 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   | Parque Chas | 12,9 Mpx, 4 hojas, 20,7 MB; 232 mil piezas | 4,2 Mpx, 2 hojas, 3,8 MB; 344 mil piezas |
   | Carabobo | 9,6 Mpx, 3 hojas, 15,4 MB; 236 mil piezas | 3,4 Mpx, 1 hoja, 3,3 MB; 316 mil piezas |
 
-  El tope: WeedJS numera las decoraciones con 19 bits, más de 524 287 no carga. Con baldosas de 3 m Parque Chas pedía 536 mil y el
+  El tope: WeedJS numeraba las decoraciones con 19 bits, más de 524 287 no cargaba (desde 39c1edf0, 1 048 575). Con baldosas de 3 m Parque Chas pedía 536 mil y el
   juego no arrancaba; con 6 m pedía 497 mil, y cortando el fondo de cada pared con su propia columna (no con la más fina de todas
   las paredes que comparten la baldosa) y con borde sólo a los costados en las paredes, 441 mil (Carabobo, 379 mil).
 
