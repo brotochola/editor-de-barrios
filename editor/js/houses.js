@@ -928,13 +928,13 @@ const Houses = (() => {
 
   // ---------- la medianera del fondo, entre los patios de dos lotes: una pared de 1,8 m sin pilares (tapia de revoque o de ladrillo:
   // salen del patrón compartido) o un alambrado de 1,5 m; cada cara, del lado que se ve
-  function medianera(W, seed, kind, phi = 0) {
+  function medianera(W, seed, kind, phi = 0, calle = false) {
     const sc = new Scene(); sc.setXform(phi); const r = rng(seed); CTX = { pobre: kind !== "ladrillo" };
     if (kind === "alambre") { const H = 1.5, t = new Tex(W, H, seed, [0, 0, 0], 0);
       for (let x = 0; x < t.w; x++) for (let y = 0; y < t.h; y++) if ((x + y) % 5 === 0 || (x - y + 500) % 5 === 0) t.p(x, y, [166, 170, 174]);
       t.rect(0, 0, t.w, 1, [140, 144, 150]); sc.box(0, 0, 0, W, .02, H, { front: t, back: t, cast: false }); return { sc }; }
     const H = 1.8, t = new Tex(W, H, seed); if (kind === "ladrillo") t.brick(); else { t.stucco(r.pick(WALLS), 1.3); t.runoff(.5, 1.2); t.humidity(.5); }
-    if (r() < .25) pintada(t, 4, t.w - 4, px(.5), r);
+    if (r() < (calle ? .3 : .06)) pintada(t, 4, t.w - 4, px(.5), r);   // pintadas: en la calle; en los fondos, pocas
     sc.box(0, 0, 0, W, .15, H, { front: t, back: t, top: [204, 200, 190] });
     return { sc };
   }

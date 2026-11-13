@@ -65,9 +65,13 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 - [ ] **Contorno de las paredes del piso de arriba** — hecho (5dc81ce; el dueño, 13/11). Las paredes de material llevaban sólo
   el contorno de los costados (arriba y abajo los tapan el techo y el piso); una pared que no llega al piso (el piso de arriba, la
   caja del techo) lleva ahora los cuatro, si mide 1,4 m o más (la cara de adentro de un petil ya tiene la línea de su tapa).
-- [ ] **Patios divididos** — pendiente (el dueño, 13/11). Los patios tienen que estar separados por paredes, cercas o algo; si no,
+- [ ] **Patios divididos** — hecho (el dueño, 13/11). Los patios tienen que estar separados por paredes, cercas o algo; si no,
   parecen parte de la vereda. En Parque Chas los lotes no llenan la manzana: lo que queda entre ellos se pinta de baldosa, sin
-  paredes, y llega hasta la vereda; y muchos patios tienen medianera de un solo lado.
+  paredes, y llega hasta la vereda; y muchos patios tenían medianera de un solo lado. Ahora cada patio está cerrado (medianeras a
+  los costados y al fondo, puestas después del recorte del catálogo, con la casa que quedó: si deja un pasillo, la medianera
+  arranca en el frente y un pedazo de pared lo cierra), y lo que queda entre lotes va detrás de una pared corrida sobre la
+  vereda. Decoraciones: Parque Chas 478 271 → 508 899, Carabobo 419 186 → 434 876 (de 524 287). Lo que más cuesta ahora es el
+  paredón (6 a 7 piezas por metro, unas 12 mil en cada barrio): si hace falta lugar, va por ahí.
 - [ ] **Casas iguales seguidas** — hecho (92d1a7b; el dueño, 13/11). Una casa que se ve como otra ya puesta a menos de 14 m
   (casillas: 6 m) toma la del catálogo más parecida que no se vea como ninguna, o una variante propia. «Se ve como»: la misma clave
   sin rumbo ni fondo. Pares de vecinas iguales: Parque Chas 154 → 0, Carabobo 4 920 → 6; caras de Carabobo 3,74 → 4,45 MB.

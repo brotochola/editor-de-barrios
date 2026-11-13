@@ -288,7 +288,7 @@ const Caras = (() => {
     const cortes = new Map();
     function columna(E, n, pm = PIE_MAX) { const porTexel = Math.abs(J(E)[1]) / n; let c = TILE; while (c > 8 && c * porTexel > pm) c = Math.ceil(c / 2); return c; }
     // una medianera de fondo (entre patios: casi no pasa gente) se corta con más tolerancia: es larga y corre hacia el fondo, y con
-    // PIE_MAX eran muchas piezas (el tope de decoraciones de WeedJS)
+    // PIE_MAX eran muchas piezas (el tope de decoraciones de WeedJS). No la que va a lo largo de la vereda (spec.ve): ahí camina gente
     const PIE_FONDO = 32;
     const BLANCO = { w: 8, h: 8, grid: [{ nombre: "_white", x0: 0, y0: 0, w: 8, h: 8 }] };
     // medio cuadrado blanco (u + v ≤ 1): cualquier triángulo liso es su imagen con escala y skew, como una cara lisa lo es de _white.
@@ -419,7 +419,7 @@ const Caras = (() => {
           // en una pared, columnas tan finas como haga falta para que cada pieza se ordene bien con lo que está al pie. El fondo de una pared
           // de material (la baldosa, compartida por todas) se corta con las de este uso: con la más fina de todos sus usos, una pared de frente
           // iba en columnas finísimas por la pared más inclinada del barrio (piezas de más: el tope de WeedJS); sus copias por nivel son chicas
-          if (pared) { const hor1 = Math.abs(q.E1[2]) <= Math.abs(q.E2[2]), k = hashDe(q.T) + (hor1 ? "u" : "v"), pm = e.spec.t === "medianera" ? PIE_FONDO : PIE_MAX, cu = hor1 ? columna(q.E1, q.T.w, pm) : columna(q.E2, q.T.h, pm);
+          if (pared) { const hor1 = Math.abs(q.E1[2]) <= Math.abs(q.E2[2]), k = hashDe(q.T) + (hor1 ? "u" : "v"), pm = e.spec.t === "medianera" && !e.spec.ve ? PIE_FONDO : PIE_MAX, cu = hor1 ? columna(q.E1, q.T.w, pm) : columna(q.E2, q.T.h, pm);
             q.corte = k; if (q.pre === "m") q.cu = cu; else cortes.set(k, Math.min(cortes.get(k) ?? TILE, cu)); } }
         const el = elementoCara(F), idx = E.length; E.push(el);
         for (const q of sub) items.push({ el: idx, q, pared, F });
@@ -462,7 +462,7 @@ const Caras = (() => {
         const vert = Math.abs(it.F.n[2]) < .1, tira = !vert && Math.min(len(q.E1), len(q.E2)) < .6;
         if (T === BLANCO && it.pared) {
           const piso = (E) => Math.abs(J([E[0], E[1], 0])[1]);
-          const hor1 = vert ? Math.abs(q.E1[2]) <= Math.abs(q.E2[2]) : piso(q.E1) >= piso(q.E2), Eh = hor1 ? q.E1 : q.E2, n = Math.max(1, Math.ceil(piso(Eh) / (e.spec.t === "medianera" ? PIE_FONDO : PIE_MAX) - 1e-6));
+          const hor1 = vert ? Math.abs(q.E1[2]) <= Math.abs(q.E2[2]) : piso(q.E1) >= piso(q.E2), Eh = hor1 ? q.E1 : q.E2, n = Math.max(1, Math.ceil(piso(Eh) / (e.spec.t === "medianera" && !e.spec.ve ? PIE_FONDO : PIE_MAX) - 1e-6));
           // cada columna, 1 px de pantalla más ancha (como las piezas con textura): si no, entre una y otra quedaba una rayita
           const pasa = n > 1 ? 1 + 1 / Math.max(1, Math.hypot(...J(sc3(Eh, 1 / n)))) : 1;
           const e1 = hor1 ? sc3(q.E1, pasa / n) : q.E1, e2 = hor1 ? q.E2 : sc3(q.E2, pasa / n), A1 = J(e1), B1 = J(e2);
