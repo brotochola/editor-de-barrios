@@ -76,7 +76,7 @@ export class ArbolP extends GameObject {
     const T = c.tipo, E = T.escala || .6, S = T.sil, fl = c.fl ? -1 : 1;
     if (S) { this.setSprite('arboles', S[0], 0); this.spriteRenderer.anchorX = S[1]; this.spriteRenderer.anchorY = S[2]; this.setScale(E / S[3] * fl, E / S[3]); this.alpha = c.verSil ? .5 : 0; }
     this.shadowCaster.heightMultiplier = S ? 1 : 0;
-    for (const p of T.piezas) this.addDecoration('arboles_' + p[0], p[1] * fl, p[2], E * fl, E, p[5], { anchorX: p[3], anchorY: p[4], sortOffsetY: p[5] > 0 ? 25 : 0, ...(c.mece ? { sway: !!p[6], swayAmplitude: .03, swayFrequency: .6 } : {}) });
+    for (const p of T.piezas) this.addDecoration('arboles_' + p[0], p[1] * fl, p[2], E * fl * p[8], E * p[9], p[5], { anchorX: p[3], anchorY: p[4], rotation: p[7] * fl, sortOffsetY: p[5] > 0 ? 25 : 0, ...(c.mece ? { sway: !!p[6], swayAmplitude: .03, swayFrequency: .6 } : {}) });
   }
 }
 

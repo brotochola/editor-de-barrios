@@ -292,10 +292,11 @@ export class Arbol extends GameObject {
     this.shadowCaster.heightMultiplier = S ? 1 : 0;
     if (TEX) this.shadowCaster.setTexture('arboles_' + S[0], { anchorX: S[1], anchorY: S[2], scaleX: E / S[3] * fl, scaleY: E / S[3] });
     for (const p of T.piezas) {
-      if (p[5] === 0 && (!S || TEX)) { this.setSprite('arboles', p[0], 0); this.spriteRenderer.anchorX = fl > 0 ? p[3] : 1 - p[3]; this.spriteRenderer.anchorY = p[4]; this.setScale(E * fl, E); continue; }
+      if (p[5] === 0 && (!S || TEX)) { this.setSprite('arboles', p[0], 0); this.spriteRenderer.anchorX = fl > 0 ? p[3] : 1 - p[3]; this.spriteRenderer.anchorY = p[4]; this.setScale(E * fl * p[8], E * p[9]); continue; }   // el tronco común, estirado a este árbol
       // las ramas de adelante (y su follaje) se ordenan casi 3 m más cerca de la cámara que el tronco: la copa está arriba y se
       // abre hacia adelante, así tapa la mesa o el banco que está debajo (si no, la silla salía encima de las hojas)
-      this.addDecoration('arboles_' + p[0], p[1] * fl, p[2], E * fl, E, p[5], { anchorX: p[3], anchorY: p[4], sway: !!p[6], swayAmplitude: .01 + rng() * .01, swayFrequency: .4 + rng() * .3, sortOffsetY: p[5] > 0 ? COPA_ADELANTE : 0 });
+      // una rama de la librería de su especie: girada (p[7]), en espejo y estirada (p[8], p[9]); el árbol en espejo la refleja entera
+      this.addDecoration('arboles_' + p[0], p[1] * fl, p[2], E * fl * p[8], E * p[9], p[5], { anchorX: p[3], anchorY: p[4], rotation: p[7] * fl, sway: !!p[6], swayAmplitude: .01 + rng() * .01, swayFrequency: .4 + rng() * .3, sortOffsetY: p[5] > 0 ? COPA_ADELANTE : 0 });
     }
   }
 }

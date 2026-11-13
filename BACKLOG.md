@@ -40,8 +40,9 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 - [ ] **Terrenos vacíos** — en curso. En Carabobo y en Parque Chas, lotes del tamaño de una o dos casas sin casa: con
   basura y yuyos, o sólo basura. Hecho (7d59c67): Parque Chas tiene baldíos (3 de cada 100 lotes; antes ninguno: su estilo no los
   traía), un tercio son sólo basura sobre la tierra, y la basura va en montones. Parque Chas: 66 baldíos (24 de basura); Carabobo: 152 (50).
-  Falta (el dueño, 12/11): barriles, cajas y lo sólido como GameObjects (colisionador y sombra), las plantas no; muchas más plantas
-  saliendo del piso (yuyos, arbustos, algún árbol) y mucha más basura y escombros.
+  Y lo que pidió el dueño (12/11), hecho (HASH_CARAS3): barriles, cajas, gomas, garrafas, colchones, chapas y escombro chocan y
+  hacen sombra (GameObjects); las plantas no. En los de yuyos, unas tres veces más yuyos, arbustos y de uno a tres árboles; en los
+  de basura, de cinco a nueve montones grandes y algún yuyo entre la basura.
 - [ ] **Techo con agujero en las esquinas con forma** — hecho (7d59c67). El techo iba en abanico desde un vértice: en una planta
   no convexa algún triángulo quedaba dado vuelta (mirando para abajo), el horneado lo descartaba y se veía el patio por el agujero.
   Ahora va por orejas, todos los triángulos mirando para arriba.
@@ -109,6 +110,13 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 
 - [ ] **Ramas más angostas y menos hojas** — hecho (2bfae69). Ramas a 0,6 de su grosor (el tronco igual), la mitad de
   los racimos pelados y al resto le queda un cuarto de sus hojas.
+- [ ] **Árboles con ramas repetidas** — hecho (HASH_CARAS3; el dueño, 12/11). Cada especie, una librería de 4 ramas paradas y su
+  cima; cada tipo de árbol las usa giradas, una sí y una no en espejo, y estiradas. Un solo tronco (y otro a la cal), recto,
+  estirado a cada árbol. Parque Chas: la hoja `arboles`, de 215 cuadros (2,71 Mpx, 1,0 MB) a 74 (0,99 Mpx, 0,48 MB); Carabobo,
+  de 141 (1,83 Mpx) a 50 (0,70 Mpx).
+- [ ] **Hojas flotando; ramas que terminan en palo** — hecho (HASH_CARAS3; el dueño, 12/11). Las rosetas iban en una esfera
+  alrededor del extremo de la rama y muchas quedaban en el aire: ahora van sobre ramitas que salen del racimo. Los racimos de las
+  puntas y la cima nunca quedan pelados, y la punta de cada ramita lleva su roseta.
 
 ## Movimiento
 
@@ -153,6 +161,21 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
   cuestan al juego esas piezas de más (memoria, carga, cuadro) en un aparato de verdad; los techos todavía guardan un recorte por
   medida (de medio metro en medio metro). Una decoración que repita su textura (tiling, como los sprites) haría innecesarios los
   recortes: sería un pedido a WeedJS.
+- [ ] **Caras, segunda y tercera vuelta** — hecho (HASH_CARAS3; el dueño, 12/11: «hay un montón de assets duplicados», «un simple
+  pattern que se repite», «decorations rotadas, con skew y scale»). El fondo de las paredes y los techos, un patrón: baldosas de
+  6 × 3 m (techos, 6 × 6) repetidas y estiradas, sin variantes por manchas. Lo dibujado, cada cosa en su recuadro, cortado en franjas
+  regulares desde su borde; las rayas a lo ancho de la pared, en su tira; lo que es la pared oscurecida pareja, negro translúcido
+  (sirve sobre cualquier color); ventanas y puertas con su azar de su tamaño y una de tres variantes. Las piezas de fachada de Gemini,
+  la imagen original una vez, escalada a cada uso; las pintadas, en una capa aparte, de una de 16 variantes por ancho. Cada pieza,
+  recortada a lo que tiene.
+
+  | | Esta mañana | Ahora |
+  |---|---|---|
+  | Parque Chas | 12,9 Mpx, 4 hojas, 20,7 MB; 232 mil piezas | 3,9 Mpx, 2 hojas, 3,6 MB; 400 mil piezas |
+  | Carabobo | 9,6 Mpx, 3 hojas, 15,4 MB; 236 mil piezas | 3,2 Mpx, 1 hoja, 3,1 MB; 374 mil piezas |
+
+  El tope: WeedJS numera las decoraciones con 19 bits, más de 524 287 no carga. Con baldosas de 3 m Parque Chas pedía 536 mil y el
+  juego no arrancaba; con 6 m pide 497 mil. Para achicar más sin pasarse, sacar piezas (los bordes de 1 px de cada pared son 88 mil).
 
 ## Formato
 
@@ -184,3 +207,18 @@ Estados: **pendiente**, **en curso**, **hecho** (con el commit), **charlar** (ha
 
 - [ ] **Reexportar el barrio inventado y Carabobo** — hecho (fffa219): los tres barrios, reexportados juntos.
 - [x] **Rama `objetos-zip`** — mergeada a main el 12/11 (sin subir a GitHub).
+- [ ] **Varsovia y Bucarelli, tal cual** — pendiente (el dueño, 12/11). En Parque Chas, la esquina de Varsovia y Bucarelli
+  tiene que quedar como es de verdad, y sobre todo la cuadra de Varsovia al 2900: lo más parecida posible, casa por casa (ancho
+  del frente, alto, materiales y colores, puertas, ventanas, rejas, portones, techos), y también la vereda, los árboles y los
+  postes. Mirarla en Google Maps, Street View o lo que haya. En el mapa, Varsovia al 2900 es la cuadra de 116 m entre Bucarelli y
+  Andonaegui (`osm_parquechas.json`, way 5513; la Ciudad pone Varsovia 2950 a mitad de cuadra); hoy sus lotes y sus casas salen
+  al azar, como en todo el barrio.
+
+## Editor
+
+- [ ] **Dibujar calles; las manzanas salen solas** — pendiente (el dueño, 12/11). Hoy las calles de un barrio real salen de
+  `real_<barrio>.js` (los `segs`, de `herramientas/osm_real.py`), y las manzanas no se guardan: el generador las saca de las
+  calles. La idea: el barrio pasa a ser un grafo de esquinas y cuadras (`editor/recursos/barrio_<carpeta>.json`) que se
+  dibuja en el editor, con imán a los 48 rumbos de los autos; de ahí salen los `segs` de siempre, y lotes, casas y manzanas
+  siguen saliendo del generador de hoy. Después, las manzanas como polígonos (las caras del grafo), para marcar una como
+  plaza, villa o complejo. Plan, por etapas y con lo que hay que charlar antes: `editor/PLAN_CALLES.md`.

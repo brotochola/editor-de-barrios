@@ -72,16 +72,24 @@ const Graffiti = (() => {
 
   // ---------- pintura
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+  // pintando en una capa aparte (la exportación por caras): la pared que está debajo (dónde se puede pintar y de qué tan clara es);
+  // la pintura se suma a la capa con su opacidad (alfa), sin mezclarse con el color de la pared
+  let CAPA = null;
+  function mezcla(t, i, c, al) {
+    if (!CAPA) { t.d[i] += (c[0] - t.d[i]) * al; t.d[i + 1] += (c[1] - t.d[i + 1]) * al; t.d[i + 2] += (c[2] - t.d[i + 2]) * al; return; }
+    const a0 = t.d[i + 3] / 255, na = al + a0 * (1 - al); if (na <= 0) return;
+    for (let k = 0; k < 3; k++) t.d[i + k] = (c[k] * al + t.d[i + k] * a0 * (1 - al)) / na;
+    t.d[i + 3] = na * 255; }
   // mancha redonda con borde suave (a: opacidad en el centro)
   function dot(t, cx, cy, rad, c, a = 1) {
     const x0 = Math.max(0, Math.floor(cx - rad - 1)), x1 = Math.min(t.w - 1, Math.ceil(cx + rad + 1)), y0 = Math.max(0, Math.floor(cy - rad - 1)), y1 = Math.min(t.h - 1, Math.ceil(cy + rad + 1));
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const d = Math.sqrt((x + .5 - cx) ** 2 + (y + .5 - cy) ** 2), al = a * clamp(rad + .5 - d, 0, 1); if (al <= 0) continue;
-      const i = (y * t.w + x) * 4; if (t.d[i + 3] < 128) continue;   // sólo sobre la pared
-      t.d[i] += (c[0] - t.d[i]) * al; t.d[i + 1] += (c[1] - t.d[i + 1]) * al; t.d[i + 2] += (c[2] - t.d[i + 2]) * al; }
+      const i = (y * t.w + x) * 4; if ((CAPA || t).d[i + 3] < 128) continue;   // sólo sobre la pared
+      mezcla(t, i, c, al); }
   }
   function box(t, x0, y0, x1, y1, c, a = 1) { for (let y = Math.max(0, y0 | 0); y < Math.min(t.h, y1 | 0); y++) for (let x = Math.max(0, x0 | 0); x < Math.min(t.w, x1 | 0); x++) {
-    const i = (y * t.w + x) * 4; if (t.d[i + 3] < 128) continue; t.d[i] += (c[0] - t.d[i]) * a; t.d[i + 1] += (c[1] - t.d[i + 1]) * a; t.d[i + 2] += (c[2] - t.d[i + 2]) * a; } }
+    const i = (y * t.w + x) * 4; if ((CAPA || t).d[i + 3] < 128) continue; mezcla(t, i, c, a); } }
   // chorreado: una línea que baja y se afina, con una gota al final
   function drip(t, x, y, len, c, w = 1) { for (let k = 0; k < len; k++) { const a = 1 - k / (len * 1.4); for (let j = 0; j < w; j++) dot(t, x + j, y + k, .5, c, a); } dot(t, x + (w - 1) / 2, y + len, .9, c, .7); }
   // las celdas encendidas de un renglón (escala c px, inclinación, ondulación), en px de la textura
@@ -180,13 +188,24 @@ const Graffiti = (() => {
 
   // luminosidad media de la pared donde va la pintada: en una pared clara no se pinta en blanco ni plateado (no se vería), en una
   // oscura no se pinta en negro
-  function lumZona(t, x0, x1, y0, y1) { let s = 0, n = 0;
+  function lumZona(t, x0, x1, y0, y1) { let s = 0, n = 0; t = CAPA || t;
     for (let j = 0; j < 5; j++) for (let i = 0; i < 8; i++) { const x = Math.min(t.w - 1, Math.max(0, (x0 + (x1 - x0) * (i + .5) / 8) | 0)), y = Math.min(t.h - 1, Math.max(0, (y0 + (y1 - y0) * (j + .5) / 5) | 0)), k = (y * t.w + x) * 4;
       if (t.d[k + 3] < 128) continue; s += .3 * t.d[k] + .59 * t.d[k + 1] + .11 * t.d[k + 2]; n++; }
     return n ? s / n : 128; }
   const lumC = (c) => .3 * c[0] + .59 * c[1] + .11 * c[2];
+  // ctx.capa (la exportación por caras): pinta en t, una capa transparente, sobre la pared ctx.capa; y para que la misma pintada se
+  // repita igual en muchas paredes (va una sola vez al atlas), su azar sale de una de VAR_PINTADA variantes, del ancho redondeado a
+  // 8 px y de si la pared es clara u oscura, no del sorteo de la casa
+  const VAR_PINTADA = 16;
   function pintar(t, x0, x1, y, r, ctx = {}) {
+    if (ctx.capa) { CAPA = ctx.capa; try { x0 = Math.round(x0); y = Math.round(y); x1 = x0 + Math.floor((x1 - x0) / 8) * 8;
+        const v = (r() * VAR_PINTADA) | 0; r(); const clara = lumZona(t, x0, x1, y, Math.min(t.h, y + 40)) > 128 ? 1 : 0;
+        gr = R3.rng((v * 7919 + (x1 - x0) * 104729 + clara * 31 + (ctx.pobre ? 3 : 0) + (ctx.villa ? 5 : 0) + (ctx.paredon ? 11 : 0)) >>> 0);
+        return pintar_(t, x0, x1, y, ctx); } finally { CAPA = null; } }
     gr = R3.rng(((r() * 4294967296) ^ (r() * 65536)) >>> 0);
+    return pintar_(t, x0, x1, y, ctx);
+  }
+  function pintar_(t, x0, x1, y, ctx) {
     const Lp = lumZona(t, x0, x1, y, Math.min(t.h, y + 40)), seVe = (c) => Math.abs(lumC(c) - Lp) > 70;
     const pickC = (lista) => { const ok = lista.filter(seVe); return pick(ok.length ? ok : lista); };
     const k = (R3.DET >= 1.5 ? 2 : 1), W = x1 - x0;

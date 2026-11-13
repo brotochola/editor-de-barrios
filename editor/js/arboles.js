@@ -1,6 +1,9 @@
 // ===================== arboles.js — árboles procedurales (esqueleto tipo L-system en 3D, follaje en racimos) =====================
 // Cada árbol se dibuja en la misma proyección oblicua del barrio (18 px/m, corrimiento K, altura × CZ) y se parte en piezas:
 // el tronco (fijo) y cada rama principal con sus ramitas y su follaje (anclada en su base, para que se meza en WeedJS).
+// Las ramas no son de cada árbol: cada especie dibuja una vez una librería de LIB ramas y su cima, y cada tipo de árbol (su
+// esqueleto: el tronco, dónde salen y hacia dónde van sus ramas) usa para cada rama la de la librería que va más para ese lado,
+// girada lo que falte, en espejo si hace falta y estirada a su largo. El tronco sí es de cada tipo.
 // El editor muestra el árbol armado con esas mismas piezas; la exportación las guarda en una hoja de sprites.
 const Arboles = (() => {
   // Se dibujan a 1/0,6 de la densidad del barrio y se muestran al 0,6, igual que los personajes LPC del juego:
@@ -45,7 +48,8 @@ const Arboles = (() => {
   }
 
   // ---- esqueleto: tronco + ramas (recursivo, como un L-system con ángulos y largos que decaen)
-  function esqueleto(tipo) {
+  // (nRamas: cuántas ramas principales, en vez de las de la especie; la cima va en su propia capa, n + 1)
+  function esqueleto(tipo, nRamas = 0) {
     const [esp, v] = tipo.split("_"), E = ESPECIES[esp], r = R3.rng(0x7a3e + v * 977 + esp.length * 131 + esp.charCodeAt(0) * 17);
     const H = r.uni(E.alto[0], E.alto[1]) * ALTURA, troncoH = H * r.uni(.32, .42), segs = [], racimos = [];
     const rot = (d, ax, a) => { // Rodrigues
@@ -53,13 +57,14 @@ const Arboles = (() => {
       return [d[0] * c + (k[1] * d[2] - k[2] * d[1]) * s + k[0] * dot * (1 - c), d[1] * c + (k[2] * d[0] - k[0] * d[2]) * s + k[1] * dot * (1 - c), d[2] * c + (k[0] * d[1] - k[1] * d[0]) * s + k[2] * dot * (1 - c)]; };
     const norm = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
     const perp = (d) => norm(Math.abs(d[2]) < .9 ? [-d[1], d[0], 0] : [1, 0, 0]);
-    // tronco en 3 tramos con algo de curva
-    let p = [0, 0, 0], d = norm([r.uni(-.08, .08), r.uni(-.08, .08), 1]), rad = .16 + H * .012;
-    for (let i = 0; i < 3; i++) { const L = troncoH / 3, q = [p[0] + d[0] * L, p[1] + d[1] * L, p[2] + d[2] * L]; segs.push({ a: p, b: q, r0: rad, r1: rad * .92, rama: 0 }); p = q; rad *= .92; d = norm([d[0] + r.uni(-.1, .1), d[1] + r.uni(-.1, .1), d[2]]); }
-    const n = r.int(E.ramas[0], E.ramas[1]) + RAMAS_MAS, yaw0 = r() * Math.PI * 2;
+    // tronco recto en 3 tramos (el dibujo del tronco es uno solo para todos, estirado: las ramas salen de él; los sorteos de la curva
+    // de antes quedan, así lo demás no cambia)
+    r.uni(-.08, .08); r.uni(-.08, .08); const d = [0, 0, 1], rad0 = .16 + H * .012; let p = [0, 0, 0], rad = rad0;
+    for (let i = 0; i < 3; i++) { const L = troncoH / 3, q = [p[0] + d[0] * L, p[1] + d[1] * L, p[2] + d[2] * L]; segs.push({ a: p, b: q, r0: rad, r1: rad * .92, rama: 0 }); p = q; rad *= .92; r.uni(-.1, .1); r.uni(-.1, .1); }
+    const n0 = r.int(E.ramas[0], E.ramas[1]) + RAMAS_MAS, n = nRamas || n0, yaw0 = r() * Math.PI * 2;
     function rama(a, dir, L, rr, prof, id) {
       const b = [a[0] + dir[0] * L, a[1] + dir[1] * L, a[2] + dir[2] * L]; segs.push({ a, b, r0: rr, r1: rr * .7, rama: id });
-      if (prof >= 3 || L < .7) { racimos.push({ c: b, R: (.85 + r() * .5) * E.copa, rama: id }); return; }
+      if (prof >= 3 || L < .7) { racimos.push({ c: b, R: (.85 + r() * .5) * E.copa, rama: id, punta: true }); return; }   // la punta de una rama
       if (prof >= 1 && r() < .55) racimos.push({ c: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], R: (.6 + r() * .3) * E.copa, rama: id });
       const hijos = prof === 0 ? 2 + (r() < .5 ? 1 : 0) : 2, ax0 = perp(dir);
       for (let h = 0; h < hijos; h++) {
@@ -76,8 +81,9 @@ const Arboles = (() => {
       rama(base, dir, (H - troncoH) * r.uni(.42, .55), rad * .72 * RAMA_FINA, 0, i + 1);
     }
     // la cima, sobre el tronco (desde y grosor: la guía que la une a él, que se ve cuando la cima pierde las hojas)
-    racimos.push({ c: [p[0], p[1], p[2] + (H - troncoH) * .55], R: 1.2 * E.copa, rama: 1 + r.int(0, n - 1), cima: true, desde: p, grosor: rad * .55 * RAMA_FINA });
-    return { E, H, segs, racimos, n, r };
+    r.int(0, n - 1);   // (la rama a la que iba la cima: ahora va en su capa)
+    racimos.push({ c: [p[0], p[1], p[2] + (H - troncoH) * .55], R: 1.2 * E.copa, rama: n + 1, cima: true, desde: p, grosor: rad * .55 * RAMA_FINA });
+    return { E, H, segs, racimos, n, r, cima: p, troncoH, rad0 };
   }
 
   // proyección al sprite (pie del árbol = 0,0; px enteros los hace el que dibuja)
@@ -101,16 +107,19 @@ const Arboles = (() => {
   // el contorno de cada racimo: el tono oscuro de la hoja, oscurecido un poco (no casi negro)
   for (const k in PAL) PAL[k][0] = PAL[k][2].map(v => Math.round(v * .62));
   const BARK = [0xa07a52, 0x74553a, 0x4e3824, 0x3a2818, 0x3c2a1a].map(hex);   // luz, medio, sombra, contorno, surco
-  function render(tipo) {
-    if (cache.has(tipo)) return cache.get(tipo);
-    const { E, segs, racimos, n, r } = esqueleto(tipo), esp = tipo.split("_")[0], pal = PAL[esp] || PAL.fresno;
+  // ---- pinta un esqueleto en capas: 0 el tronco, 1..n cada rama con su follaje, n + 1 la cima (con su guía). soloTronco: sólo la
+  // capa 0 (las ramas de un árbol salen de la librería de su especie)
+  // giros (opcional): por rama, {x, y, c, s}: su dibujo girado sobre su base (px de pantalla) antes de pintarlo
+  function pintar(sk, tipo, soloTronco, giros = null) {
+    const { E, segs, racimos, n, r } = sk, esp = tipo.split("_")[0], pal = PAL[esp] || PAL.fresno;
+    const P2 = (q, rama) => { const [x, y] = PX(...q), g = giros && giros[rama]; if (!g) return [x, y]; const dx = x - g.x, dy = y - g.y; return [g.x + dx * g.c - dy * g.s, g.y + dx * g.s + dy * g.c]; };
     // luz en pantalla: de arriba a la izquierda (como el sol del barrio visto desde la cámara)
     const LX = -.55, LY = -.6, LZ = .58;
     // elementos: tramos de rama y racimos, cada uno con su rama (0 = tronco) y su profundidad
     const el = [];
-    for (const sg of segs) { const m = [(sg.a[0] + sg.b[0]) / 2, (sg.a[1] + sg.b[1]) / 2, (sg.a[2] + sg.b[2]) / 2]; el.push({ t: 0, sg, rama: sg.rama, d: prof(...m) }); }
+    for (const sg of segs) { if (soloTronco && sg.rama) continue; const m = [(sg.a[0] + sg.b[0]) / 2, (sg.a[1] + sg.b[1]) / 2, (sg.a[2] + sg.b[2]) / 2]; el.push({ t: 0, sg, rama: sg.rama, d: prof(...m) }); }
     // la cima flota sobre el tronco: con pocas hojas se vería suelta, así que una guía la une a él
-    for (const c of racimos) if (c.cima) { const a = c.desde, b = c.c;
+    if (!soloTronco) for (const c of racimos) if (c.cima) { const a = c.desde, b = c.c;
       el.push({ t: 0, sg: { a, b, r0: c.grosor, r1: c.grosor * .6, rama: c.rama }, rama: c.rama, d: prof((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2) }); }
     // un azar aparte para el otoño (el mismo para <tipo> y <tipo>_c), así el esqueleto y las hojas que quedan son los de la copa llena
     const [, vv] = tipo.split("_"), cae = R3.rng(0x0702 + vv * 977 + esp.length * 131 + esp.charCodeAt(0) * 17);
@@ -119,26 +128,36 @@ const Arboles = (() => {
     // dibujados del barrio. Las de arriba a la izquierda, más claras; las de abajo y de adentro, más oscuras.
     const LW = (() => { const v = [-.55, -.38, .74], l = Math.hypot(...v); return v.map(x => x / l); })(), Htop = Math.max(...racimos.map(c => c.c[2])) || 1;
     // otoño: a cada racimo se le sortea si ya quedó pelado, y a cada roseta si ya se cayó
-    for (const c of racimos) { if (r() < .16) continue;
-      const Rm = c.R * .62, N = Math.round(Rm * Rm * 34 * E.hoja), deja = cae() < CALVOS ? 0 : HOJAS;
+    // (toda rama termina en hojas, el dueño 12/11: los racimos de las puntas y la cima nunca faltan ni quedan pelados; los del medio de
+    // una rama, sí)
+    if (!soloTronco) for (const c of racimos) { const fijo = c.punta || c.cima; if (r() < .16 && !fijo) continue;
+      const Rm = c.R * .62, N = Math.round(Rm * Rm * 34 * E.hoja), calvo = cae() < (tipo.endsWith("_7") ? CALVOS * .6 : CALVOS), deja = calvo && !fijo ? 0 : HOJAS;   // (la librería, menos peladas, y la cima nunca: las comparten todos los árboles de la especie)
+      // ninguna hoja flota (el dueño, 12/11): del punto del racimo en la rama (su extremo o su medio) salen de 3 a 5 ramitas finas,
+      // hacia afuera y algo arriba, y cada roseta va sobre una de ellas (apenas corrida: la toca). Un racimo pelado deja sus ramitas
+      const nT = 3 + r.int(0, 2), ramitas = [];
+      for (let j = 0; j < nT; j++) { const u = r() * 2 - 1, th = r() * Math.PI * 2, sq = Math.sqrt(1 - u * u); let dir = [sq * Math.cos(th), sq * Math.sin(th), .25 + .75 * Math.abs(u)];
+        const l = Math.hypot(dir[0], dir[1], dir[2]); dir = dir.map(v => v / l); const len = Rm * (.6 + r() * .4);
+        const b = [c.c[0] + dir[0] * len, c.c[1] + dir[1] * len, c.c[2] + dir[2] * len * .85]; ramitas.push({ a: c.c, b });
+        el.push({ t: 0, sg: { a: c.c, b, r0: .02, r1: .01, rama: c.rama, fina: true }, rama: c.rama, d: prof((c.c[0] + b[0]) / 2, (c.c[1] + b[1]) / 2, (c.c[2] + b[2]) / 2) }); }
       for (let k = 0; k < N; k++) {
-        let u = r() * 2 - 1, th = r() * Math.PI * 2; const sq = Math.sqrt(1 - u * u), n3 = [sq * Math.cos(th), sq * Math.sin(th), u];
-        if (n3[1] > .55 && r() < .6) continue;                                     // las de atrás casi no se ven: menos trabajo
-        const rr = Rm * (.55 + r() * .45), p3 = [c.c[0] + n3[0] * rr, c.c[1] + n3[1] * rr, c.c[2] + n3[2] * rr * .85];
+        const tw = ramitas[k % nT], punta = k < nT, sT = punta ? 1 : .3 + r() * .7, jit = () => (r() - .5) * .08;
+        const p3 = [tw.a[0] + (tw.b[0] - tw.a[0]) * sT + jit(), tw.a[1] + (tw.b[1] - tw.a[1]) * sT + jit(), tw.a[2] + (tw.b[2] - tw.a[2]) * sT + jit()];
+        const dd = [p3[0] - c.c[0], p3[1] - c.c[1], p3[2] - c.c[2]], dl = Math.hypot(dd[0], dd[1], dd[2]) || 1, n3 = dd.map(v => v / dl), rr = dl;
+        if (!punta && n3[1] > .55 && r() < .6) continue;                                     // las de atrás casi no se ven: menos trabajo
         const lit = n3[0] * LW[0] + n3[1] * LW[1] + n3[2] * LW[2], ao = (1 - Math.min(1, p3[2] / Htop)) * .9 + (rr < Rm * .7 ? .5 : 0);
         const tono = Math.max(1, Math.min(4, Math.round(3.3 + lit * 1.5 - ao * .8 + (r() - .5) * .6)));
-        el.push({ t: 1, p: p3, tono, rama: c.rama, d: prof(...p3), n: 5 + r.int(0, 2), rot: r() * Math.PI * 2, L: (3.6 + r() * 1.6) * SF / 30, brillo: lit > .55 && r() < .6, cayo: cae() >= deja });
+        el.push({ t: 1, p: p3, tono, rama: c.rama, d: prof(...p3), n: 5 + r.int(0, 2), rot: r() * Math.PI * 2, L: (3.6 + r() * 1.6) * SF / 30, brillo: lit > .55 && r() < .6, cayo: cae() >= deja && !(punta && (fijo || deja)) });   // la de la punta de cada ramita, en un racimo con hojas, no se cae
       } }
     el.sort((p, q) => q.d - p.d);
     // caja total
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     const grow = (px, py, m) => { x0 = Math.min(x0, px - m); x1 = Math.max(x1, px + m); y0 = Math.min(y0, py - m); y1 = Math.max(y1, py + m); };
-    for (const e of el) { if (e.t === 0) { for (const q of [e.sg.a, e.sg.b]) { const [px, py] = PX(...q); grow(px, py, e.sg.r0 * SF + 3); } }
-      else { const [px, py] = PX(...e.p); grow(px, py, e.L * 2 + 3); } }
+    for (const e of el) { if (e.t === 0) { for (const q of [e.sg.a, e.sg.b]) { const [px, py] = P2(q, e.rama); grow(px, py, e.sg.r0 * SF + 3); } }
+      else { const [px, py] = P2(e.p, e.rama); grow(px, py, e.L * 2 + 3); } }
     x0 = Math.floor(x0) - 2; y0 = Math.floor(y0) - 2; x1 = Math.ceil(x1) + 2; y1 = Math.ceil(y1) + 2;
     const Wc = x1 - x0, Hc = y1 - y0;
     // una capa por rama (0 = tronco)
-    const capas = Array.from({ length: n + 1 }, () => new Uint8ClampedArray(Wc * Hc * 4));
+    const capas = Array.from({ length: n + 2 }, () => new Uint8ClampedArray(Wc * Hc * 4));
     const put = (buf, x, y, c, a = 255) => { x |= 0; y |= 0; if (x < 0 || y < 0 || x >= Wc || y >= Hc) return; const i = (y * Wc + x) * 4; buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = a; };
     const disc = (buf, cx, cy, rad, fn) => { const R2 = rad * rad; for (let y = Math.floor(cy - rad); y <= Math.ceil(cy + rad); y++) for (let x = Math.floor(cx - rad); x <= Math.ceil(cx + rad); x++) {
       const dx = x + .5 - cx, dy = y + .5 - cy, d2 = dx * dx + dy * dy; if (d2 <= R2) fn(x, y, dx / rad, dy / rad, d2 / R2); } };
@@ -157,7 +176,9 @@ const Arboles = (() => {
     for (const e of el) {
       const buf = capas[e.rama];
       if (e.t === 0) {   // rama: primero todo el contorno del tramo, después la corteza (luz de un lado, surcos a lo largo)
-        const sg = e.sg, [ax, ay] = PX(...sg.a), [bx, by] = PX(...sg.b), L = Math.hypot(bx - ax, by - ay), steps = Math.max(1, Math.ceil(L)), tx = (bx - ax) / (L || 1), ty = (by - ay) / (L || 1);
+        const sg = e.sg, [ax, ay] = P2(sg.a, e.rama), [bx, by] = P2(sg.b, e.rama), L = Math.hypot(bx - ax, by - ay), steps = Math.max(1, Math.ceil(L)), tx = (bx - ax) / (L || 1), ty = (by - ay) / (L || 1);
+        // una ramita (la de un racimo): una línea de 1 px de corteza, sin contorno (con el de una rama quedaba gruesa)
+        if (sg.fina) { for (let i = 0; i <= steps; i++) { const t = i / steps; put(buf, ax + (bx - ax) * t - x0, ay + (by - ay) * t - y0, BARK[2]); } continue; }
         const base = sg.rama === 0 && sg.a[2] === 0;
         for (const pase of [0, 1]) for (let i = 0; i <= steps; i++) { const t = i / steps, x = ax + (bx - ax) * t - x0, y = ay + (by - ay) * t - y0;
           const rad = Math.max(.7, (sg.r0 + (sg.r1 - sg.r0) * t) * SF * (base ? 1 + .4 * Math.pow(Math.max(0, 1 - t * 6), 2) : 1));
@@ -171,11 +192,11 @@ const Arboles = (() => {
       } else {           // roseta: centro oscuro y hojas en punta (contorno, cuerpo, punta clara del lado de la luz)
         // una que se cayó gasta el azar de sus hojas (el ángulo y el largo de cada una) sin pintar: las demás no cambian
         if (e.cayo) { for (let k = 0; k < 2 * e.n; k++) r(); continue; }
-        const [cx, cy] = PX(...e.p), X = cx - x0, Y = cy - y0, T = e.tono;
+        const [cx, cy] = P2(e.p, e.rama), X = cx - x0, Y = cy - y0, T = e.tono, gr = giros && giros[e.rama];
         disc(buf, X, Y, e.L * .32, (px, py) => put(buf, px, py, pal[Math.max(0, T - 2)]));
         const hojas = []; for (let k = 0; k < e.n; k++) { const a = e.rot + k / e.n * Math.PI * 2 + (r() - .5) * .5; hojas.push(a); }
         hojas.sort((p, q) => Math.sin(p) - Math.sin(q));                             // las que apuntan hacia abajo (hacia la cámara), al final
-        for (const a of hojas) hoja(buf, X, Y, Math.cos(a), Math.sin(a) * .78, e.L * (.85 + r() * .3), Math.max(1.2, e.L * .3), T, e.brillo && Math.sin(a) < .2);
+        for (const a of hojas) { const hx = Math.cos(a), hy = Math.sin(a) * .78; hoja(buf, X, Y, gr ? hx * gr.c - hy * gr.s : hx, gr ? hx * gr.s + hy * gr.c : hy, e.L * (.85 + r() * .3), Math.max(1.2, e.L * .3), T, e.brillo && Math.sin(a) < .2); }
       }
     }
     // tronco pintado a la cal ("<tipo>_c", árboles de vereda): la corteza del tronco, blanca hasta 1,2 m, con el borde de arriba
@@ -185,36 +206,93 @@ const Arboles = (() => {
       for (let y = Math.max(0, Math.floor(top - 3)); y < Hc; y++) for (let x = 0; x < Wc; x++) { const i = (y * Wc + x) * 4; if (!c0[i + 3]) continue;
         if (y < top + ((x * 7 + 3) % 5) - 2) continue;
         for (let k = 0; k < 5; k++) if (c0[i] === BARK[k][0] && c0[i + 1] === BARK[k][1] && c0[i + 2] === BARK[k][2]) { const c = CAL[k]; c0[i] = c[0]; c0[i + 1] = c[1]; c0[i + 2] = c[2]; break; } } }
-    // piezas: recortadas a su contenido, con el ancla en la base de la rama (el tronco, en el pie)
-    const bases = [[0, 0, 0]]; for (let i = 1; i <= n; i++) { const sg = segs.find(q => q.rama === i); bases.push(sg ? sg.a : [0, 0, 0]); }
-    const piezas = [];
-    capas.forEach((d, i) => {
-      let a = 1e9, b = 1e9, e = -1, f = -1;
-      for (let y = 0; y < Hc; y++) for (let x = 0; x < Wc; x++) if (d[(y * Wc + x) * 4 + 3]) { if (x < a) a = x; if (x > e) e = x; if (y < b) b = y; if (y > f) f = y; }
-      if (e < 0) return;
-      // contorno (contorno.js): 1 px por fuera, que a la escala del juego mide 0,6 px de mundo (más fino que el de los personajes:
-      // cada racimo ya trae su borde y con más grosor la copa quedaba recargada); en la base de una rama no, que sale de otra rama
+    return { capas, x0, y0, Wc, Hc };
+  }
+  // la base de cada capa (m): el pie del tronco, el arranque de cada rama, la cima desde lo alto del tronco
+  const basesDe = (sk) => { const B = [[0, 0, 0]]; for (let i = 1; i <= sk.n; i++) { const sg = sk.segs.find(q => q.rama === i); B.push(sg ? sg.a : [0, 0, 0]); } B.push(sk.cima); return B; };
+  // hacia dónde va cada rama en pantalla, desde su base: el ángulo y la distancia (px) al centro de sus tramos y racimos
+  function rumbos(sk) { const B = basesDe(sk), out = [];
+    for (let i = 1; i <= sk.n + 1; i++) { let sx = 0, sy = 0, k = 0; const sum = (q) => { const [x, y] = PX(...q); sx += x; sy += y; k++; };
+      for (const sg of sk.segs) if (sg.rama === i) { sum(sg.a); sum(sg.b); } for (const c of sk.racimos) if (c.rama === i) sum(c.c);
+      const [bx, by] = PX(...B[i]), dx = k ? sx / k - bx : 0, dy = k ? sy / k - by : -1;
+      out[i] = { ang: Math.atan2(dy, dx), d: Math.max(1, Math.hypot(dx, dy)) }; }
+    return out; }
+  // una capa recortada a su contenido, con el ancla en su base (b: m) y su contorno (contorno.js: 1 px por fuera, que a la escala
+  // del juego mide 0,6 px de mundo; en la base de una rama no, que sale de otra rama: r0, el grosor de la rama en su base)
+  function cortar(P, d, b, r0) { const { x0, y0, Wc, Hc } = P;
+    {
+      let a = 1e9, bb = 1e9, e = -1, f = -1;
+      for (let y = 0; y < Hc; y++) for (let x = 0; x < Wc; x++) if (d[(y * Wc + x) * 4 + 3]) { if (x < a) a = x; if (x > e) e = x; if (y < bb) bb = y; if (y > f) f = y; }
+      if (e < 0) return null;
       const T = typeof Contorno === "undefined" ? 0 : Math.max(1, Contorno.grosor(ESCALA) - 1);
-      const w = e - a + 1 + 2 * T, h = f - b + 1 + 2 * T, cut = document.createElement("canvas"); cut.width = w; cut.height = h;
-      const id = new ImageData(w, h); for (let y = 0; y < h - 2 * T; y++) id.data.set(d.subarray(((y + b) * Wc + a) * 4, ((y + b) * Wc + a + w - 2 * T) * 4), ((y + T) * w + T) * 4);
-      const [bx, by] = PX(...bases[i]), ux = bx - x0 - a + T, uy = by - y0 - b + T;
-      if (T) { const sg = segs.find(q => q.rama === i), R = i > 0 && sg ? sg.r0 * SF + T + 2 : 0;
-        Contorno.aplicar(id.data, w, h, T, R ? (x, y) => (x + .5 - ux) ** 2 + (y + .5 - uy) ** 2 < R * R : null); }
+      const w = e - a + 1 + 2 * T, h = f - bb + 1 + 2 * T, cut = document.createElement("canvas"); cut.width = w; cut.height = h;
+      const id = new ImageData(w, h); for (let y = 0; y < h - 2 * T; y++) id.data.set(d.subarray(((y + bb) * Wc + a) * 4, ((y + bb) * Wc + a + w - 2 * T) * 4), ((y + T) * w + T) * 4);
+      const [bx, by] = PX(...b), ux = bx - x0 - a + T, uy = by - y0 - bb + T;
+      if (T) { const R = r0 ? r0 * SF + T + 2 : 0; Contorno.aplicar(id.data, w, h, T, R ? (x, y) => (x + .5 - ux) ** 2 + (y + .5 - uy) ** 2 < R * R : null); }
       cut.getContext("2d").putImageData(id, 0, 0);
-      piezas.push({ canvas: cut, i, ax: ux / w, ay: uy / h, dx: bx, dy: by, w, h, prof: prof(...bases[i]), sway: i > 0 });
-    });
+      return { canvas: cut, ax: ux / w, ay: uy / h, w, h };
+    }
+  }
+  // ---- la librería de una especie: LIB ramas (de un esqueleto propio, con las ramas repartidas alrededor) y su cima, cada una con
+  // su nombre (<especie>_r<k>, <especie>_cima), su pieza y su largo en pantalla. Las ramas, paradas: su dibujo girado sobre su base
+  // hasta que va derecho para arriba (la caja más chica: el dueño, 12/11), antes de pintarlo (así el pixel art queda nítido); el
+  // juego las gira a su ángulo
+  const LIB = 4, ARRIBA = -Math.PI / 2, libs = new Map();
+  function libreria(esp) {
+    let L = libs.get(esp); if (L) return L;
+    const sk = esqueleto(esp + "_7", LIB), B = basesDe(sk), ru = rumbos(sk), giros = [];
+    for (let i = 1; i <= sk.n; i++) { const [x, y] = PX(...B[i]), th = ARRIBA - ru[i].ang; giros[i] = { x, y, c: Math.cos(th), s: Math.sin(th) }; }
+    const P = pintar(sk, esp + "_7", false, giros); L = [];
+    for (let i = 1; i <= sk.n + 1; i++) { const sg = sk.segs.find(q => q.rama === i), pz = cortar(P, P.capas[i], B[i], i <= sk.n && sg ? sg.r0 : 0);
+      if (pz) L.push({ nombre: esp + (i > sk.n ? "_cima" : "_r" + (i - 1)), cima: i > sk.n, ...pz, d: ru[i].d, ang: i > sk.n ? ru[i].ang : ARRIBA }); }
+    libs.set(esp, L); return L;
+  }
+  // ---- el tronco: uno solo para todos los árboles (la corteza es la misma), recto, de TRONCO_H m y TRONCO_R m de radio; cada árbol lo
+  // estira a su alto y su grosor. Con cal (los de vereda), otro
+  const TRONCO_H = 3, TRONCO_R = .22, troncos = new Map();
+  function troncoComun(cal) {
+    const k = cal ? "tronco_c" : "tronco"; let T = troncos.get(k); if (T) return T;
+    const segs = []; let p = [0, 0, 0], rad = TRONCO_R;
+    for (let i = 0; i < 3; i++) { const q = [0, 0, p[2] + TRONCO_H / 3]; segs.push({ a: p, b: q, r0: rad, r1: rad * .92, rama: 0 }); p = q; rad *= .92; }
+    const sk = { E: ESPECIES.fresno, segs, racimos: [], n: 0, r: R3.rng(0x7a3e), cima: p }, P = pintar(sk, cal ? "tronco_0_c" : "tronco_0", true);
+    T = { nombre: k, ...cortar(P, P.capas[0], [0, 0, 0], 0) }; troncos.set(k, T); return T;
+  }
+  const difAng = (a, b) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
+  // ---- un tipo de árbol: el tronco común, estirado a su alto y su grosor, y, de la librería de su especie, para cada rama la de largo
+  // más parecido, sin repetir si se puede, girada a su ángulo (las de la librería van paradas), una sí y una no en espejo, y estirada
+  // a su largo; la cima, la de la especie
+  function render(tipo) {
+    if (cache.has(tipo)) return cache.get(tipo);
+    const esp = tipo.split("_")[0], sk = esqueleto(tipo.replace(/_c$/, "")), B = basesDe(sk), ru = rumbos(sk), L = libreria(esp);
+    const piezas = [], tr = troncoComun(tipo.endsWith("_c"));
+    if (tr.canvas) { const [bx, by] = PX(...B[0]); piezas.push({ ...tr, i: 0, dx: bx, dy: by, prof: prof(...B[0]), sway: false, rot: 0, sx: sk.rad0 / TRONCO_R, sy: sk.troncoH / TRONCO_H }); }
+    const usadas = new Set(), semilla = [...tipo].reduce((a, ch) => a + ch.charCodeAt(0), 0);
+    for (let i = 1; i <= sk.n + 1; i++) { const cima = i > sk.n, q = ru[i]; let mejor = null;
+      for (const l of L) { if (l.cima !== cima) continue;
+        const d = Math.abs(Math.log(q.d / l.d)) + (usadas.has(l.nombre) ? .5 : 0);
+        if (!mejor || d < mejor.d) mejor = { l, esp2: cima || ((i + semilla) & 1) ? 1 : -1, ang: l.ang, d }; }
+      if (!mejor) continue; usadas.add(mejor.l.nombre);
+      const k = Math.max(.75, Math.min(1.3, q.d / mejor.l.d)), [bx, by] = PX(...B[i]);
+      piezas.push({ nombre: mejor.l.nombre, canvas: mejor.l.canvas, ax: mejor.l.ax, ay: mejor.l.ay, w: mejor.l.w, h: mejor.l.h, i, dx: bx, dy: by, prof: prof(...B[i]), sway: true,
+        rot: cima ? 0 : difAng(q.ang, mejor.ang), sx: mejor.esp2 * k, sy: k }); }
     // orden dentro del árbol: las ramas de atrás antes que el tronco, las de adelante después
     piezas.sort((p, q) => q.prof - p.prof || (p.i === 0 ? -1 : q.i === 0 ? 1 : 0));
     const it = piezas.findIndex(q => q.i === 0); piezas.forEach((p, k) => p.z = k - it);
-    // árbol completo (para el editor): las piezas superpuestas en ese orden
-    const full = document.createElement("canvas"); full.width = Wc; full.height = Hc; const fg = full.getContext("2d");
-    for (const p of piezas) fg.drawImage(p.canvas, Math.round(p.dx - x0 - p.ax * p.w), Math.round(p.dy - y0 - p.ay * p.h));
+    // árbol completo (para el editor y la silueta de la sombra): las piezas en ese orden, cada una girada, en espejo y estirada
+    // sobre su base. La caja: la de todas las piezas así puestas
+    let a0 = 1e9, b0 = 1e9, a1 = -1e9, b1 = -1e9;
+    for (const p of piezas) { const c = Math.cos(p.rot), s = Math.sin(p.rot);
+      for (const [u, v] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const lx = (u - p.ax) * p.w * p.sx, ly = (v - p.ay) * p.h * p.sy, X = p.dx + lx * c - ly * s, Y = p.dy + lx * s + ly * c;
+        a0 = Math.min(a0, X); a1 = Math.max(a1, X); b0 = Math.min(b0, Y); b1 = Math.max(b1, Y); } }
+    const fx0 = Math.floor(a0) - 1, fy0 = Math.floor(b0) - 1, Wc = Math.ceil(a1) + 1 - fx0, Hc = Math.ceil(b1) + 1 - fy0;
+    const full = document.createElement("canvas"); full.width = Wc; full.height = Hc; const fg = full.getContext("2d"); fg.imageSmoothingEnabled = false;
+    for (const p of piezas) { fg.save(); fg.translate(p.dx - fx0, p.dy - fy0); fg.rotate(p.rot); fg.scale(p.sx, p.sy); fg.drawImage(p.canvas, -p.ax * p.w, -p.ay * p.h); fg.restore(); }
     // versión a la escala del barrio (filtrada como la ve el juego), para el editor
     const vw = Math.max(1, Math.round(Wc * ESCALA)), vh = Math.max(1, Math.round(Hc * ESCALA)), vis = document.createElement("canvas"); vis.width = vw; vis.height = vh;
     const vg = vis.getContext("2d"); vg.imageSmoothingEnabled = true; vg.imageSmoothingQuality = "high"; vg.drawImage(full, 0, 0, vw, vh);
-    const res = { tipo, canvas: full, ox: -x0, oy: -y0, w: Wc, h: Hc, piezas, radio: segs[0].r0, escala: ESCALA, vista: { canvas: vis, ox: -x0 * ESCALA, oy: -y0 * ESCALA, w: vw, h: vh } };
+    const res = { tipo, canvas: full, ox: -fx0, oy: -fy0, w: Wc, h: Hc, piezas, radio: sk.segs[0].r0, escala: ESCALA, vista: { canvas: vis, ox: -fx0 * ESCALA, oy: -fy0 * ESCALA, w: vw, h: vh } };
     cache.set(tipo, res); return res;
   }
-  function clear() { cache.clear(); }
+  function clear() { cache.clear(); libs.clear(); troncos.clear(); }
   return { ESPECIES, TIPOS, ESCALA, pick, render, clear };
 })();

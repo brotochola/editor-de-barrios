@@ -59,6 +59,7 @@ const R3 = (() => {
     static fromPx(w, h, seed, col = [0, 0, 0], a = 0) { const t = new Tex(0.01, 0.01, seed); t.w = w; t.h = h; t.d = new Float32Array(w * h * 4);
       for (let i = 0; i < w * h; i++) { t.d[i * 4] = col[0]; t.d[i * 4 + 1] = col[1]; t.d[i * 4 + 2] = col[2]; t.d[i * 4 + 3] = a; } return t; }
     rect(x0, y0, x1, y1, c, a = 255) { x0 = Math.max(0, x0 | 0); y0 = Math.max(0, y0 | 0); x1 = Math.min(this.w, x1 | 0); y1 = Math.min(this.h, y1 | 0);
+      if (Tex.kit && this.fondo && Tex.kit.rect(this, x0, y0, x1, y1, c, a)) return;
       for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const i = (y * this.w + x) * 4; this.d[i] = c[0]; this.d[i + 1] = c[1]; this.d[i + 2] = c[2]; this.d[i + 3] = a; } }
     shade(x0, y0, x1, y1, f) { x0 = Math.max(0, x0 | 0); y0 = Math.max(0, y0 | 0); x1 = Math.min(this.w, x1 | 0); y1 = Math.min(this.h, y1 | 0);
       for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const i = (y * this.w + x) * 4; this.d[i] *= f; this.d[i + 1] *= f; this.d[i + 2] *= f; } }
@@ -68,7 +69,8 @@ const R3 = (() => {
     get(x, y) { const i = (y * this.w + x) * 4; return [this.d[i], this.d[i + 1], this.d[i + 2], this.d[i + 3]]; }
     // pega una pieza de fachada (R3.DECALS[name] = {w, h, d: RGBA bytes}) estirada a w×h, sin suavizar; devuelve false si no está
     // tint: recolorea conservando el sombreado (luminancia de cada pixel relativa a la media de la pieza)
-    blit(name, x, y, w, h, tint) { const im = DECALS[name]; if (!im) return false; x = Math.round(x); y = Math.round(y); w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+    blit(name, x, y, w, h, tint) { const im = DECALS[name]; if (!im) return false;
+      if (Tex.kit && this.fondo && Tex.kit.blit(this, name, x, y, w, h, tint)) return true; x = Math.round(x); y = Math.round(y); w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
       if (tint && im.L == null) { let s = 0, n = 0; for (let k = 0; k < im.d.length; k += 4) if (im.d[k + 3] >= 128) { s += .3 * im.d[k] + .59 * im.d[k + 1] + .11 * im.d[k + 2]; n++; } im.L = s / Math.max(1, n); }
       for (let j = 0; j < h; j++) { const yy = y + j; if (yy < 0 || yy >= this.h) continue; const sy = Math.min(im.h - 1, ((j + .5) * im.h / h) | 0);
         for (let i = 0; i < w; i++) { const xx = x + i; if (xx < 0 || xx >= this.w) continue; const sx = Math.min(im.w - 1, ((i + .5) * im.w / w) | 0), k = (sy * im.w + sx) * 4;
@@ -82,6 +84,11 @@ const R3 = (() => {
     crop(y0, y1) { y0 = Math.max(0, y0 | 0); y1 = Math.min(this.h, y1 | 0); const t = Tex.fromPx(this.w, Math.max(1, y1 - y0), 1); t.d.set(this.d.subarray(y0 * this.w * 4, y1 * this.w * 4)); t.r = this.r;
       if (this.fondo) { const f = []; for (const R of this.fondo) { const a = Math.max(R.y0, y0), b = Math.min(R.y1, y1); if (b > a) f.push({ ...R, y0: a - y0, y1: b - y0, dy: (R.dy || 0) + y0 }); }
         if (f.length) { t.fondo = f; if (this.capas) t.capas = this.capas.map(([k, a, b, o]) => [k, a, b, (o || 0) + (k === "runoff" ? y0 : this.h - y1)]); } }
+      // sus piezas de fachada (las que caen en el recorte: enteras, corridas; la pieza se recorta sola contra el borde de la cara)
+      if (this.blits && t.fondo) for (const b of this.blits) { if (b.y + b.h <= y0 || b.y >= y1) continue; (t.blits || (t.blits = [])).push({ ...b, y: b.y - y0 }); }
+      // y sus pintadas (las que caen en el recorte, cortadas a él)
+      if (this.pintadas && t.fondo) for (const p of this.pintadas) { const a = Math.max(p.y, y0), b = Math.min(p.y + p.h, y1); if (b <= a) continue;
+        const h = b - a, d = p.d.slice((a - p.y) * p.w * 4, (b - p.y) * p.w * 4); (t.pintadas || (t.pintadas = [])).push({ x: p.x, y: a - y0, w: p.w, h, d }); }
       return t; }
     // ---- materiales
     stucco(col, wear = 1, y0 = 0, y1 = this.h) {
@@ -181,7 +188,8 @@ const R3 = (() => {
         }
       }
     }
-    // la exportación por caras (houses.js, modo kit) pone acá { fondo(t, tipo, a, b, y0, y1), capa(t, tipo, a, b) }: el material de una
+    // la exportación por caras (houses.js, modo kit) pone acá { fondo(t, tipo, a, b, y0, y1), capa(t, tipo, a, b), rect(t, x0, y0, x1, y1, c, a) }
+    // (rect: un rectángulo del color de la pared por k es la pared oscurecida; blit: una pieza de fachada va aparte, escalada). El material de una
     // pared sale de una baldosa compartida y las manchas se anotan en vez de pintarse (caras.js las dibuja como piezas compartidas).
     // Devuelven false si no corresponde (una textura chica): entonces se pinta como siempre
     static kit = null;

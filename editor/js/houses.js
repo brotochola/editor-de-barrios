@@ -36,7 +36,8 @@ const Houses = (() => {
   // pieza de Gemini para cada estilo (si está cargada); si no, el dibujo procedural de siempre
   const pieza = (style, w, h) => style === "persiana" && h > px(1.8) && R3.DECALS.fd_persiana_madera ? "fd_persiana_madera" : style === "arco" ? "fd_ventana_arco" : style === "persiana" ? "fd_ventana_persiana" : style === "reja" ? "fd_ventana_reja" : style === "cerrado" ? null
     : h < px(.75) ? "fd_ventana_bano" : "fd_ventana_madera";
-  function windowDecal(t, x, y, w, h, style, wall) {
+  function windowDecal(t, x, y, w, h, style, wall) { return azarDe(t, x, y, w, h, 1 + style.length, () => windowDecal_(t, x, y, w, h, style, wall)); }
+  function windowDecal_(t, x, y, w, h, style, wall) {
     const pz = pieza(style, w, h);
     if (pz && R3.DECALS[pz]) { t.rect(x - 1, y - 1, x + w + 1, y + h + 1, mul(wall, .55)); reveal(t, x, y, w, h, wall); const rv = Math.max(2, Math.round(px(.09)));
       t.blit(pz, x + rv, y + rv + 1, w - rv * 2, h - rv - 1 + (pz === "fd_ventana_bano" ? 0 : Math.round(h * .06)));
@@ -58,7 +59,8 @@ const Houses = (() => {
   const abrePuertas = (t) => { PUERTAS = { t, l: [] }; };
   const cierraPuertas = () => { const k = px(1), l = PUERTAS ? PUERTAS.l.map(([a, b]) => [Math.round(a / k * 100) / 100, Math.round(b / k * 100) / 100]) : []; PUERTAS = null; return l; };
   const anotaPuerta = (t, x, w) => { if (PUERTAS && t === PUERTAS.t) PUERTAS.l.push([x, x + w]); };
-  function doorDecal(t, x, y, w, h, kind, wall) {
+  function doorDecal(t, x, y, w, h, kind, wall) { return azarDe(t, x, y, w, h, 20 + kind.length, () => doorDecal_(t, x, y, w, h, kind, wall)); }
+  function doorDecal_(t, x, y, w, h, kind, wall) {
     anotaPuerta(t, x, w);
     t.rect(x - 1, y - 1, x + w + 1, y + h, mul(wall, .5));
     if (R3.DECALS.fd_puerta_madera) { reveal(t, x, y, w, h, wall); const rv = Math.max(2, Math.round(px(.09))); x += rv; y += rv + 1; w -= rv * 2; h -= rv + 1; }
@@ -78,7 +80,8 @@ const Houses = (() => {
     t.p(x + w - 4, y + (h >> 1) + 2, [236, 206, 100]); t.p(x + w - 3, y + (h >> 1) + 2, [176, 146, 60]);
     const nx = x + w + 3; if (nx + 8 < t.w) { t.rect(nx, y + 6, nx + 8, y + 11, [40, 40, 46]); t.rect(nx + 1, y + 7, nx + 7, y + 10, [232, 232, 226]); for (const k of [2, 4, 6]) t.p(nx + k, y + 8, [40, 40, 46]); }
   }
-  function shutterDecal(t, x, y, w, h, up = 0) {
+  function shutterDecal(t, x, y, w, h, up = 0) { return azarDe(t, x, y, w, h, 40 + Math.round(up * 10), () => shutterDecal_(t, x, y, w, h, up)); }
+  function shutterDecal_(t, x, y, w, h, up = 0) {
     anotaPuerta(t, x, w);
     if (!up && t.blit("fd_persiana_local", x - 1, y - Math.round(h * .12), w + 2, h + Math.round(h * .12))) return;
     t.rect(x - 1, y - 3, x + w + 1, y, [104, 104, 102]); const top = y + ((h * up) | 0); t.rect(x, y, x + w, top, [26, 24, 24]);
@@ -87,7 +90,8 @@ const Houses = (() => {
     t.shade(x, y, x + 2, y + h, .7); t.shade(x + w - 2, y, x + w, y + h, .8);
     for (let i = 0; i < 3; i++) { const sx = t.r.int(x, x + w - 6); t.shade(sx, top, sx + 4, y + h, .93); }
   }
-  function portonDecal(t, x, y, w, h) { anotaPuerta(t, x, w); const c = t.r.pick([[36, 96, 66], [58, 78, 118], [126, 46, 36], [54, 54, 60], [196, 192, 182], [180, 140, 60]]);
+  function portonDecal(t, x, y, w, h) { return azarDe(t, x, y, w, h, 60, () => portonDecal_(t, x, y, w, h)); }
+  function portonDecal_(t, x, y, w, h) { anotaPuerta(t, x, w); const c = t.r.pick([[36, 96, 66], [58, 78, 118], [126, 46, 36], [54, 54, 60], [196, 192, 182], [180, 140, 60]]);
     if (t.blit("fd_porton", x, y, w, h, c[0] === 36 ? null : mul(c, 1.2))) return;
     for (let xx = x; xx < x + w; xx++) t.rect(xx, y, xx + 1, y + h, mul(c, [1.12, 1, .8, .94][(xx - x) % 4])); t.rect(x, y, x + w, y + 2, mul(c, .6)); t.rect(x + (w >> 1), y, x + (w >> 1) + 1, y + h, mul(c, .5)); t.shade(x, y, x + 2, y + h, .7); }
   function goodsDecal(t, x0, y0, x1, y1, shop) {
@@ -106,7 +110,7 @@ const Houses = (() => {
   // encima se dibuja en el juego con esa baldosa, compartida entre todas las casas (t.mat, t.limpia).
   let KIT = false; const MATS = new Map();
   const TEJAS = [[182, 84, 54], [170, 96, 64], [150, 72, 50]];   // colores de teja francesa
-  function setKit(v) { KIT = !!v; Tex.kit = KIT ? { fondo: fondoKit, capa: capaKit } : null; }
+  function setKit(v) { KIT = !!v; Tex.kit = KIT ? { fondo: fondoKit, capa: capaKit, rect: rectKit, blit: blitKit } : null; }
   const hashD = (d) => { let a = 0x811c9dc5; for (let i = 0; i < d.length; i++) a = Math.imul(a ^ (d[i] | 0), 16777619); return a >>> 0; };
   function baldosa(key, tw, th, make) { key += "@" + R3.DET; let m = MATS.get(key); if (!m) { m = { key, tw, th, tex: make(tw, th) }; MATS.set(key, m); } return m; }
   // una textura W × H hecha con la baldosa repetida: lo que se ve en el editor; la cara limpia la arma el exportador
@@ -128,7 +132,7 @@ const Houses = (() => {
     const key = tipo + (tipo === "brick" ? ":" + a.map(Math.round).join(",") : tipo === "concrete" ? ":" + Math.round(b * 4) / 4 : "") + "@" + DET;
     let m = MUROS.get(key); if (m) return m;
     let sem = 0x51ed27; for (let i = 0; i < key.length; i++) sem = Math.imul(sem ^ key.charCodeAt(i), 16777619);
-    const r = rng(sem >>> 0), W0 = px(6), H0 = px(3.6), V = R3.vnoiseCiclico;
+    const r = rng(sem >>> 0), W0 = px(6), H0 = px(3), V = R3.vnoiseCiclico;   // (6 m de ancho: con 3, las piezas pasaban el tope de decoraciones de WeedJS)
     let w = W0, h = H0, d;
     const cada = (f) => { d = new Float32Array(w * h * 3); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const c = f(x, y, y * w + x), o = (y * w + x) * 3; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; } };
     if (tipo === "stucco") {   // Tex.stucco sin el degradé de arriba abajo ni las chorreaduras (ésas van aparte: runoff)
@@ -180,6 +184,30 @@ const Houses = (() => {
     (t.fondo || (t.fondo = [])).push({ m, col: col ? col.slice() : null, y0, y1 });
     return true;
   }
+  // la región de fondo de una fila (la última que la cubre) y lo que la baldosa puso en un texel
+  const regionDe = (t, y) => { let R = null; for (const q of t.fondo) if (y >= q.y0 && y < q.y1) R = q; return R; };
+  // en una pared de material compartido, un rectángulo del color de la pared por k (mul(wall, k): el vano y el marco de una ventana,
+  // un zócalo oscuro) es la pared misma oscurecida (o aclarada) por k: caras.js lo guarda como sombra (negro translúcido), que sirve
+  // sobre cualquier color de pared. Si no es parejo (otro color, o el rectángulo cruza regiones de colores distintos), como siempre
+  function rectKit(t, x0, y0, x1, y1, c, a) {
+    if (!KIT || a !== 255 || x1 <= x0 || y1 <= y0) return false;
+    let col = null; for (let y = y0; y < y1; y++) { const R = regionDe(t, y); if (!R || !R.col) return false; if (!col) col = R.col; else if (R.col[0] !== col[0] || R.col[1] !== col[1] || R.col[2] !== col[2]) return false; }
+    const k = c[0] / col[0]; if (!(k > 0 && k < 1.25) || Math.abs(c[1] / col[1] - k) > .012 || Math.abs(c[2] / col[2] - k) > .012) return false;
+    for (let y = y0; y < y1; y++) { const R = regionDe(t, y), m = R.m, fila = ((y + (R.dy || 0)) % m.h) * m.w;
+      for (let x = x0; x < x1; x++) { const j = (fila + x % m.w) * 3, i = (y * t.w + x) * 4; t.d[i] = col[0] * m.d[j] * k; t.d[i + 1] = col[1] * m.d[j + 1] * k; t.d[i + 2] = col[2] * m.d[j + 2] * k; t.d[i + 3] = 255; } }
+    return true;
+  }
+  // en modo kit, una pieza de fachada (Gemini: ventanas, puertas, frentes de local, cortinas) pegada en una pared de material no se
+  // pinta: se anota (t.blits: cuál, dónde, de qué tamaño, su tinte) y caras.js la pone como pieza propia que usa la imagen original
+  // una sola vez, escalada a cada uso
+  function blitKit(t, name, x, y, w, h, tint) { if (!KIT) return false;
+    (t.blits || (t.blits = [])).push({ name, x: Math.round(x), y: Math.round(y), w: Math.max(1, Math.round(w)), h: Math.max(1, Math.round(h)), tint: tint ? tint.map(Math.round) : null }); return true; }
+  // en modo kit, cada ventana, puerta, cortina o portón de una pared de material saca su azar de su tamaño, su clase y una de VAR_DIB
+  // variantes (por dónde está), no del sorteo de la casa: el mismo dibujo se repite igual y va una sola vez al atlas (caras.js)
+  const VAR_DIB = 3;
+  function azarDe(t, x, y, w, h, k, fn) { if (!KIT || !t.fondo) return fn(); const r0 = t.r;
+    t.r = rng(((Math.round(w) * 73856093) ^ (Math.round(h) * 19349663) ^ (k * 83492791) ^ (((((Math.round(x) * 7 + Math.round(y) * 13) % VAR_DIB) + VAR_DIB) % VAR_DIB + 1) * 2654435761)) >>> 0);
+    try { return fn(); } finally { t.r = r0; } }
   // las manchas de una pared de material compartido: se anotan (caras.js las pone encima como piezas compartidas)
   function capaKit(t, tipo, a, b) { if (!KIT || !t.fondo) return false; (t.capas || (t.capas = [])).push([tipo, a, b, 0]); return true; }
   const acc = (sc, a) => { (sc.acc || (sc.acc = [])).push(a); };
@@ -188,7 +216,17 @@ const Houses = (() => {
     try { if (a.tipo === "tanque") tank(sc, 0, 0, 0, a.seed, a.kind, true); else if (a.tipo === "aire") ac(sc, 0, 0, 0, a.seed, a.wall, a.back);
       else if (a.tipo === "antena") antenna(sc, 0, 0, 0); else if (a.tipo === "maceta") plant(sc, 0, 0, 0, a.seed, a.big); } finally { KIT = k; }
     return sc; }
-  function pintada(t, x0, x1, y, r) { return typeof Graffiti !== "undefined" ? Graffiti.pintar(t, x0, x1, y, r, CTX) : false; }
+  // en modo kit, en una pared de material compartido, la pintada va en una capa aparte (t.pintadas: su recuadro y sus pixeles con
+  // alfa) y caras.js la pone como pieza propia: la misma pintada, en muchas paredes, va una sola vez al atlas
+  function pintada(t, x0, x1, y, r) { if (typeof Graffiti === "undefined") return false;
+    if (!KIT || !t.fondo) return Graffiti.pintar(t, x0, x1, y, r, CTX);
+    const L = Tex.fromPx(t.w, t.h, 1); if (!Graffiti.pintar(L, x0, x1, y, r, { ...CTX, capa: t })) return false;
+    let a = t.w, b = t.h, e = -1, f = -1;
+    for (let yy = 0; yy < t.h; yy++) for (let xx = 0; xx < t.w; xx++) if (L.d[(yy * t.w + xx) * 4 + 3] > 0) { if (xx < a) a = xx; if (xx > e) e = xx; if (yy < b) b = yy; if (yy > f) f = yy; }
+    if (e < 0) return true;
+    const w = e - a + 1, h = f - b + 1, d = new Uint8ClampedArray(w * h * 4);
+    for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { const i = ((b + yy) * t.w + a + xx) * 4, o = (yy * w + xx) * 4; d[o] = L.d[i]; d[o + 1] = L.d[i + 1]; d[o + 2] = L.d[i + 2]; d[o + 3] = L.d[i + 3]; }
+    (t.pintadas || (t.pintadas = [])).push({ x: a, y: b, w, h, d }); return true; }
   function rejaTex(wm, hm, seed) { const t = new Tex(wm, hm, seed, [0, 0, 0], 0), c = [24, 24, 28];
     for (let x = 1; x < t.w; x += 4) t.rect(x, 0, x + 1, t.h, c); for (const y of [1, t.h >> 1, t.h - 2]) t.rect(0, y, t.w, y + 1, c); for (let x = 1; x < t.w; x += 4) { t.p(x - 1, 3, c); t.p(x + 1, 3, c); } return t; }
   // textura hecha de una pieza de Gemini (lo demás transparente), para usarla en una cara 3D (rejas, barandas de hierro)
@@ -433,8 +471,8 @@ const Houses = (() => {
     } else {   // tejas
       const c = r.pick(TEJAS), ridge = zr + 1.9;
       const base = (w, h, s) => { const t = new Tex(w, h, s); for (let yy = 0; yy < t.h; yy++) for (let xx = 0; xx < t.w; xx++) { const lx = (xx + ((yy / 4) | 0) * 3) % 6, f = 1.12 - .07 * (yy % 4) - (lx === 0 ? .22 : 0) + (lx === 2 || lx === 3 ? .08 : 0); t.p(xx, yy, mul(c, f * (.92 + .12 * t.r()))); } return t; };
-      // horneado en piezas: un paño de tejas de 6 × 6,4 m por color, compartido por todos los techos (6,4 m: las hileras
-      // corridas se repiten cada 8 px a 30 px/m)
+      // horneado en piezas: un paño de tejas de 6 × 6,4 m por color, compartido por todos los techos (3,2 m: las hileras
+      // corridas se repiten cada 8 px a 30 px/m; más chico, las piezas pasaban el tope de decoraciones de WeedJS)
       const mk = (s) => KIT ? deBaldosa(W + .6, D / 2 + .5, baldosa("tejas:" + TEJAS.indexOf(c), 6, 6.4, (tw, th) => base(tw, th, 7001 + TEJAS.indexOf(c) * 13)), s) : base(W + .6, D / 2 + .5, s);
       sc.quad([-.3, y0 + D / 2, ridge], [W + .6, 0, 0], [0, -(D / 2 + .5), -(ridge - zr + .15)], mk(spec.seed + 6));
       sc.quad([W + .3, y0 + D / 2, ridge], [-(W + .6), 0, 0], [0, D / 2 + .5, -(ridge - zr + .15)], mk(spec.seed + 7));

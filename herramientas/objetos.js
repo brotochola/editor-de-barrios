@@ -117,6 +117,7 @@ rol(['u_cesto', 'u_cesto_b', 'canasto_0', 'canasto_1', 'canasto_2'], [['TACHO', 
 rol(['bolsas_0', 'bolsas_1'], [['BOLSAS', 1]]);
 rol(['b_bolsones'], [['ARENA', 1]]);
 rol(['obra_material'], [['MADERAS', 2], ['ARENA', 1], ['ESCOMBRO', .5]]);
+rol(['escombro'], [['Y_PIEDRA', 2], ['ESCOMBRO', 1], ['ARENA', .5]]);   // los baldíos: piedras, escombro, arena
 rol(['u_valla'], [['CABALLETE', 1]]);
 rol(['chango', 'b_chango_vacio', 'carro_cartonero'], [['CHANGO', 1]]);
 rol(['garrafa'], [['GARRAFA', 1]]);
